@@ -64,7 +64,7 @@ var errCommKey = errors.New("الجهاز رفض الاتصال: عليه كلم
 func dialZK(ip string, port int, commKey uint32, timeout time.Duration) (*zkClient, error) {
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, strconv.Itoa(port)), timeout)
 	if err != nil {
-		return nil, fmt.Errorf("ما گدرت أتصل بالجهاز %s:%d (%v)", ip, port, err)
+		return nil, fmt.Errorf("ما گدرت أتصل بالجهاز %s:%d (%v)%s", ip, port, err, connectHint)
 	}
 	// انتظار رد الجهاز أطول من مهلة الاتصال، لأن الأجهزة المشغولة (أو الشبكة البطيئة) تتأخر أحياناً بالبيانات الكبيرة
 	c := &zkClient{conn: conn, r: bufio.NewReaderSize(conn, 1<<16), replyID: ushrtMax - 1, timeout: 2 * timeout}

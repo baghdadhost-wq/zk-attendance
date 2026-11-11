@@ -21,6 +21,7 @@ func Start(dataDir, timeZone string) (string, error) {
 		}
 	}
 	server.Configure(dataDir, false)
+	server.SetConnectHint(". بالآيفون والآيباد: تأكد إن الجهاز على نفس الواي فاي، وإن التطبيق مسموحله بالشبكة المحلية (الإعدادات ← الحضور ← الشبكة المحلية)")
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", err

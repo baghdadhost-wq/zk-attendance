@@ -29,6 +29,11 @@ func Configure(dir string, demo bool) {
 	demoMode = demo
 }
 
+var connectHint string
+
+// SetConnectHint نص يضاف لرسالة الخطأ إذا ما گدر يتصل بالجهاز (مثلاً تنبيه إذن الشبكة المحلية بالآيفون)
+func SetConnectHint(s string) { connectHint = s }
+
 // DataDir مجلد البيانات الحالي
 func DataDir() string { return dataDir }
 
