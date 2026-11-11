@@ -66,7 +66,8 @@ func dialZK(ip string, port int, commKey uint32, timeout time.Duration) (*zkClie
 	if err != nil {
 		return nil, fmt.Errorf("ما گدرت أتصل بالجهاز %s:%d (%v)", ip, port, err)
 	}
-	c := &zkClient{conn: conn, r: bufio.NewReaderSize(conn, 1<<16), replyID: ushrtMax - 1, timeout: timeout}
+	// انتظار رد الجهاز أطول من مهلة الاتصال، لأن الأجهزة المشغولة (أو الشبكة البطيئة) تتأخر أحياناً بالبيانات الكبيرة
+	c := &zkClient{conn: conn, r: bufio.NewReaderSize(conn, 1<<16), replyID: ushrtMax - 1, timeout: 2 * timeout}
 	code, _, err := c.send(cmdConnect, nil)
 	if err != nil {
 		conn.Close()

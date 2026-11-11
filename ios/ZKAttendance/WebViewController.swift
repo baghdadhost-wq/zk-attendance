@@ -229,9 +229,10 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
           try {
             post({ loaded: document.title });
             el('ip').value = '\(ip)';
+            var t0 = Date.now();
             el('fetchBtn').click();
-            await until(function () { return /^(تم|تعذر)/.test(el('status').textContent); });
-            post({ fetch: el('status').textContent });
+            await until(function () { return /^(تم|تعذر)/.test(el('status').textContent); }, 60000);
+            post({ fetch: el('status').textContent, fetchMs: Date.now() - t0 });
             var t = await (await fetch('/api/cmd', { method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ip: '\(ip)', port: 4370, action: 'getTime' }) })).json();
             post({ goTime: t.pcTime || t.error, jsTime: new Date().toString(), jsZone: Intl.DateTimeFormat().resolvedOptions().timeZone });

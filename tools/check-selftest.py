@@ -20,7 +20,9 @@ for path in sys.argv[1:]:
         js_min = int(m.group(1)) * 60 + int(m.group(2))
         go_min = int(g[11:13]) * 60 + int(g[14:16])
         checks['program time matches phone time zone'] = abs(js_min - go_min) <= 2 or abs(js_min - go_min) >= 1438
-    print(f'\n{path}  (zone: {r.get("jsZone")}, program time {g}, phone time {r.get("jsTime", "")[:24]})')
+    print(f'\n{path}  (zone: {r.get("jsZone")}, program time {g}, phone time {r.get("jsTime", "")[:24]}, pull took {r.get("fetchMs")} ms)')
+    if r.get('jsZone') != 'Asia/Baghdad':
+        print('  NOTE  simulator is not on Baghdad time, so the time-zone check is weaker')
     for name, passed in checks.items():
         print(('  PASS  ' if passed else '  FAIL  ') + name)
         ok &= passed

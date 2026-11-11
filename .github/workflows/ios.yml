@@ -8,6 +8,9 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  contents: write
+
 jobs:
   ios:
     runs-on: macos-latest
@@ -59,8 +62,25 @@ jobs:
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/sim \
             CODE_SIGNING_ALLOWED=NO -quiet build
 
+      - name: Use Baghdad time zone (so the time test is meaningful)
+        run: |
+          sudo systemsetup -settimezone Asia/Baghdad || sudo ln -sf /usr/share/zoneinfo/Asia/Baghdad /etc/localtime
+          date
+
       - name: Test on iPhone and iPad simulators
         run: bash tools/ios-sim-test.sh
+
+      - name: Publish IPA and test results to the ci-results branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [ -d out ] || exit 0
+          cd out
+          git init -q -b ci-results
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "Build ${GITHUB_SHA::7} (run ${GITHUB_RUN_ID})"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-results
 
       - uses: actions/upload-artifact@v4
         if: always()
