@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تقارير الحضور - جهاز البصمة</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#16212e">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="الحضور">
+<style>
+  :root { --bg:#f4f6f8; --card:#fff; --line:#e3e7eb; --text:#1d2733; --muted:#6b7682; --accent:#1f6feb; --ok:#1a7f37; --warn:#b35900; --bad:#c62828; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Tahoma, "Segoe UI", Arial, sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  header { background:#16212e; color:#fff; padding:14px 22px; display:flex; align-items:center; justify-content:space-between; }
+  header h1 { margin:0; font-size:18px; }
+  header small { color:#9fb0c2; }
+  main { max-width:1200px; margin:0 auto; padding:18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
+  .card h2 { margin:0 0 10px; font-size:15px; }
+  .row { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+  input, select { padding:7px 9px; border:1px solid var(--line); border-radius:6px; font:inherit; color:var(--text); min-width:110px; }
+  button { padding:8px 14px; border:1px solid var(--line); background:#fff; border-radius:6px; font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.6; cursor:wait; }
+  button.danger { color:var(--bad); border-color:#f1c4c4; }
+  .ctl { padding:10px 0; border-top:1px dashed var(--line); }
+  .ctl:first-of-type { border-top:none; padding-top:0; }
+  .ctl-label { font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:bold; }
+  .hint { font-size:11px; color:var(--muted); margin-top:6px; }
+  .info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:6px 18px; margin-top:12px; }
+  .info-grid div { display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid var(--line); padding:5px 0; }
+  .info-grid span { color:var(--muted); } .info-grid b { font-weight:normal; direction:ltr; }
+  .bars { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px 18px; margin-top:14px; }
+  .bar-top { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
+  .bar { height:8px; background:#edf0f3; border-radius:4px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--accent); }
+  .bar i.high { background:var(--warn); }
+  button.small { padding:4px 10px; font-size:12px; }
+  .overlay { position:fixed; inset:0; background:rgba(16,24,34,.45); display:none; align-items:center; justify-content:center; z-index:10; }
+  .overlay.open { display:flex; }
+  .modal { background:#fff; border-radius:10px; padding:18px 20px; width:min(660px, 94vw); max-height:92vh; overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.2); }
+  .sec-title { font-weight:bold; font-size:13px; margin:14px 0 8px; padding-top:10px; border-top:1px solid var(--line); }
+  .pgrid { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
+  .pgrid .wide { grid-column:1 / -1; }
+  .modal textarea { width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:6px; font:inherit; resize:vertical; }
+  .tools { display:flex; gap:12px; flex-wrap:wrap; }
+  #tabStatus { font-size:13px; margin:0 0 10px; }
+  @media (max-width:560px) { .pgrid { grid-template-columns:1fr; } }
+  .modal h3 { margin:0 0 4px; font-size:16px; }
+  .modal .sub { color:var(--muted); font-size:12px; margin-bottom:14px; }
+  .modal label { margin-bottom:10px; }
+  .modal input, .modal select { width:100%; }
+  .modal .actions { display:flex; gap:8px; justify-content:flex-start; margin-top:6px; }
+  #editStatus { font-size:13px; margin-top:10px; min-height:18px; }
+  #status { margin-top:10px; font-size:13px; }
+  .err { color:var(--bad); } .okc { color:var(--ok); }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  .stat b { display:block; font-size:22px; margin-top:4px; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:10px; }
+  .tabs button { border:none; border-bottom:2px solid transparent; border-radius:0; background:none; color:var(--muted); }
+  .tabs button.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:bold; }
+  .tablewrap { overflow:auto; max-height:60vh; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { padding:7px 9px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  th { background:#f8fafb; position:sticky; top:0; font-size:12px; color:var(--muted); }
+  td.num { font-variant-numeric: tabular-nums; }
+  .tag { padding:2px 7px; border-radius:10px; font-size:11px; }
+  .t-late { background:#fff1e0; color:var(--warn); } .t-miss { background:#fde8e8; color:var(--bad); } .t-ok { background:#e6f4ea; color:var(--ok); }
+  .empty { color:var(--muted); padding:30px; text-align:center; }
+  /* شاشات الموبايل */
+  @media (max-width: 640px) {
+    main { padding: 10px; }
+    header { padding: 12px 14px; }
+    header h1 { font-size: 16px; }
+    .card { padding: 12px; }
+    input, select, textarea, button { font-size: 16px; } /* يمنع الآيفون يكبّر الشاشة وقت الكتابة */
+    .row > label { flex: 1 1 140px; }
+    .row > label input, .row > label select { width: 100%; min-width: 0 !important; }
+    .row > button, .tools > button { flex: 1 1 auto; }
+    .tabs { overflow-x: auto; white-space: nowrap; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .stat b { font-size: 18px; }
+    .info-grid, .bars { grid-template-columns: 1fr; }
+  }
+  @media print {
+    header, .no-print, .tabs { display:none !important; }
+    body { background:#fff; } .card { border:none; padding:0; } .tablewrap { max-height:none; overflow:visible; }
+    #printTitle { display:block !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>تقارير الحضور والانصراف</h1>
+  <div><small id="deviceInfo">غير متصل</small><a id="logoutLink" href="/logout" style="display:none;color:#9fb0c2;font-size:13px;margin-right:14px">خروج</a></div>
+</header>
+<main>
+  <section class="card no-print">
+    <h2>الاتصال بالجهاز</h2>
+    <div class="row">
+      <label>عنوان IP للجهاز <input id="ip" value="192.168.1.201"></label>
+      <label>المنفذ <input id="port" type="number" value="4370" style="min-width:80px"></label>
+      <label>كلمة سر الاتصال <bdi dir="ltr">(Comm Key)</bdi> <input id="commKey" type="password" inputmode="numeric" placeholder="0 = بدون" style="min-width:110px"></label>
+      <button class="primary" id="fetchBtn">سحب البيانات من الجهاز</button>
+      <button id="loadFileBtn">فتح نسخة محفوظة</button>
+      <button id="saveFileBtn">حفظ نسخة</button>
+      <input type="file" id="fileInput" accept=".json" hidden>
+    </div>
+    <div id="status"></div>
+  </section>
+
+  <section class="card no-print">
+    <h2>التحكم بالجهاز</h2>
+    <div class="ctl">
+      <div class="ctl-label">المعلومات والوقت</div>
+      <div class="row">
+        <button data-cmd="info">معلومات الجهاز والذاكرة</button>
+        <button data-cmd="getTime">قراءة وقت الجهاز</button>
+        <button data-cmd="syncTime">مزامنة الوقت مع الحاسبة</button>
+        <button data-cmd="refresh">تحديث بيانات الجهاز</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <div class="ctl-label">الباب والصوت</div>
+      <div class="row">
+        <label>مدة فتح الباب (ثانية) <input type="number" id="unlockSec" value="5" min="1" max="60" style="min-width:70px"></label>
+        <button data-cmd="unlock">فتح الباب</button>
+        <label>الصوت
+          <select id="voiceIdx">
+            <option value="0">0 - شكراً (Thank you)</option>
+            <option value="1">1 - كلمة السر غير صحيحة</option>
+            <option value="2">2 - الدخول مرفوض</option>
+            <option value="3">3 - رقم غير صالح</option>
+            <option value="4">4 - حاول مرة أخرى</option>
+            <option value="5">5 - رقم مكرر</option>
+            <option value="7">7 - الذاكرة ممتلئة</option>
+            <option value="8">8 - بصمة إصبع مكررة</option>
+            <option value="9">9 - تسجيل حضور مكرر</option>
+            <option value="10">10 - صفارة</option>
+            <option value="11">11 - صفارة إنذار</option>
+            <option value="13">13 - جرس</option>
+            <option value="20">20 - البصمة غير مسجلة</option>
+            <option value="21">21 - كلمة السر غير مسجلة</option>
+            <option value="22">22 - البطاقة غير مسجلة</option>
+            <option value="23">23 - الوجه غير مسجل</option>
+            <option value="24">24 - صفارة عادية</option>
+            <option value="30">30 - مستخدم غير صالح</option>
+            <option value="31">31 - خارج الوقت المسموح</option>
+            <option value="33">33 - دخول غير مسموح</option>
+            <option value="34">34 - مساحة التخزين ممتلئة</option>
+            <option value="51">51 - ركّز عينيك على المربع الأخضر</option>
+          </select>
+        </label>
+        <button data-cmd="testVoice">تشغيل الصوت</button>
+      </div>
+      <div class="hint">أسماء الأصوات من توثيق مكتبة pyzk، وقد تختلف حسب إصدار الجهاز.</div>
+    </div>
+    <div class="ctl">
+      <div class="ctl-label">رسالة على الشاشة</div>
+      <div class="row">
+        <label>النص <input id="lcdText" maxlength="40" placeholder="مثال: اجتماع الساعة 10" style="min-width:220px"></label>
+        <button data-cmd="lcdWrite">عرض على الشاشة</button>
+        <button data-cmd="lcdClear">مسح الشاشة</button>
+      </div>
+      <div class="hint">هذا الأمر مصمم لشاشات الأجهزة القديمة، وممكن شاشة iFace ما تعرض النص.</div>
+    </div>
+    <div class="ctl">
+      <div class="ctl-label">حالة الجهاز</div>
+      <div class="row">
+        <button data-cmd="disable">إيقاف البصمة مؤقتاً</button>
+        <button data-cmd="enable">إعادة تفعيل البصمة</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <div class="ctl-label">تحتاج تأكيد</div>
+      <div class="row">
+        <button data-cmd="restart" class="danger">إعادة تشغيل الجهاز</button>
+        <button data-cmd="powerOff" class="danger">إطفاء الجهاز</button>
+        <button data-cmd="clearLogs" class="danger">مسح سجل البصمات (بعد حفظ نسخة)</button>
+      </div>
+    </div>
+    <div id="cmdStatus" style="margin-top:12px;font-size:13px"></div>
+    <div id="infoPanel"></div>
+  </section>
+
+  <section class="card no-print">
+    <h2>إعدادات الدوام والتصفية</h2>
+    <div class="row">
+      <label>من تاريخ <input type="date" id="from"></label>
+      <label>إلى تاريخ <input type="date" id="to"></label>
+      <label>الموظف <select id="emp"><option value="">الكل</option></select></label>
+      <label>القسم <select id="dept"><option value="">كل الأقسام</option></select></label>
+      <label>بداية الدوام <input type="time" id="start" value="08:00"></label>
+      <label>نهاية الدوام <input type="time" id="end" value="14:00"></label>
+      <label>سماحية التأخير (دقيقة) <input type="number" id="grace" value="10" style="min-width:80px"></label>
+      <label>العطلة الأسبوعية
+        <select id="weekend">
+          <option value="5">الجمعة</option><option value="5,6">الجمعة والسبت</option>
+          <option value="6">السبت</option><option value="0">الأحد</option><option value="">بدون</option>
+        </select>
+      </label>
+      <label>تجاهل البصمة المكررة خلال (دقيقة) <input type="number" id="dedup" value="3" style="min-width:80px"></label>
+    </div>
+  </section>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="card" style="margin-top:14px">
+    <div id="printTitle" style="display:none"><h2 id="printTitleText"></h2></div>
+    <div class="tabs">
+      <button data-tab="daily" class="active">التقرير اليومي</button>
+      <button data-tab="summary">ملخص الموظفين</button>
+      <button data-tab="raw">سجل البصمات</button>
+      <button data-tab="users">الموظفون</button>
+    </div>
+    <div class="row no-print" style="margin-bottom:10px">
+      <button id="csvBtn">تصدير Excel (CSV)</button>
+      <button id="printBtn">طباعة / PDF</button>
+      <div class="tools" id="usersTools" style="display:none">
+        <button id="profExportBtn">تصدير كل بيانات الموظفين</button>
+        <button id="profImportBtn">استيراد من Excel (CSV)</button>
+        <button id="mdbImportBtn">استيراد من برنامج ZKTeco القديم (att2000.mdb)</button>
+        <input type="file" id="profFile" accept=".csv,.txt" hidden>
+        <input type="file" id="mdbFile" accept=".mdb" hidden>
+      </div>
+    </div>
+    <div id="tabStatus" class="no-print"></div>
+    <div class="tablewrap" id="tableArea"><div class="empty">اسحب البيانات من الجهاز أولاً</div></div>
+  </section>
+</main>
+
+<div class="overlay no-print" id="editOverlay">
+  <div class="modal" role="dialog" aria-labelledby="editTitle">
+    <h3 id="editTitle">تعديل موظف</h3>
+    <div class="sub" id="editSub"></div>
+    <div id="devSection">
+    <div class="sec-title" style="border-top:none;padding-top:0;margin-top:0">بيانات الجهاز</div>
+    <label>الاسم بالجهاز <input id="editName" maxlength="40"></label>
+    <div class="hint" id="editBytes" style="margin:-6px 0 10px"></div>
+    <label>رقم البطاقة (0 = بدون بطاقة) <input id="editCard" inputmode="numeric"></label>
+    <label>ترميز الأسماء بالجهاز
+      <select id="editEnc">
+        <option value="auto">تلقائي (حسب الأسماء الموجودة بالجهاز)</option>
+        <option value="utf8">UTF-8 (الأجهزة الحديثة)</option>
+        <option value="cp1256">Windows-1256 (عربي، أجهزة قديمة)</option>
+      </select>
+    </label>
+    <div class="hint">رقم الموظف والصلاحية وكلمة السر والبصمات والوجه ما تتغير. البرنامج يحفظ نسخة من كل الموظفين قبل التعديل، ويتأكد من الحفظ بعده.</div>
+    </div>
+    <div class="hint" id="devNote" style="display:none"></div>
+    <div class="sec-title">بيانات إضافية (تنحفظ بالحاسبة، مو بالجهاز)</div>
+    <div class="pgrid">
+      <label>الاسم الكامل (للتقارير) <input data-pf="fullName"></label>
+      <label>القسم <input data-pf="department" list="deptList"></label>
+      <label>العنوان الوظيفي <input data-pf="title"></label>
+      <label>الجنس <select data-pf="gender"><option value=""></option><option>ذكر</option><option>أنثى</option></select></label>
+      <label>الهاتف المحمول <input data-pf="mobile" inputmode="tel" dir="ltr"></label>
+      <label>هاتف العمل <input data-pf="officePhone" inputmode="tel" dir="ltr"></label>
+      <label>هاتف المنزل <input data-pf="homePhone" inputmode="tel" dir="ltr"></label>
+      <label>رقم الهوية <input data-pf="nationalId" dir="ltr"></label>
+      <label>تاريخ الميلاد <input type="date" data-pf="birthday"></label>
+      <label>تاريخ التعيين <input type="date" data-pf="hireDate"></label>
+      <label class="wide">العنوان <input data-pf="address"></label>
+      <label class="wide">ملاحظات <textarea data-pf="notes" rows="2"></textarea></label>
+    </div>
+    <datalist id="deptList"></datalist>
+    <div id="editStatus"></div>
+    <div class="actions">
+      <button class="primary" id="editSave">حفظ</button>
+      <button id="editCancel">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+// وضع الشبكة: إذا انتهت الجلسة نرجع لصفحة الدخول
+const _fetch = window.fetch.bind(window);
+window.fetch = async (...args) => { const r = await _fetch(...args); if (r.status === 401) location.href = '/login'; return r; };
+fetch('/api/session').then(r => r.json()).then(j => { if (j.auth) $('logoutLink').style.display = ''; }).catch(() => {});
+// يخلي البرنامج يتثبت كتطبيق على الشاشة الرئيسية
+if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
+let DATA = null;          // { info, users, logs }
+let currentTab = 'daily';
+let lastTable = null;     // { headers, rows } للتصدير
+
+// ---------- حفظ الإعدادات ----------
+const SETTINGS = ['ip','port','commKey','start','end','grace','weekend','dedup','unlockSec','voiceIdx'];
+function saveSettings() { try { const s={}; SETTINGS.forEach(k=>s[k]=$(k).value); localStorage.setItem('zkSettings', JSON.stringify(s)); } catch(_){} }
+function loadSettings() { try { const s=JSON.parse(localStorage.getItem('zkSettings')||'{}'); SETTINGS.forEach(k=>{ if(s[k]!==undefined) $(k).value=s[k]; }); } catch(_){} }
+
+// ---------- أدوات ----------
+const pad = (n) => String(n).padStart(2,'0');
+const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const hhmm = (d) => d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '';
+const toMin = (t) => { const [h,m]=t.split(':').map(Number); return h*60+m; };
+const fmtDur = (min) => { if (min==null || isNaN(min)) return ''; const s=min<0?'-':''; min=Math.abs(Math.round(min)); return `${s}${Math.floor(min/60)}:${pad(min%60)}`; };
+const DAYS = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function setStatus(msg, cls='') { $('status').className = cls; $('status').textContent = msg; }
+// البيانات الإضافية للموظفين (من ملف data/employees.json بالحاسبة)
+let PROFILES = {};
+const PF = ['fullName','department','title','gender','mobile','officePhone','homePhone','birthday','hireDate','address','nationalId','notes'];
+const PF_LABELS = { fullName:'الاسم الكامل', department:'القسم', title:'العنوان الوظيفي', gender:'الجنس', mobile:'الهاتف المحمول',
+  officePhone:'هاتف العمل', homePhone:'هاتف المنزل', birthday:'تاريخ الميلاد', hireDate:'تاريخ التعيين', address:'العنوان', nationalId:'رقم الهوية', notes:'ملاحظات' };
+const prof = (id) => PROFILES[id] || {};
+const deviceUser = (id) => DATA ? DATA.users.find(x => x.userId === id) : null;
+function userName(id) { const u = deviceUser(id); return prof(id).fullName || (u && u.name) || ('رقم ' + id); }
+const deptOf = (id) => prof(id).department || '';
+function fillDeptSelect() {
+  const cur = $('dept').value;
+  const ds = [...new Set(Object.values(PROFILES).map(p => p.department).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'ar'));
+  $('dept').innerHTML = '<option value="">كل الأقسام</option>' + ds.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+  if (ds.includes(cur)) $('dept').value = cur;
+  $('deptList').innerHTML = ds.map(d => `<option value="${esc(d)}">`).join('');
+}
+async function loadProfiles() {
+  try { const r = await fetch('/api/profiles'); const j = await r.json(); PROFILES = j.profiles || {}; } catch (_) { PROFILES = {}; }
+  fillDeptSelect();
+  if (DATA) { fillEmpSelect(); render(); }
+}
+function setTabStatus(msg, cls = '') { $('tabStatus').className = 'no-print ' + cls; $('tabStatus').textContent = msg; }
+
+// ---------- سحب البيانات ----------
+async function fetchData() {
+  saveSettings();
+  const btn = $('fetchBtn'); btn.disabled = true;
+  setStatus('جارِ الاتصال بالجهاز وسحب البيانات... قد يستغرق دقيقة إذا كانت السجلات كثيرة');
+  try {
+    const r = await fetch(`/api/data?ip=${encodeURIComponent($('ip').value.trim())}&port=${encodeURIComponent($('port').value)}&key=${encodeURIComponent($('commKey').value.trim())}`);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'خطأ غير معروف');
+    setData(j);
+    setStatus(`تم السحب: ${j.users.length} موظف، ${j.logs.length} بصمة` + (j.info && j.info.mock ? ' (بيانات تجريبية)' : '')
+      + (j.partial ? ' — تنبيه: السحب ما اكتمل بالكامل، أعد المحاولة' : ''), j.partial ? 'err' : 'okc');
+    return true;
+  } catch (e) {
+    setStatus(e.message + (/Comm Key/.test(e.message) ? '' : ' — تأكد أن الجهاز والحاسبة على نفس الشبكة، وأن برنامج ZKTeco القديم مغلق.'), 'err');
+    return false;
+  } finally { btn.disabled = false; }
+}
+
+function fillEmpSelect() {
+  const cur = $('emp').value;
+  const ids = [...new Set([...DATA.users.map(u=>u.userId), ...DATA.logs.map(l=>l.userId)])].sort((a,b)=>Number(a)-Number(b)||a.localeCompare(b));
+  $('emp').innerHTML = '<option value="">الكل</option>' + ids.map(id => `<option value="${esc(id)}">${esc(id)} - ${esc(userName(id))}</option>`).join('');
+  if (ids.includes(cur)) $('emp').value = cur;
+}
+const ROLES = { 0: 'مستخدم', 2: 'مسجِّل', 6: 'مشرف', 14: 'مدير' };
+const roleName = (r) => ROLES[r] || ('صلاحية ' + r);
+
+function setData(j) {
+  DATA = j;
+  DATA.logs.forEach(l => l.d = new Date(l.time));
+  DATA.logs.sort((a,b) => a.d - b.d);
+  $('deviceInfo').textContent = `متصل · ${DATA.users.length} موظف · ${DATA.logs.length} بصمة`;
+  fillEmpSelect();
+  // المدى الافتراضي: الشهر الحالي أو آخر شهر فيه بيانات
+  if (DATA.logs.length) {
+    const last = DATA.logs[DATA.logs.length-1].d;
+    $('from').value = dateKey(new Date(last.getFullYear(), last.getMonth(), 1));
+    $('to').value = dateKey(last);
+  }
+  render();
+}
+
+// ---------- الحسابات ----------
+function filteredLogs() {
+  const f = $('from').value, t = $('to').value, emp = $('emp').value, dept = $('dept').value;
+  return DATA.logs.filter(l => { const k = dateKey(l.d); return (!f || k >= f) && (!t || k <= t) && (!emp || l.userId === emp) && (!dept || deptOf(l.userId) === dept); });
+}
+
+function dailyRows() {
+  const dedupMs = (+$('dedup').value || 0) * 60000;
+  const startM = toMin($('start').value), endM = toMin($('end').value), grace = +$('grace').value || 0;
+  const groups = new Map();
+  for (const l of filteredLogs()) {
+    const k = l.userId + '|' + dateKey(l.d);
+    if (!groups.has(k)) groups.set(k, []);
+    const arr = groups.get(k);
+    if (!arr.length || l.d - arr[arr.length-1] > dedupMs) arr.push(l.d);
+  }
+  const rows = [];
+  for (const [k, punches] of groups) {
+    const [userId, day] = k.split('|');
+    const first = punches[0], last = punches.length > 1 ? punches[punches.length-1] : null;
+    const inM = first.getHours()*60 + first.getMinutes();
+    const outM = last ? last.getHours()*60 + last.getMinutes() : null;
+    const late = Math.max(0, inM - startM - grace) > 0 ? inM - startM : 0;
+    const early = outM != null && outM < endM ? endM - outM : 0;
+    const overtime = outM != null && outM > endM ? outM - endM : 0;
+    rows.push({ userId, name: userName(userId), day, dow: DAYS[first.getDay()], first, last,
+      worked: last ? (last - first) / 60000 : null, late, early, overtime, count: punches.length });
+  }
+  rows.sort((a,b) => a.day.localeCompare(b.day) || Number(a.userId) - Number(b.userId));
+  return rows;
+}
+
+function workingDays() {
+  const f = $('from').value, t = $('to').value; if (!f || !t) return [];
+  const off = $('weekend').value === '' ? [] : $('weekend').value.split(',').map(Number);
+  const out = []; const d = new Date(f + 'T00:00:00'); const end = new Date(t + 'T00:00:00');
+  while (d <= end) { if (!off.includes(d.getDay())) out.push(dateKey(d)); d.setDate(d.getDate()+1); }
+  return out;
+}
+
+function summaryRows(daily) {
+  const wd = workingDays(); const emp = $('emp').value, dept = $('dept').value;
+  const ids = (emp ? [emp] : [...new Set([...DATA.users.map(u=>u.userId), ...daily.map(r=>r.userId)])]).filter(id => !dept || deptOf(id) === dept);
+  return ids.map(id => {
+    const rs = daily.filter(r => r.userId === id);
+    const present = new Set(rs.map(r => r.day));
+    return { userId: id, name: userName(id), present: present.size,
+      absent: wd.filter(d => !present.has(d)).length,
+      lateCount: rs.filter(r => r.late).length, lateMin: rs.reduce((s,r)=>s+r.late,0),
+      earlyMin: rs.reduce((s,r)=>s+r.early,0), overtime: rs.reduce((s,r)=>s+r.overtime,0),
+      missingOut: rs.filter(r => !r.last).length, worked: rs.reduce((s,r)=>s+(r.worked||0),0) };
+  }).sort((a,b) => Number(a.userId) - Number(b.userId));
+}
+
+// ---------- العرض ----------
+function table(headers, rows, htmlRows, extraTh = '') {
+  lastTable = { headers, rows };
+  if (!rows.length) return '<div class="empty">لا توجد بيانات ضمن هذه الفترة</div>';
+  return `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}${extraTh}</tr></thead><tbody>${htmlRows.join('')}</tbody></table>`;
+}
+
+function render() {
+  if (!DATA) return;
+  saveSettings();
+  const daily = dailyRows();
+  const summ = summaryRows(daily);
+  // بطاقات
+  const s = { emp: summ.length, days: workingDays().length, late: daily.filter(r=>r.late).length, miss: daily.filter(r=>!r.last).length };
+  $('stats').innerHTML = [
+    ['عدد الموظفين', s.emp], ['أيام العمل بالفترة', s.days], ['حالات التأخير', s.late], ['بدون بصمة خروج', s.miss]
+  ].map(([k,v]) => `<div class="stat">${k}<b>${v}</b></div>`).join('');
+
+  const period = `${$('from').value || '...'} إلى ${$('to').value || '...'}`;
+  let html = '';
+  if (currentTab === 'daily') {
+    $('printTitleText').textContent = 'التقرير اليومي للحضور: ' + period;
+    const H = ['التاريخ','اليوم','الرقم','الاسم','الدخول','الخروج','ساعات العمل','التأخير','خروج مبكر','إضافي','الحالة'];
+    const rows = daily.map(r => [r.day, r.dow, r.userId, r.name, hhmm(r.first), hhmm(r.last), fmtDur(r.worked), fmtDur(r.late||null), fmtDur(r.early||null), fmtDur(r.overtime||null),
+      !r.last ? 'بدون خروج' : r.late ? 'متأخر' : 'منتظم']);
+    html = table(H, rows, daily.map((r,i) => {
+      const st = !r.last ? '<span class="tag t-miss">بدون خروج</span>' : r.late ? '<span class="tag t-late">متأخر</span>' : '<span class="tag t-ok">منتظم</span>';
+      return `<tr>${rows[i].slice(0,10).map((c,j)=>`<td class="${j>=4?'num':''}">${esc(c)}</td>`).join('')}<td>${st}</td></tr>`;
+    }));
+  } else if (currentTab === 'summary') {
+    $('printTitleText').textContent = 'ملخص حضور الموظفين: ' + period;
+    const H = ['الرقم','الاسم','القسم','أيام الحضور','أيام الغياب','مرات التأخير','مجموع التأخير','مجموع الخروج المبكر','مجموع الإضافي','بدون خروج','مجموع ساعات العمل'];
+    const rows = summ.map(r => [r.userId, r.name, deptOf(r.userId), r.present, r.absent, r.lateCount, fmtDur(r.lateMin), fmtDur(r.earlyMin), fmtDur(r.overtime), r.missingOut, fmtDur(r.worked)]);
+    html = table(H, rows, rows.map(r => `<tr>${r.map((c,j)=>`<td class="${j>=3?'num':''}">${esc(c)}</td>`).join('')}</tr>`));
+  } else if (currentTab === 'raw') {
+    $('printTitleText').textContent = 'سجل البصمات: ' + period;
+    const logs = filteredLogs();
+    const H = ['التاريخ','اليوم','الوقت','الرقم','الاسم'];
+    const rows = logs.map(l => [dateKey(l.d), DAYS[l.d.getDay()], `${hhmm(l.d)}:${pad(l.d.getSeconds())}`, l.userId, userName(l.userId)]);
+    html = table(H, rows, rows.map(r => `<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`));
+  } else {
+    $('printTitleText').textContent = 'قائمة الموظفين المسجلين بالجهاز';
+    const dept = $('dept').value;
+    const list = employeeList().filter(u => !dept || deptOf(u.userId) === dept);
+    const H = ['الرقم','الاسم بالجهاز','الاسم الكامل','القسم','العنوان الوظيفي','الهاتف المحمول','رقم البطاقة','الصلاحية','رقم سري'];
+    const pinText = (u) => !u.onDevice || u.hasPassword == null ? '' : u.hasPassword ? 'موجود' : 'لا يوجد';
+    const rows = list.map(u => { const p = prof(u.userId); return [u.userId, u.onDevice ? u.name : 'غير موجود بالجهاز',
+      p.fullName || '', p.department || '', p.title || '', p.mobile || '', u.cardno || '', u.onDevice ? roleName(u.role) : '', pinText(u)]; });
+    html = table(H, rows, rows.map((r, i) =>
+      `<tr>${r.map((c,j)=>`<td${j===5?' dir="ltr" style="text-align:right"':''}>${esc(c)}</td>`).join('')}<td class="no-print"><button class="small" data-edit="${esc(list[i].userId)}">تعديل</button></td></tr>`
+    ), '<th class="no-print"></th>');
+  }
+  $('tableArea').innerHTML = html;
+  $('usersTools').style.display = currentTab === 'users' ? 'flex' : 'none';
+}
+
+// كل الموظفين: الموجودين بالجهاز + اللي إلهم بيانات بالحاسبة بس
+function employeeList() {
+  const devIds = new Set(DATA.users.map(u => u.userId));
+  return [...DATA.users.map(u => ({ ...u, onDevice: true })),
+    ...Object.keys(PROFILES).filter(id => !devIds.has(id)).map(id => ({ uid: null, userId: id, name: '', cardno: '', role: null, onDevice: false }))]
+    .sort((a, b) => (Number(a.userId) - Number(b.userId)) || a.userId.localeCompare(b.userId));
+}
+
+// ---------- تصدير ----------
+function exportCSV() {
+  if (!lastTable || !lastTable.rows.length) return;
+  const q = (v) => `"${String(v ?? '').replace(/"/g,'""')}"`;
+  const csv = '﻿' + [lastTable.headers, ...lastTable.rows].map(r => r.map(q).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `تقرير_${currentTab}_${$('from').value}_${$('to').value}.csv`;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function saveBackup() {
+  if (!DATA) return;
+  const clean = { info: DATA.info, users: DATA.users, logs: DATA.logs.map(l => ({ userId: l.userId, time: l.time })) };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(clean)], { type: 'application/json' }));
+  a.download = `نسخة_البصمة_${dateKey(new Date())}.json`; a.click();
+}
+
+// ---------- أوامر الجهاز ----------
+const CONFIRM = {
+  disable: 'راح يتوقف الجهاز عن استقبال البصمات لحد ما تضغط "إعادة تفعيل البصمة". متأكد؟',
+  restart: 'راح يعيد تشغيل جهاز البصمة (حوالي دقيقة). متأكد؟',
+  powerOff: 'راح يطفي جهاز البصمة، ولازم تشغله يدوياً بعدين. متأكد؟',
+  clearLogs: 'راح ينمسح سجل البصمات من الجهاز.\nالبرنامج يحفظ نسخة كاملة بمجلد backups أولاً، ويتأكد إن عددها مطابق للجهاز، وإذا ما تطابق يلغي المسح.\nمتأكد؟',
+};
+function setCmdStatus(msg, cls='') { $('cmdStatus').className = cls; $('cmdStatus').textContent = msg; }
+const fmtT = (t) => t ? t.replace('T', ' ') : '—';
+
+function cmdParams(action) {
+  if (action === 'unlock') return { seconds: +$('unlockSec').value || 5 };
+  if (action === 'testVoice') return { index: +$('voiceIdx').value };
+  if (action === 'lcdWrite') return { text: $('lcdText').value, line: 0 };
+  return {};
+}
+
+async function sendCmd(action) {
+  const r = await fetch('/api/cmd', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ip: $('ip').value.trim(), port: $('port').value, key: $('commKey').value.trim(), action, params: cmdParams(action) }) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || 'خطأ');
+  return j;
+}
+
+function timeDiffText(dev, pc) {
+  const diff = Math.round((new Date(dev) - new Date(pc)) / 1000);
+  if (Math.abs(diff) < 60) return { ok: true, txt: 'الوقت مضبوط' };
+  return { ok: false, txt: `الجهاز ${diff > 0 ? 'متقدم' : 'متأخر'} ${Math.floor(Math.abs(diff)/60)} دقيقة، اضغط "مزامنة الوقت"` };
+}
+
+function renderInfo(j) {
+  const rows = [
+    ['اسم الجهاز', j.deviceName], ['الرقم التسلسلي', j.serial], ['إصدار البرنامج الثابت', j.firmware],
+    ['المنصة', j.platform], ['إصدار خوارزمية الوجه', j.faceVersion], ['إصدار خوارزمية البصمة', j.fpVersion],
+    ['عنوان IP', j.ip], ['قناع الشبكة', j.netmask], ['البوابة', j.gateway], ['عنوان MAC', j.mac],
+    ['أقصى طول لرقم الموظف', j.pinWidth], ['وقت الجهاز', fmtT(j.deviceTime)],
+  ];
+  let html = '<div class="info-grid">' + rows.map(([k,v]) => `<div><span>${k}</span><b>${esc(v ?? '—')}</b></div>`).join('') + '</div>';
+  const s = j.sizes;
+  if (s) {
+    const bar = (label, used, cap) => {
+      const pct = cap > 0 ? Math.min(100, Math.round(used / cap * 100)) : null;
+      return `<div><div class="bar-top"><span>${label}</span><span dir="ltr">${used ?? '—'}${cap > 0 ? ' / ' + cap + ' (' + pct + '%)' : ''}</span></div>`
+        + (pct != null ? `<div class="bar"><i class="${pct >= 80 ? 'high' : ''}" style="width:${pct}%"></i></div>` : '') + '</div>';
+    };
+    html += '<div class="bars">' + bar('الموظفون', s.users, s.usersCap) + bar('بصمات الأصابع', s.fingers, s.fingersCap)
+      + (s.faces != null ? bar('الوجوه', s.faces, s.facesCap) : '') + bar('سجلات الحضور', s.records, s.recordsCap)
+      + bar('البطاقات', s.cards, 0) + '</div>';
+    if (s.recordsCap > 0 && s.records / s.recordsCap >= 0.8) html += '<div class="hint" style="color:var(--warn)">ذاكرة السجلات قاربت تمتلي. اسحب البيانات واحفظ نسخة، وبعدها امسح السجل.</div>';
+  }
+  $('infoPanel').innerHTML = html;
+}
+
+async function runCmd(btn) {
+  const action = btn.dataset.cmd;
+  if (CONFIRM[action] && !confirm(CONFIRM[action])) return;
+  if (action === 'lcdWrite' && !$('lcdText').value.trim()) { setCmdStatus('اكتب النص أولاً', 'err'); return; }
+  saveSettings();
+  document.querySelectorAll('[data-cmd]').forEach(b => b.disabled = true);
+  setCmdStatus(action === 'clearLogs' ? 'جارِ سحب السجلات وحفظ النسخة ثم المسح... لا تسكر الصفحة' : 'جارِ تنفيذ الأمر...');
+  try {
+    const j = await sendCmd(action);
+    if (action === 'info') {
+      renderInfo(j);
+      const t = j.deviceTime ? timeDiffText(j.deviceTime, j.pcTime) : null;
+      setCmdStatus('تمت قراءة معلومات الجهاز' + (t ? ' · ' + t.txt : ''), !t || t.ok ? 'okc' : 'err');
+    } else if (action === 'getTime') {
+      const t = timeDiffText(j.deviceTime, j.pcTime);
+      setCmdStatus(`وقت الجهاز: ${fmtT(j.deviceTime)} · وقت الحاسبة: ${fmtT(j.pcTime)} · ${t.txt}`, t.ok ? 'okc' : 'err');
+    } else {
+      setCmdStatus(j.message + (action === 'syncTime' && j.deviceTime ? ` · وقت الجهاز الآن: ${fmtT(j.deviceTime)}` : ''), 'okc');
+    }
+  } catch (e) {
+    setCmdStatus(e.message, 'err');
+  } finally {
+    document.querySelectorAll('[data-cmd]').forEach(b => b.disabled = false);
+  }
+}
+document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => runCmd(b));
+
+// ---------- تعديل موظف ----------
+let editing = null;
+const utf8Len = (t) => new TextEncoder().encode(t).length;
+function updateBytes() {
+  const t = $('editName').value.trim();
+  const n = $('editEnc').value === 'cp1256' ? [...t].length : utf8Len(t);
+  $('editBytes').textContent = `الطول: ${n} من 24 بايت (الحرف العربي ياخذ 2 بايت بترميز UTF-8)` + (n > 24 ? ' — طويل، اختصره' : '');
+  $('editBytes').style.color = n > 24 ? 'var(--bad)' : '';
+}
+function profileFromForm() {
+  const p = {};
+  document.querySelectorAll('[data-pf]').forEach(el => { const v = el.value.trim(); if (v) p[el.dataset.pf] = v; });
+  return p;
+}
+const sameProfile = (a, b) => PF.every(k => (a[k] || '') === (b[k] || ''));
+function openEdit(userId) {
+  const dev = deviceUser(userId);
+  editing = { userId, dev };
+  const p = prof(userId);
+  $('editTitle').textContent = 'تعديل الموظف: ' + userName(userId);
+  $('editSub').textContent = `رقم الموظف ${userId}` + (dev ? ` · ${roleName(dev.role)}` + (dev.hasPassword ? ' · عنده رقم سري' : dev.hasPassword === false ? ' · بدون رقم سري' : '') : ' · غير موجود بالجهاز');
+  const canDev = !!(dev && dev.uid != null);
+  $('devSection').style.display = canDev ? '' : 'none';
+  $('devNote').style.display = canDev ? 'none' : '';
+  $('devNote').textContent = dev ? 'حتى تعدل الاسم أو البطاقة بالجهاز، اسحب البيانات من الجهاز أولاً (هذه نسخة محفوظة).' : 'هذا الموظف موجود ببيانات الحاسبة فقط، مو مسجل بجهاز البصمة.';
+  if (canDev) { $('editName').value = dev.name || ''; $('editCard').value = dev.cardno || 0; $('editEnc').value = 'auto'; updateBytes(); }
+  document.querySelectorAll('[data-pf]').forEach(el => { el.value = p[el.dataset.pf] || ''; });
+  $('editStatus').textContent = ''; $('editStatus').className = '';
+  $('editOverlay').classList.add('open');
+  (canDev ? $('editName') : document.querySelector('[data-pf="fullName"]')).focus();
+}
+function closeEdit() { $('editOverlay').classList.remove('open'); editing = null; }
+async function postJSON(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || 'خطأ');
+  return j;
+}
+async function saveEdit() {
+  if (!editing) return;
+  const { userId, dev } = editing;
+  const err = (m) => { $('editStatus').className = 'err'; $('editStatus').textContent = m; };
+  // بيانات الجهاز
+  const canDev = !!(dev && dev.uid != null);
+  let devChange = null;
+  if (canDev) {
+    const name = $('editName').value.trim(), card = $('editCard').value.trim();
+    if ((name !== (dev.name || '')) || (card !== '' && Number(card) !== Number(dev.cardno || 0))) {
+      if (!name) return err('الاسم بالجهاز ما يصير يكون فارغ');
+      const nBytes = $('editEnc').value === 'cp1256' ? [...name].length : utf8Len(name);
+      if (nBytes > 24) return err(`الاسم بالجهاز طويل (${nBytes} بايت)، الحد 24. الاسم الكامل اكتبه بالبيانات الإضافية`);
+      if (card !== '' && !/^\d+$/.test(card)) return err('رقم البطاقة لازم يكون أرقام فقط');
+      devChange = { uid: dev.uid, userId, name, card: card === '' ? undefined : card, encoding: $('editEnc').value };
+    }
+  }
+  // البيانات الإضافية
+  const newProf = profileFromForm();
+  const profChanged = !sameProfile(newProf, prof(userId));
+  if (!devChange && !profChanged) { closeEdit(); setTabStatus('ما أكو أي تغيير'); return; }
+
+  const btn = $('editSave'); btn.disabled = true;
+  const msgs = [];
+  try {
+    if (profChanged) {
+      $('editStatus').className = ''; $('editStatus').textContent = 'جارِ حفظ البيانات الإضافية...';
+      const j = await postJSON('/api/profiles/save', { userId, profile: newProf });
+      if (Object.keys(j.profile).length) PROFILES[userId] = j.profile; else delete PROFILES[userId];
+      msgs.push('انحفظت البيانات الإضافية بالحاسبة');
+    }
+    if (devChange) {
+      $('editStatus').className = ''; $('editStatus').textContent = 'جارِ الحفظ على الجهاز والتأكد منه...';
+      saveSettings();
+      try {
+        const j = await postJSON('/api/cmd', { ip: $('ip').value.trim(), port: $('port').value, key: $('commKey').value.trim(), action: 'updateUser', params: devChange });
+        if (j.user) Object.assign(dev, { name: j.user.name, cardno: j.user.cardno, hasPassword: j.user.hasPassword });
+        msgs.push(j.message + (j.note ? ' · ' + j.note : ''));
+      } catch (e) {
+        fillDeptSelect(); fillEmpSelect(); render();
+        return err((profChanged ? 'البيانات الإضافية انحفظت، بس ' : '') + 'تعديل الجهاز فشل: ' + e.message);
+      }
+    }
+    fillDeptSelect(); fillEmpSelect(); render();
+    closeEdit();
+    setTabStatus(msgs.join(' · '), 'okc');
+  } catch (e) {
+    err(e.message);
+  } finally { btn.disabled = false; }
+}
+
+// ---------- استيراد وتصدير بيانات الموظفين ----------
+const PHONE_FIELDS = ['mobile', 'officePhone', 'homePhone', 'nationalId'];
+function exportProfiles() {
+  if (!DATA) return setTabStatus('اسحب البيانات من الجهاز أولاً', 'err');
+  const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  // ="..." يخلي Excel يحافظ على الصفر بأول رقم الهاتف
+  const keep0 = (v) => v ? `="${String(v).replace(/"/g, '')}"` : '';
+  const head = ['رقم الموظف', 'الاسم بالجهاز', ...PF.map(k => PF_LABELS[k])];
+  const lines = [head.map(q).join(',')];
+  for (const u of employeeList()) {
+    const p = prof(u.userId);
+    lines.push([q(u.userId), q(u.onDevice ? u.name : ''), ...PF.map(k => PHONE_FIELDS.includes(k) ? keep0(p[k]) : q(p[k]))].join(','));
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'بيانات_الموظفين.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function parseCSV(text) {
+  text = text.replace(/^﻿/, '');
+  const first = text.split(/\r?\n/, 1)[0];
+  const sep = [',', ';', '\t'].map(c => [c, first.split(c).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; } else field += c; }
+    else if (c === '"') q = true;
+    else if (c === sep) { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(field); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ''));
+}
+const HEADER_ALIASES = {
+  userId: ['رقم الموظف', 'الرقم', 'userid', 'user id', 'badgenumber', 'pin', 'employee id', 'id'],
+  fullName: ['الاسم الكامل', 'الاسم', 'fullname', 'full name', 'name'],
+  department: ['القسم', 'department', 'dept', 'deptname'],
+  title: ['العنوان الوظيفي', 'الوظيفة', 'المنصب', 'title', 'job title'],
+  gender: ['الجنس', 'gender'],
+  mobile: ['الهاتف المحمول', 'الموبايل', 'رقم الهاتف', 'الهاتف', 'mobile', 'phone', 'pager'],
+  officePhone: ['هاتف العمل', 'ophone', 'office phone'],
+  homePhone: ['هاتف المنزل', 'fphone', 'home phone'],
+  birthday: ['تاريخ الميلاد', 'birthday', 'birth date'],
+  hireDate: ['تاريخ التعيين', 'hiredday', 'hireday', 'hire date'],
+  address: ['العنوان', 'address', 'street'],
+  nationalId: ['رقم الهوية', 'رقم البطاقة الوطنية', 'ssn', 'national id'],
+  notes: ['ملاحظات', 'notes'],
+};
+function normDate(v) {
+  let m = v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if (m) return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
+  m = v.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/); // يوم/شهر/سنة
+  if (m) return `${m[3]}-${pad(+m[2])}-${pad(+m[1])}`;
+  return v;
+}
+function normValue(k, v) {
+  // ="0770..." من Excel: المحلل يشيل علامات الاقتباس ويبقى = بالبداية
+  v = v.trim().replace(/^="(.*)"$/, '$1').replace(/^=/, '').trim();
+  if (!v) return '';
+  if (k === 'gender') { const g = v.toLowerCase(); return ['m', 'male', 'ذكر'].includes(g) ? 'ذكر' : ['f', 'female', 'أنثى', 'انثى'].includes(g) ? 'أنثى' : v; }
+  if (k === 'birthday' || k === 'hireDate') return normDate(v);
+  if (['mobile', 'officePhone', 'homePhone'].includes(k) && /^7\d{9}$/.test(v)) return '0' + v; // Excel يحذف الصفر من أرقام الموبايل العراقية
+  return v;
+}
+async function readTextFile(file) {
+  const buf = await file.arrayBuffer();
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (_) { return new TextDecoder('windows-1256').decode(buf); }
+}
+async function importCSVFile(file) {
+  const rows = parseCSV(await readTextFile(file));
+  if (rows.length < 2) throw new Error('الملف فارغ أو ما بيه غير العناوين');
+  const norm = (h) => h.replace(/^﻿/, '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const cols = {};
+  rows[0].forEach((h, i) => { for (const [k, al] of Object.entries(HEADER_ALIASES)) if (cols[k] == null && al.includes(norm(h))) cols[k] = i; });
+  if (cols.userId == null) throw new Error('ما لقيت عمود "رقم الموظف" بالملف. صدّر الملف من زر "تصدير كل بيانات الموظفين" وعدّل عليه');
+  const incoming = {};
+  for (const r of rows.slice(1)) {
+    const id = normValue('userId', r[cols.userId] || '');
+    if (!id) continue;
+    const p = {};
+    for (const k of PF) if (cols[k] != null) { const v = normValue(k, r[cols[k]] || ''); if (v) p[k] = v; }
+    incoming[id] = p;
+  }
+  const n = Object.keys(incoming).length;
+  if (!n) throw new Error('ما لقيت موظفين بالملف');
+  const found = PF.filter(k => cols[k] != null).map(k => PF_LABELS[k]).join('، ');
+  if (!confirm(`لقيت ${n} موظف بالملف، والأعمدة: ${found}.\nالقيم اللي بالملف راح تنكتب فوق القديمة (الخانات الفارغة بالملف ما تمسح شي).\nتكمل؟`)) return setTabStatus('تم إلغاء الاستيراد');
+  return finishImport(incoming, 'merge');
+}
+async function finishImport(incoming, mode) {
+  const j = await postJSON('/api/profiles/import', { profiles: incoming, mode });
+  PROFILES = j.profiles || {};
+  fillDeptSelect(); if (DATA) { fillEmpSelect(); render(); }
+  setTabStatus(`تم الاستيراد: ${j.added} موظف جديد، ${j.updated} تحدثت بياناتهم، ${j.unchanged} بدون تغيير`, 'okc');
+}
+async function importMdbFile(file) {
+  setTabStatus(`جارِ قراءة ${file.name} (${(file.size / 1048576).toFixed(1)} ميگا)...`);
+  const r = await fetch('/api/import-mdb', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || 'خطأ');
+  if (!j.count) throw new Error('ما لقيت موظفين بالملف');
+  const ps = Object.values(j.profiles);
+  const phones = ps.filter(p => p.mobile || p.officePhone || p.homePhone).length, depts = ps.filter(p => p.department).length;
+  if (!confirm(`لقيت ${j.count} موظف ببرنامج ZKTeco القديم (${phones} عندهم رقم هاتف، ${depts} عندهم قسم).\nبياناتهم راح تنضاف. اللي كتبته أنت بالبرنامج ما يتغير، بس الخانات الفارغة تنملي.\nتكمل؟`)) return setTabStatus('تم إلغاء الاستيراد');
+  return finishImport(j.profiles, 'fill');
+}
+$('profExportBtn').onclick = exportProfiles;
+$('profImportBtn').onclick = () => $('profFile').click();
+$('mdbImportBtn').onclick = () => $('mdbFile').click();
+$('profFile').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { await importCSVFile(f); } catch (x) { setTabStatus(x.message, 'err'); } };
+$('mdbFile').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { await importMdbFile(f); } catch (x) { setTabStatus(x.message, 'err'); } };
+$('tableArea').addEventListener('click', (e) => { const b = e.target.closest('[data-edit]'); if (b) openEdit(b.dataset.edit); });
+$('editName').addEventListener('input', updateBytes);
+$('editEnc').addEventListener('change', updateBytes);
+$('editSave').onclick = saveEdit;
+$('editCancel').onclick = closeEdit;
+$('editOverlay').addEventListener('click', (e) => { if (e.target.id === 'editOverlay') closeEdit(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && editing) closeEdit(); });
+
+// ---------- الأحداث ----------
+$('fetchBtn').onclick = fetchData;
+$('csvBtn').onclick = exportCSV;
+$('printBtn').onclick = () => window.print();
+$('saveFileBtn').onclick = saveBackup;
+$('loadFileBtn').onclick = () => $('fileInput').click();
+$('fileInput').onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try { setData(JSON.parse(await f.text())); setStatus('تم فتح النسخة المحفوظة: ' + f.name, 'okc'); }
+  catch (_) { setStatus('الملف غير صالح', 'err'); }
+  e.target.value = '';
+};
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active'); currentTab = b.dataset.tab; render();
+});
+['from','to','emp','dept','start','end','grace','weekend','dedup'].forEach(id => $(id).addEventListener('change', render));
+loadSettings();
+loadProfiles();
+</script>
+</body>
+</html>

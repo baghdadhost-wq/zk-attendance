@@ -1,0 +1,32 @@
+name: ZKAttendance
+options:
+  bundleIdPrefix: com.baghdadhost
+  deploymentTarget:
+    iOS: "15.0"
+settings:
+  base:
+    MARKETING_VERSION: "2.2.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  ZKAttendance:
+    type: application
+    platform: iOS
+    sources:
+      - path: ZKAttendance
+    dependencies:
+      - framework: Mobile.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_NAME: ZKAttendance
+        PRODUCT_BUNDLE_IDENTIFIER: com.baghdadhost.zkattendance
+        INFOPLIST_FILE: Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        OTHER_LDFLAGS: ["-lresolv", "-framework", "Security", "-framework", "CoreFoundation"]
+        ENABLE_BITCODE: NO
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""

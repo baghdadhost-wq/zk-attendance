@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تسجيل الدخول - تقارير الحضور</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#16212e">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="الحضور">
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+    font-family: Tahoma, "Segoe UI", Arial, sans-serif; background:#f4f6f8; color:#1d2733; }
+  .box { background:#fff; border:1px solid #e3e7eb; border-radius:14px; padding:26px 22px; width:min(360px, 100%); text-align:center; }
+  img { width:72px; height:72px; border-radius:16px; }
+  h1 { font-size:20px; margin:14px 0 4px; }
+  p { color:#6b7682; font-size:13px; margin:0 0 18px; }
+  input { width:100%; padding:12px; font-size:16px; border:1px solid #e3e7eb; border-radius:8px; margin-bottom:12px; text-align:center; }
+  button { width:100%; padding:12px; font-size:16px; border:0; border-radius:8px; background:#1f6feb; color:#fff; cursor:pointer; }
+  button:disabled { opacity:.6; }
+  #err { color:#c62828; font-size:14px; min-height:20px; margin-top:10px; }
+</style>
+</head>
+<body>
+<form class="box" id="f">
+  <img src="/icon-192.png" alt="">
+  <h1>تقارير الحضور</h1>
+  <p>اكتب كلمة سر البرنامج حتى تدخل</p>
+  <input type="password" id="pw" autocomplete="current-password" placeholder="كلمة السر" autofocus required>
+  <button id="btn">دخول</button>
+  <div id="err"></div>
+</form>
+<script>
+document.getElementById('f').onsubmit = async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btn'), err = document.getElementById('err');
+  btn.disabled = true; err.textContent = '';
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: document.getElementById('pw').value }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'خطأ');
+    location.replace('/');
+  } catch (x) {
+    err.textContent = x.message === 'Failed to fetch' ? 'ما گدرت أتصل بالبرنامج' : x.message;
+    btn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>

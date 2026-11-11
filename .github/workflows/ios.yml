@@ -1,0 +1,69 @@
+name: iOS app
+
+on:
+  push:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ios:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+          cache: false
+
+      - name: Go tests
+        run: go vet ./... && go test ./...
+
+      - name: Tools
+        run: xcodebuild -version && xcrun simctl list runtimes
+
+      - name: Build Go framework (gomobile)
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          go get golang.org/x/mobile/bind@latest
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          gomobile init
+          gomobile bind -target=ios,iossimulator -iosversion=15.0 -o ios/Mobile.xcframework ./mobile
+          ls ios/Mobile.xcframework
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd ios && xcodegen generate
+
+      - name: Build IPA (unsigned, for sideloading)
+        run: |
+          xcodebuild -project ios/ZKAttendance.xcodeproj -scheme ZKAttendance -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/device \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" -quiet build
+          APP=build/device/Build/Products/Release-iphoneos/ZKAttendance.app
+          mkdir -p out/Payload && cp -R "$APP" out/Payload/
+          (cd out && zip -qry ZKAttendance.ipa Payload && rm -rf Payload)
+          ls -la out/ZKAttendance.ipa
+          lipo -info "$APP/ZKAttendance"
+          plutil -p "$APP/Info.plist"
+
+      - name: Build for simulator
+        run: |
+          xcodebuild -project ios/ZKAttendance.xcodeproj -scheme ZKAttendance -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/sim \
+            CODE_SIGNING_ALLOWED=NO -quiet build
+
+      - name: Test on iPhone and iPad simulators
+        run: bash tools/ios-sim-test.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ZKAttendance-iOS
+          path: out/
