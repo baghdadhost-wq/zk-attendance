@@ -3,8 +3,11 @@ package main
 // برنامج تقارير الحضور لأجهزة بصمة ZKTeco، ملف تنفيذي واحد بدون Node وبدون تنصيب.
 //
 //   تشغيل عادي (على نفس الحاسبة):   zk-attendance
-//   للشبكة (يطلب كلمة سر):          zk-attendance --network
+//   للشبكة:                          zk-attendance --network
 //   وضع التجربة بدون جهاز:           zk-attendance --demo
+//   نسيت كلمة سر المدير:             zk-attendance --reset-admin
+//
+// الدخول دائماً باسم مستخدم وكلمة سر، وكل مستخدم إله صلاحية: مدير (مطلقة) أو مشرف أو مشاهد.
 
 import (
 	"bufio"
@@ -28,13 +31,19 @@ import (
 func main() {
 	setupConsole()
 	var (
-		network   = flag.Bool("network", os.Getenv("HOST") == "0.0.0.0", "افتح البرنامج لأجهزة الشبكة (يحتاج كلمة سر)")
-		port      = flag.Int("port", envInt("PORT", 3000), "منفذ البرنامج")
-		demo      = flag.Bool("demo", os.Getenv("MOCK") == "1", "وضع التجربة ببيانات وهمية")
-		data      = flag.String("data", "", "مجلد حفظ البيانات (الافتراضي: جنب البرنامج)")
-		setPass   = flag.Bool("set-password", false, "غيّر كلمة سر الدخول")
-		password  = flag.String("password", os.Getenv("APP_PASSWORD"), "حدد كلمة سر الدخول بدون سؤال (للخدمات)")
-		noBrowser = flag.Bool("no-browser", false, "لا تفتح المتصفح تلقائياً")
+		network     = flag.Bool("network", os.Getenv("HOST") == "0.0.0.0", "افتح البرنامج لأجهزة الشبكة")
+		port        = flag.Int("port", envInt("PORT", 3000), "منفذ البرنامج")
+		demo        = flag.Bool("demo", os.Getenv("MOCK") == "1", "وضع التجربة ببيانات وهمية")
+		data        = flag.String("data", "", "مجلد حفظ البيانات (الافتراضي: جنب البرنامج)")
+		resetAdm    = flag.Bool("reset-admin", false, "أنشئ حساب مدير أو غيّر كلمة سره (إذا نسيتها)")
+		setPass     = flag.Bool("set-password", false, "نفس --reset-admin (من النسخ السابقة)")
+		adminUser   = flag.String("admin-user", "admin", "اسم حساب المدير ويا --password أو --reset-admin")
+		password    = flag.String("password", os.Getenv("APP_PASSWORD"), "كلمة سر حساب المدير بدون سؤال (للخدمات)")
+		noBrowser   = flag.Bool("no-browser", false, "لا تفتح المتصفح تلقائياً")
+		verifyAudit = flag.Bool("verify-audit", false, "تحقق من سلامة سجل التدقيق (hash chain) واخرج")
+		auditMirror = flag.String("audit-mirror", os.Getenv("AUDIT_MIRROR"), "انسخ كل قيد تدقيق لهذا الملف أيضاً (يُفضّل مجلد إلحاق-فقط أو جهاز آخر)")
+		tlsCert     = flag.String("tls-cert", os.Getenv("TLS_CERT"), "ملف شهادة TLS لتشغيل البرنامج على https (يُنصح به بوضع الشبكة)")
+		tlsKey      = flag.String("tls-key", os.Getenv("TLS_KEY"), "ملف مفتاح TLS")
 	)
 	flag.Parse()
 	server.Configure(chooseDataDir(*data), *demo)
@@ -43,19 +52,55 @@ func main() {
 	fmt.Printf("ZK Attendance %s\n", server.Version)
 	fmt.Println("Data folder / مجلد البيانات:", server.DataDir())
 
-	var auth *server.AuthConfig
-	if *network {
-		var err error
-		auth, err = ensurePassword(*setPass, *password)
+	if *verifyAudit {
+		n, ok, detail := server.VerifyAudit()
+		fmt.Println(detail)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "Audit log integrity CHECK FAILED / فشل فحص سلامة سجل التدقيق (%d قيد مفحوص)\n", n)
+			os.Exit(1)
+		}
+		return
+	}
+	if *auditMirror != "" {
+		server.SetAuditMirror(*auditMirror)
+	}
+
+	users, err := server.LoadUsers()
+	if err != nil {
+		fatal(err.Error())
+	}
+	if users.Migrated() {
+		fmt.Println("Your old password now belongs to user \"admin\" (full permissions). / كلمة السر القديمة صارت لحساب admin (صلاحية مطلقة).")
+	}
+	switch {
+	case *resetAdm || *setPass:
+		if err := resetAdmin(users, *adminUser, *password); err != nil {
+			fatal(err.Error())
+		}
+		if !*network {
+			return
+		}
+	case *password != "":
+		created, changed, err := users.EnsureAdmin(*adminUser, *password)
 		if err != nil {
 			fatal(err.Error())
 		}
-	} else if *setPass {
-		if _, err := ensurePassword(true, *password); err != nil {
-			fatal(err.Error())
+		if created {
+			fmt.Printf("Admin account %q created. / انعمل حساب المدير %s.\n", *adminUser, *adminUser)
+		} else if changed {
+			fmt.Printf("Password of %q changed. / تغيرت كلمة سر %s.\n", *adminUser, *adminUser)
 		}
-		fmt.Println("Password saved. / انحفظت كلمة السر.")
-		return
+	}
+	webSetup := false
+	if users.Count() == 0 {
+		if *network {
+			if err := createFirstAdmin(users); err != nil {
+				fatal(err.Error())
+			}
+		} else {
+			users.AllowWebSetup() // البرنامج يسمع من نفس الحاسبة بس، فنخلي إنشاء المدير من المتصفح
+			webSetup = true
+		}
 	}
 
 	host := "127.0.0.1"
@@ -75,11 +120,23 @@ func main() {
 		fatal(fmt.Sprintf("Cannot use port %d / ما گدرت أستخدم المنفذ %d: %v", *port, *port, err))
 	}
 
-	srv := &http.Server{Handler: server.NewHandler(auth), ReadHeaderTimeout: 20 * time.Second}
+	srv := &http.Server{Handler: server.NewHandler(users), ReadHeaderTimeout: 20 * time.Second}
+	useTLS := *tlsCert != "" && *tlsKey != ""
+	scheme := "http"
+	if useTLS {
+		scheme = "https"
+	}
+	localURL = fmt.Sprintf("%s://localhost:%d", scheme, *port)
 
 	fmt.Println()
+	if useTLS {
+		fmt.Println("TLS enabled (https) / التشفير مفعّل")
+	} else if *network {
+		fmt.Println("Note: network mode over http is not encrypted. Use --tls-cert/--tls-key or a VPN. / تنبيه: وضع الشبكة على http غير مشفّر، استخدم شهادة TLS أو VPN.")
+	}
 	if server.DemoMode() {
 		fmt.Println("DEMO MODE (fake data) / وضع التجربة - بيانات وهمية")
+		fmt.Println("Demo accounts / حسابات التجربة: admin, supervisor, viewer  (password / كلمة السر: 123456)")
 	}
 	fmt.Println("Running / البرنامج يعمل:", localURL)
 	if *network {
@@ -87,15 +144,24 @@ func main() {
 		for _, ip := range lanIPs() {
 			fmt.Printf("   http://%s:%d\n", ip, *port)
 		}
-		fmt.Println("Log in with the password you chose. / ادخل بكلمة السر اللي اخترتها.")
+		fmt.Println("Log in with your username and password. / ادخل باسم المستخدم وكلمة السر.")
 	} else {
+		if webSetup {
+			fmt.Println("First run: create the admin account in the browser. / أول تشغيل: أنشئ حساب المدير بالمتصفح.")
+		}
 		fmt.Println("Keep this window open while using the program. / خلي هذي النافذة مفتوحة طول ما تستخدم البرنامج.")
 		if !*noBrowser {
 			go func() { time.Sleep(400 * time.Millisecond); openBrowser(localURL) }()
 		}
 	}
 	fmt.Println()
-	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	serve := func() error {
+		if useTLS {
+			return srv.ServeTLS(ln, *tlsCert, *tlsKey)
+		}
+		return srv.Serve(ln)
+	}
+	if err := serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fatal(err.Error())
 	}
 }
@@ -183,37 +249,66 @@ func openBrowser(url string) {
 	cmd.Start()
 }
 
-// ---------- كلمة سر الدخول ----------
+// ---------- حسابات الدخول ----------
 
-func ensurePassword(change bool, given string) (*server.AuthConfig, error) {
-	if given != "" {
-		if len(given) < 6 {
-			return nil, errors.New("password must be 6+ characters / كلمة السر لازم تكون 6 أحرف أو أكثر")
-		}
-		return server.SetPassword(given)
+func createFirstAdmin(users *server.UserStore) error {
+	if !stdinIsTerminal() {
+		return errors.New("no users yet. Run once in a terminal, or use --password / ما أكو مستخدمين. شغّل البرنامج مرة بنافذة الأوامر حتى تنشئ حساب المدير، أو استخدم --password")
 	}
-	if a := server.LoadAuth(); a != nil && !change {
-		return a, nil
+	fmt.Println()
+	fmt.Println("Create the main admin account (full permissions) / إنشاء حساب المدير الأساسي (صلاحية مطلقة)")
+	return promptAdmin(users, "admin")
+}
+
+func resetAdmin(users *server.UserStore, name, given string) error {
+	if given != "" {
+		if _, _, err := users.EnsureAdmin(name, given); err != nil {
+			return err
+		}
+		fmt.Printf("Admin %q saved. / انحفظ حساب المدير %s.\n", name, name)
+		return nil
 	}
 	if !stdinIsTerminal() {
-		return nil, errors.New("no password set. Run once in a terminal, or use --password / ما أكو كلمة سر. شغّل البرنامج مرة بنافذة الأوامر حتى تختارها")
+		return errors.New("run it in a terminal, or add --password / شغّله بنافذة الأوامر، أو أضف --password")
 	}
+	fmt.Println("Create an admin account, or give it a new password / إنشاء حساب مدير، أو كلمة سر جديدة إله")
+	return promptAdmin(users, name)
+}
+
+func promptAdmin(users *server.UserStore, defName string) error {
 	in := bufio.NewReader(os.Stdin)
+	name := ""
 	for {
-		p1, err1 := readSecret(in, "Choose a login password (6+ chars) / اختار كلمة سر للدخول (6 أحرف أو أكثر): ")
+		fmt.Printf("Username [%s] / اسم المستخدم [%s]: ", defName, defName)
+		line, err := in.ReadString('\n')
+		if err != nil && line == "" {
+			return errors.New("input closed / انقطع الإدخال")
+		}
+		if name = strings.TrimSpace(line); name == "" {
+			name = defName
+		}
+		if err := server.CheckUsername(name); err != nil {
+			fmt.Println(err.Error())
+			continue
+		}
+		break
+	}
+	for {
+		p1, err1 := readSecret(in, "Password (6+ chars) / كلمة السر (6 أحرف أو أكثر): ")
 		p2, err2 := readSecret(in, "Repeat it / أعد كتابتها: ")
 		if err1 != nil || err2 != nil {
-			return nil, errors.New("password input closed / انقطع إدخال كلمة السر")
+			return errors.New("password input closed / انقطع إدخال كلمة السر")
 		}
-		if len(p1) >= 6 && p1 == p2 {
-			a, err := server.SetPassword(p1) // كلمة سر جديدة تطلع كل الأجهزة المسجلة
-			if err != nil {
-				return nil, err
-			}
-			fmt.Println("Password saved. / انحفظت كلمة السر.")
-			return a, nil
+		if p1 != p2 {
+			fmt.Println("Not matching, try again. / غير متطابقة، حاول مرة ثانية.")
+			continue
 		}
-		fmt.Println("Too short or not matching, try again. / قصيرة أو غير متطابقة، حاول مرة ثانية.")
+		if _, _, err := users.EnsureAdmin(name, p1); err != nil {
+			fmt.Println(err.Error())
+			continue
+		}
+		fmt.Printf("Saved. Log in as %q. / انحفظ. ادخل باسم %s.\n", name, name)
+		return nil
 	}
 }
 

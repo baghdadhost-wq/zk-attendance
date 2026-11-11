@@ -1,0 +1,27 @@
+برنامج تقارير الحضور لأجهزة بصمة ZKTeco - نسخة @VERSION@ (ماك)
+ملف واحد، ما يحتاج Node.js ولا أي تنصيب. يحتاج macOS 11 (Big Sur) أو أحدث.
+
+اختار الملف حسب جهازك (قائمة Apple ثم About This Mac):
+  إذا مكتوب Chip Apple M...         -> mac-apple-silicon
+  إذا مكتوب Processor ... Intel     -> mac-intel
+
+التنصيب من برنامج Terminal (مرة وحدة، بدّل mac-apple-silicon إذا جهازك Intel):
+  mkdir -p ~/zk-attendance
+  cp ~/Downloads/zk-attendance-mac/mac-apple-silicon/zk-attendance ~/zk-attendance/
+  cd ~/zk-attendance
+  chmod +x zk-attendance
+  xattr -c zk-attendance
+  ./zk-attendance
+  المتصفح ينفتح على البرنامج وحده، ويطلب تنشئ حساب المدير أول مرة.
+  لا تسكر نافذة Terminal طول ما تستخدمه.
+  الأمر xattr يحتاجه الماك لأن البرنامج غير موقّع من Apple.
+
+كل مرة بعدها:
+  cd ~/zk-attendance && ./zk-attendance
+
+للاستخدام من أجهزة ثانية بالشبكة:
+  cd ~/zk-attendance && ./zk-attendance --network
+  الماك يسألك تسمح للبرنامج بالاتصالات: اختار Allow.
+
+للتجربة بدون جهاز بصمة: ./zk-attendance --demo
+

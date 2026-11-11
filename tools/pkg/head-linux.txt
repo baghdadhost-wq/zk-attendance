@@ -1,0 +1,23 @@
+برنامج تقارير الحضور لأجهزة بصمة ZKTeco - نسخة @VERSION@ (لينكس و Raspberry Pi)
+ملف واحد، ما يحتاج Node.js ولا أي تنصيب.
+
+اختار الملف حسب جهازك (اكتب uname -m حتى تعرف):
+  x86_64            -> linux-x64      (سيرفرات وحاسبات عادية)
+  aarch64 / arm64   -> linux-arm64    (Raspberry Pi 4 و 5 بنظام 64 بت)
+  armv7l / armv6l   -> linux-arm32    (Raspberry Pi بنظام 32 بت)
+
+التشغيل:
+  sudo mkdir -p /opt/zk-attendance
+  sudo cp linux-x64/zk-attendance /opt/zk-attendance/
+  sudo chmod +x /opt/zk-attendance/zk-attendance
+  cd /opt/zk-attendance
+  sudo ./zk-attendance --network
+  أول مرة يطلب تنشئ حساب المدير (اسم وكلمة سر)، وبعدها يطلعلك العنوان اللي تفتحه من باقي الأجهزة.
+
+حتى يشتغل وحده مع تشغيل السيرفر (بعد ما تنشئ حساب المدير أول مرة):
+  sudo cp zk-attendance.service /etc/systemd/system/
+  sudo systemctl enable --now zk-attendance
+  الحالة: systemctl status zk-attendance     السجل: journalctl -u zk-attendance -f
+
+إذا جدار الحماية شغال: sudo ufw allow 3000/tcp
+

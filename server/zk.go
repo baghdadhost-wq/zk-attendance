@@ -14,13 +14,21 @@ import (
 	"time"
 )
 
+// أرقام الأوامر من const.py بمكتبة pyzk (ونفسها بمكتبة node-zklib)
 const (
 	cmdUserWrq       = 8
 	cmdUserTempRrq   = 9
 	cmdOptionsRrq    = 11
+	cmdOptionsWrq    = 12 // كتابة إعداد بالجهاز "Key=Value" (pyzk.set_sdk_build_1)
 	cmdAttLogRrq     = 13
+	cmdClearData     = 14 // مسح كل البيانات: الموظفين والبصمات والسجل (pyzk.clear_data)
 	cmdClearAttLog   = 15
+	cmdDeleteUser    = 18 // حذف موظف (pyzk.delete_user)
+	cmdDeleteUTemp   = 19 // حذف بصمة إصبع بالرقم الداخلي (pyzk.delete_user_template)
+	cmdClearAdmin    = 20 // إلغاء صلاحية المدير من كل الموظفين
 	cmdUnlock        = 31
+	cmdClearAcc      = 32 // إرجاع إعدادات التحكم بالأبواب للوضع الافتراضي
+	cmdClearOplog    = 33 // مسح سجل عمليات الجهاز
 	cmdGetFreeSizes  = 50
 	cmdWriteLCD      = 66
 	cmdClearLCD      = 67
@@ -35,6 +43,7 @@ const (
 	cmdRestart       = 1004
 	cmdPowerOff      = 1005
 	cmdRefreshData   = 1013
+	cmdRefreshOption = 1014 // تطبيق الإعدادات بعد كتابتها
 	cmdTestVoice     = 1017
 	cmdGetVersion    = 1100
 	cmdAuth          = 1102
@@ -43,6 +52,7 @@ const (
 	cmdFreeData      = 1502
 	cmdPrepareBuffer = 1503
 	cmdReadBuffer    = 1504
+	cmdDelUserTemp   = 134 // حذف بصمة إصبع برقم الموظف، للأجهزة الحديثة عبر TCP (pyzk.delete_user_template)
 	ackOK            = 2000
 	ackUnauth        = 2005
 	fctUser          = 5

@@ -3,22 +3,13 @@
 package server
 
 import (
-	"crypto/pbkdf2"
-	"crypto/rand"
-	"crypto/sha256"
-	"crypto/subtle"
 	"embed"
-	"encoding/hex"
-	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 )
 
 // Version رقم نسخة البرنامج
-const Version = "2.2.0"
+const Version = "2.6.0"
 
 //go:embed public
 var publicFS embed.FS
@@ -40,24 +31,41 @@ func DataDir() string { return dataDir }
 // DemoMode هل البرنامج بوضع التجربة
 func DemoMode() bool { return demoMode }
 
-// NewHandler يرجع الخادم كامل. auth == nil يعني بدون تسجيل دخول (للاستخدام على نفس الجهاز).
-func NewHandler(auth *AuthConfig) http.Handler {
+// NewHandler يرجع الخادم كامل.
+// users == nil يعني بدون تسجيل دخول وبكل الصلاحيات (تطبيق الموبايل اللي يشتغل على نفس الجهاز بس).
+func NewHandler(users *UserStore) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/data", handleData)
-	mux.HandleFunc("/api/cmd", handleCmd)
-	mux.HandleFunc("/api/profiles", handleProfiles)
-	mux.HandleFunc("/api/profiles/save", handleProfileSave)
-	mux.HandleFunc("/api/profiles/import", handleProfileImport)
-	mux.HandleFunc("/api/import-mdb", handleImportMdb)
+	mux.HandleFunc("/api/data", need(RoleViewer, handleData))
+	mux.HandleFunc("/api/cmd", handleCmd) // كل أمر يتأكد من صلاحيته
+	mux.HandleFunc("/api/profiles", need(RoleViewer, handleProfiles))
+	mux.HandleFunc("/api/profiles/save", need(RoleSupervisor, handleProfileSave))
+	mux.HandleFunc("/api/profiles/import", need(RoleSupervisor, handleProfileImport))
+	mux.HandleFunc("/api/import-mdb", need(RoleSupervisor, handleImportMdb))
+	mux.HandleFunc("/api/backups", need(RoleAdmin, handleBackups))
+	mux.HandleFunc("/api/audit", need(RoleAdmin, handleAudit))
+	mux.HandleFunc("/api/leaves", need(RoleViewer, handleLeaves))
+	mux.HandleFunc("/api/leaves/import", need(RoleAdmin, handleLeavesImport))
+	mux.HandleFunc("/api/leaves/clear", need(RoleAdmin, handleLeavesClear))
+	mux.HandleFunc("/api/manual", need(RoleViewer, handleManual))
+	mux.HandleFunc("/api/manual/add", need(RoleAdmin, handleManualAdd))
+	mux.HandleFunc("/api/manual/delete", need(RoleAdmin, handleManualDelete))
 	var as *authServer
-	if auth != nil {
-		as = newAuthServer(auth)
+	if users != nil {
+		as = newAuthServer(users)
 		mux.HandleFunc("/api/login", as.handleLogin)
+		mux.HandleFunc("/api/setup", as.handleSetup)
+		mux.HandleFunc("/api/session", as.handleSession)
 		mux.HandleFunc("/logout", as.handleLogout)
+		mux.HandleFunc("/api/me/password", as.handleMyPassword)
+		mux.HandleFunc("/api/users", need(RoleAdmin, as.handleUsers))
+		mux.HandleFunc("/api/users/save", need(RoleAdmin, as.handleUserSave))
+		mux.HandleFunc("/api/users/delete", need(RoleAdmin, as.handleUserDelete))
+	} else {
+		mux.HandleFunc("/api/session", func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, 200, map[string]any{"auth": false, "demo": demoMode, "version": Version,
+				"user": map[string]any{"username": "", "role": RoleAdmin, "roleLabel": roleLabels[RoleAdmin]}})
+		})
 	}
-	mux.HandleFunc("/api/session", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]any{"auth": as != nil})
-	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		file, ctype := "", ""
 		switch r.URL.Path {
@@ -97,61 +105,5 @@ func NewHandler(auth *AuthConfig) http.Handler {
 	if as != nil {
 		return as.middleware(mux)
 	}
-	return mux
-}
-
-// ---------- كلمة سر الدخول (تنحفظ مشفرة بـ PBKDF2، مو نص واضح) ----------
-
-// AuthConfig كلمة سر الدخول بصيغتها المشفرة
-type AuthConfig struct {
-	Salt       string `json:"salt"`
-	Hash       string `json:"hash"`
-	Iterations int    `json:"iterations"`
-	ok         sync.Map
-}
-
-func authFile() string { return filepath.Join(dataDir, "data", "auth.json") }
-
-func derive(pass string, salt []byte, iter int) []byte {
-	k, _ := pbkdf2.Key(sha256.New, pass, salt, iter, 32)
-	return k
-}
-
-func (a *AuthConfig) check(pass string) bool {
-	salt, err1 := hex.DecodeString(a.Salt)
-	want, err2 := hex.DecodeString(a.Hash)
-	if err1 != nil || err2 != nil {
-		return false
-	}
-	return subtle.ConstantTimeCompare(derive(pass, salt, a.Iterations), want) == 1
-}
-
-// LoadAuth يقرأ كلمة السر المحفوظة، ويرجع nil إذا ما أكو
-func LoadAuth() *AuthConfig {
-	b, err := os.ReadFile(authFile())
-	if err != nil {
-		return nil
-	}
-	var a AuthConfig
-	if json.Unmarshal(b, &a) != nil || a.Hash == "" || a.Iterations == 0 {
-		return nil
-	}
-	return &a
-}
-
-// SetPassword يحفظ كلمة سر جديدة ويطلّع كل الأجهزة المسجلة
-func SetPassword(pass string) (*AuthConfig, error) {
-	salt := make([]byte, 16)
-	rand.Read(salt)
-	iter := 120000
-	a := &AuthConfig{Salt: hex.EncodeToString(salt), Hash: hex.EncodeToString(derive(pass, salt, iter)), Iterations: iter}
-	if err := os.MkdirAll(filepath.Dir(authFile()), 0o755); err != nil {
-		return nil, err
-	}
-	b, _ := json.MarshalIndent(a, "", " ")
-	if err := os.WriteFile(authFile(), b, 0o600); err != nil {
-		return nil, err
-	}
-	os.Remove(sessionsFile())
-	return a, nil
+	return localOnly(mux)
 }

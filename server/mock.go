@@ -21,7 +21,10 @@ type mockUser struct {
 }
 
 var (
-	mockMu    sync.Mutex
+	mockMu      sync.Mutex
+	mockOptions = map[string]string{"~SerialNumber": "DEMO123456789", "~Platform": "ZMM220_TFT", "~DeviceName": "iFace1000",
+		"MAC": "00:17:61:00:00:01", "IPAddress": "192.168.1.201", "NetMask": "255.255.255.0", "GATEIPAddress": "192.168.1.1",
+		"ZKFaceVersion": "7", "~ZKFPVersion": "10", "~ExtendFmt": "1", "FaceFunOn": "1"}
 	mockUsers = func() []*mockUser {
 		names := []string{"أحمد علي", "محمد حسن", "زينب كاظم", "علي جاسم", "نور الهدى", "حسين عباس", "مريم صالح", "عمر خالد"}
 		out := make([]*mockUser, len(names))
@@ -117,9 +120,172 @@ func mockAction(action string, p map[string]any) (map[string]any, error) {
 			"user": map[string]any{"uid": target.UID, "userId": target.UserID, "name": target.Name, "cardno": target.Card, "role": target.Role, "hasPassword": target.HasPass}}, nil
 	case "clearLogs":
 		return msg("(تجريبي) انحفظت نسخة وبعدها انمسح السجل"), nil
+	case "addUser", "setPrivilege", "setPin", "deleteUser", "deleteFingers", "clearAdmins":
+		return mockUserAction(action, p)
+	case "setTime":
+		s, _ := anyStr(p["time"])
+		return map[string]any{"message": "(تجريبي) تم ضبط وقت الجهاز على " + strings.Replace(s, "T", " ", 1), "deviceTime": now, "pcTime": now}, nil
+	case "readOption":
+		key, err := cleanOptionKey(p)
+		if err != nil {
+			return nil, err
+		}
+		mockMu.Lock()
+		v, ok := mockOptions[key]
+		mockMu.Unlock()
+		if !ok {
+			return map[string]any{"key": key, "value": nil, "message": "(تجريبي) الجهاز ما رجّع قيمة للإعداد " + key}, nil
+		}
+		return map[string]any{"key": key, "value": v, "message": "(تجريبي) " + key + " = " + v}, nil
+	case "writeOption":
+		key, err := cleanOptionKey(p)
+		if err != nil {
+			return nil, err
+		}
+		v, _ := anyStr(p["value"])
+		mockMu.Lock()
+		mockOptions[key] = strings.TrimSpace(v)
+		mockMu.Unlock()
+		return map[string]any{"key": key, "message": fmt.Sprintf("(تجريبي) انكتب الإعداد %s = %s", key, strings.TrimSpace(v))}, nil
+	case "clearAllData":
+		return msg("(تجريبي) هنا ينمسح كل شي بالجهاز بعد حفظ نسخة. بالتجربة ما انمسح شي"), nil
+	case "clearOplog", "clearAccess", "restoreUsers":
+		return msg("(تجريبي) تم تنفيذ الأمر"), nil
+	case "deviceSecurityCheck":
+		return mockDeviceScan(), nil
+	case "setDeviceCommKey":
+		change, _ := p["change"].(bool)
+		n, err := parseNewCommKey(p["password"], change)
+		if err != nil {
+			return nil, err
+		}
+		if n == 0 {
+			return map[string]any{"applied": true, "key": 0, "disabled": true,
+				"message": "(تجريبي) انعطّلت كلمة سر اتصال الجهاز."}, nil
+		}
+		verb := "ضبط"
+		if change {
+			verb = "تغيير"
+		}
+		return map[string]any{"applied": true, "key": n,
+			"message": "(تجريبي) تم " + verb + " كلمة سر الاتصال بالجهاز وحفظها بالبرنامج."}, nil
 	}
 	if _, ok := actions[action]; !ok {
 		return nil, errors.New("أمر غير معروف")
 	}
 	return map[string]any{"message": "(تجريبي) تم تنفيذ: " + action, "deviceTime": now}, nil
+}
+
+func mockUserJSON(u *mockUser) map[string]any {
+	return map[string]any{"uid": u.UID, "userId": u.UserID, "name": u.Name, "cardno": u.Card, "role": u.Role, "hasPassword": u.HasPass}
+}
+
+// أوامر موظفي الجهاز بوضع التجربة: تغير القائمة الوهمية حتى تبين النتيجة بالتقارير
+func mockUserAction(action string, p map[string]any) (map[string]any, error) {
+	mockMu.Lock()
+	defer mockMu.Unlock()
+	if action == "clearAdmins" {
+		for _, u := range mockUsers {
+			u.Role = 0
+		}
+		return msg("(تجريبي) انلغت صلاحية المدير من كل الموظفين"), nil
+	}
+	if action == "addUser" {
+		id, _ := anyStr(p["userId"])
+		id = trimSpace(id)
+		name, _ := anyStr(p["name"])
+		name = trimSpace(name)
+		if !isDigits(id) {
+			return nil, badReq("رقم الموظف لازم يكون أرقام فقط")
+		}
+		if name == "" {
+			return nil, badReq("اكتب اسم الموظف")
+		}
+		if p["privilege"] == nil || p["privilege"] == "" {
+			p["privilege"] = privUser
+		}
+		priv, err := paramPriv(p)
+		if err != nil {
+			return nil, err
+		}
+		pin, err := paramPin(p)
+		if err != nil {
+			return nil, err
+		}
+		maxUID := 0
+		for _, u := range mockUsers {
+			if u.UserID == id {
+				return nil, badReq("رقم الموظف " + id + " موجود بالجهاز")
+			}
+			maxUID = max(maxUID, u.UID)
+		}
+		card, _ := anyStr(p["card"])
+		cn := anyInt(card, 0)
+		u := &mockUser{UID: maxUID + 1, UserID: id, Name: name, Card: uint32(max(0, cn)), Role: priv, HasPass: pin != ""}
+		mockUsers = append(mockUsers, u)
+		return map[string]any{"message": fmt.Sprintf("(تجريبي) انضاف الموظف رقم %s (%s)", id, name), "user": mockUserJSON(u)}, nil
+	}
+	uid := anyInt(p["uid"], -1)
+	userID, _ := anyStr(p["userId"])
+	idx := -1
+	for i, u := range mockUsers {
+		if u.UID == uid && u.UserID == userID {
+			idx = i
+		}
+	}
+	if idx < 0 {
+		return nil, badReq("بيانات هذا الموظف تغيرت، اسحب البيانات من جديد")
+	}
+	u := mockUsers[idx]
+	switch action {
+	case "setPrivilege":
+		priv, err := paramPriv(p)
+		if err != nil {
+			return nil, err
+		}
+		u.Role = priv
+		return map[string]any{"message": "(تجريبي) صارت الصلاحية: " + privLabel(priv), "user": mockUserJSON(u)}, nil
+	case "setPin":
+		pin, err := paramPin(p)
+		if err != nil {
+			return nil, err
+		}
+		u.HasPass = pin != ""
+		return map[string]any{"message": "(تجريبي) تغير الرقم السري", "user": mockUserJSON(u)}, nil
+	case "deleteUser":
+		mockUsers = append(mockUsers[:idx:idx], mockUsers[idx+1:]...)
+		return msg(fmt.Sprintf("(تجريبي) انحذف الموظف رقم %s (%s)", u.UserID, u.Name)), nil
+	}
+	return msg("(تجريبي) انحذفت بصمات الأصابع للموظف رقم " + u.UserID), nil
+}
+
+// فحص أمان الجهاز بوضع التجربة: نتيجة واقعية فيها مخاطر حتى تبين شكل التقرير
+func mockDeviceScan() map[string]any {
+	f := func(id, title, sev, detail, fix string) map[string]any {
+		return map[string]any{"id": id, "title": title, "severity": sev, "detail": detail, "fix": fix}
+	}
+	findings := []map[string]any{
+		f("commkey", "كلمة سر الاتصال (Comm Key)", "critical",
+			"(تجريبي) الجهاز يقبل الاتصال بدون كلمة سر اتصال. أي جهاز بالشبكة يقدر يقرا ويعدّل ويمسح.",
+			"عيّن كلمة سر اتصال من قائمة الجهاز واكتبها بالبرنامج."),
+		f("deviceadmin", "مدير على الجهاز", "high",
+			"(تجريبي) ماكو مدير على الجهاز، فأي شخص يفتح القائمة ويغيّر الإعدادات.",
+			"سجّل موظفاً بصلاحية مدير على الجهاز."),
+		f("network", "تعرّض الجهاز على الشبكة", "medium",
+			"(تجريبي) منفذ 4370 مفتوح والبروتوكول غير مشفّر.",
+			"اعزل الجهاز على شبكة إدارة وحجب المنفذ عن غير السيرفر."),
+		f("attlog", "سجل البصمات بالجهاز", "info",
+			"(تجريبي) يُمسح كاملاً بأمر واحد، لكن ما يُعدّل سجل مفرد.",
+			"فعّل نسخاً احتياطية دورية."),
+		f("firmware", "البرنامج الثابت للجهاز", "info",
+			"(تجريبي) إصدار البرنامج الثابت: Ver 6.60. تابع تحديثات المورّد.", "تابع تحديثات ZKTeco."),
+	}
+	return map[string]any{
+		"message":  "(تجريبي) فحص الجهاز خلص. لگينا 3 نقاط تحتاج انتباه (أعلاها: حرجة).",
+		"device":   map[string]any{"name": "iFace1000", "serial": "DEMO123456789", "platform": "ZMM220_TFT", "firmware": "Ver 6.60"},
+		"risk":     "critical",
+		"findings": findings,
+		"counts":   map[string]int{"critical": 1, "high": 1, "medium": 1, "info": 2},
+		"scanTime": localISO(time.Now()),
+	}
 }

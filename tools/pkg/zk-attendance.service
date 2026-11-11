@@ -1,0 +1,13 @@
+[Unit]
+Description=ZK Attendance
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/zk-attendance
+ExecStart=/opt/zk-attendance/zk-attendance --network --no-browser
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

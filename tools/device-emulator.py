@@ -1,6 +1,7 @@
 """ZKTeco TCP device emulator for testing (port 4370), closer to real devices.
 Env: EMU_NAMES=utf8|cp1256|ascii  EMU_LOGS=N  EMU_REC=40|16|8  EMU_COMMKEY=n  EMU_MISMATCH=1  EMU_IGNORE_WRITE=1
-Logs: CMD <code> <hex> | BADCHK | USERWRQ <hex> | SETTIME <iso>
+     EMU_NO134=1 (old firmware: delete-finger by user id unknown)  EMU_OPLOG_CLEARS_LOGS=1
+Logs: CMD <code> <hex> | BADCHK | USERWRQ <hex> | SETTIME <iso> | DELUSER | DELFP | CLEARDATA | CLEARADMIN | OPTW
 """
 import os, socket, struct, threading, datetime, sys, random, time
 LOG = open(sys.argv[1] if len(sys.argv) > 1 else '/tmp/emu.log', 'a', buffering=1)
@@ -27,6 +28,7 @@ users = [(1, '1', nm('أحمد علي', b'Ahmed'), b'1234', 14, 555, b'1'),
          (3, '3', nm('محمد', b'Mohammed'), b'', 0, 0, b'1'),
          (4, '4', b'John', b'', 0, 0, b'1')]
 RAW = {u[0]: user_rec(*u) for u in users}
+FINGERS = {1: {0, 1, 2}, 2: {0, 1}, 3: {6}, 4: {5}}  # enrolled finger indexes per uid
 base = datetime.datetime(2026, 10, 1, 8, 0, 0)
 logs = [(str((i % 4) + 1), base + datetime.timedelta(minutes=i * 37)) for i in range(NLOGS)]
 state = {'time_offset': -125}
@@ -114,7 +116,7 @@ def client(conn):
             if cmd == 50:
                 n = len(logs) + (3 if os.environ.get('EMU_MISMATCH') else 0)
                 f = [0] * 20
-                f[4], f[6], f[8], f[12] = len(RAW), 7, n, 0
+                f[4], f[6], f[8], f[12] = len(RAW), sum(len(v) for v in FINGERS.values()), n, 0
                 f[14], f[15], f[16], f[17], f[18], f[19] = 4000, 10000, 100000, 3993, 9996, 100000 - n
                 conn.sendall(ok(struct.pack('<20i', *f) + struct.pack('<3i', 4, 0, 3000))); continue
             if cmd == 201:
@@ -125,10 +127,43 @@ def client(conn):
                 state['time_offset'] = (t - datetime.datetime.now()).total_seconds()
                 LOG.write(f'SETTIME {t.isoformat()}\n'); conn.sendall(ok()); continue
             if cmd == 15: logs.clear(); conn.sendall(ok()); continue
+            if cmd == 14:
+                RAW.clear(); FINGERS.clear(); logs.clear(); LOG.write('CLEARDATA\n'); conn.sendall(ok()); continue
+            if cmd == 18:
+                uid = struct.unpack('<H', data[:2])[0]
+                if uid in RAW:
+                    del RAW[uid]; FINGERS.pop(uid, None); LOG.write(f'DELUSER {uid}\n'); conn.sendall(ok())
+                else: conn.sendall(frame(2001, rid))
+                continue
+            if cmd in (134, 19):
+                if cmd == 134:
+                    if os.environ.get('EMU_NO134'): conn.sendall(frame(0xffff, rid)); continue
+                    uid_s = data[:24].split(b'\x00')[0].decode(); fid = data[24]
+                    uid = next((k for k, v in RAW.items() if v[48:72].split(b'\x00')[0].decode() == uid_s), None)
+                else:
+                    uid, fid = struct.unpack('<hb', data[:3])
+                if uid is not None and fid in FINGERS.get(uid, set()):
+                    FINGERS[uid].discard(fid); LOG.write(f'DELFP cmd={cmd} uid={uid} fid={fid}\n'); conn.sendall(ok())
+                else: conn.sendall(frame(2001, rid))
+                continue
+            if cmd == 20:
+                for k in list(RAW): RAW[k] = RAW[k][:2] + b'\x00' + RAW[k][3:]
+                LOG.write('CLEARADMIN\n'); conn.sendall(ok()); continue
+            if cmd == 33:
+                if os.environ.get('EMU_OPLOG_CLEARS_LOGS'): logs.clear()
+                conn.sendall(ok()); continue
+            if cmd in (32, 1014): conn.sendall(ok()); continue
+            if cmd == 12:
+                k, _, v = data.decode(errors='replace').partition('=')
+                v = v.rstrip('\x00'); OPTIONS[k] = v; LOG.write(f'OPTW {k}={v}\n')
+                if k.lower() == 'comkey' and not os.environ.get('EMU_IGNORE_COMKEY'):
+                    globals()['COMMKEY'] = v if v and v != '0' else None  # يفرض المفتاح على الاتصالات الجديدة
+                conn.sendall(ok()); continue
             if cmd == 8:
                 LOG.write(f'USERWRQ {data.hex()}\n')
                 if not os.environ.get('EMU_IGNORE_WRITE') and len(data) == 72:
-                    RAW[struct.unpack('<H', data[:2])[0]] = bytes(data)
+                    uid = struct.unpack('<H', data[:2])[0]
+                    RAW[uid] = bytes(data); FINGERS.setdefault(uid, set())
                 conn.sendall(ok()); continue
             if cmd == 1503:
                 b = user_buf() if data[1] == 0x09 else log_buf()

@@ -1,7 +1,9 @@
 name: iOS app
 
+# ينبني بس عند وسم إصدار (مثل v2.6.0) أو بطلب يدوي — مو مع كل رفع للنسخة العامة
 on:
   push:
+    tags: ["v*"]
   workflow_dispatch:
 
 defaults:

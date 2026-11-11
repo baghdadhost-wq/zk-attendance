@@ -14,10 +14,23 @@
 <style>
   :root { --bg:#f4f6f8; --card:#fff; --line:#e3e7eb; --text:#1d2733; --muted:#6b7682; --accent:#1f6feb; --ok:#1a7f37; --warn:#b35900; --bad:#c62828; }
   * { box-sizing: border-box; }
+  [hidden] { display:none !important; }
   body { margin:0; font-family: Tahoma, "Segoe UI", Arial, sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
   header { background:#16212e; color:#fff; padding:14px 22px; display:flex; align-items:center; justify-content:space-between; }
   header h1 { margin:0; font-size:18px; }
   header small { color:#9fb0c2; }
+  header .who { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+  header .who a { color:#9fb0c2; font-size:13px; }
+  #whoBox { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .chip { background:#2a3a4d; color:#dbe6f2; padding:3px 9px; border-radius:12px; font-size:12px; white-space:nowrap; }
+  .chip.admin { background:#8e2a36; color:#fff; } .chip.supervisor { background:#2d5a8a; color:#fff; }
+  details.card > summary { cursor:pointer; font-weight:bold; font-size:15px; padding:2px 0; }
+  details.card[open] > summary { margin-bottom:12px; }
+  details.card > summary small { font-weight:normal; color:var(--muted); font-size:12px; margin-right:6px; }
+  .danger-zone { border-color:#f1c4c4; }
+  .danger-zone > summary { color:var(--bad); }
+  td .row { gap:6px; flex-wrap:nowrap; }
+  td select { min-width:0; padding:4px 6px; }
   main { max-width:1200px; margin:0 auto; padding:18px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
   .card h2 { margin:0 0 10px; font-size:15px; }
@@ -72,6 +85,15 @@
   td.num { font-variant-numeric: tabular-nums; }
   .tag { padding:2px 7px; border-radius:10px; font-size:11px; }
   .t-late { background:#fff1e0; color:var(--warn); } .t-miss { background:#fde8e8; color:var(--bad); } .t-ok { background:#e6f4ea; color:var(--ok); }
+  .t-man { background:#ede7f6; color:#5e35b1; white-space:nowrap; }
+  .t-hour { background:#e0f2f1; color:#00695c; white-space:nowrap; }
+  .t-info { background:#e8f0fe; color:#1a56c4; white-space:nowrap; }
+  label.chk { flex-direction:row; align-items:center; gap:6px; font-size:13px; }
+  label.chk input { width:auto; min-width:0; }
+  #leavesInfo { font-size:13px; margin:0 0 10px; }
+  #leavesInfo .lv-box { background:#f8fafc; border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; }
+  #leavesInfo .lv-counts { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:6px; }
+  @media print { .t-man { border:1px solid #5e35b1; } }
   .empty { color:var(--muted); padding:30px; text-align:center; }
   /* شاشات الموبايل */
   @media (max-width: 640px) {
@@ -98,7 +120,14 @@
 <body>
 <header>
   <h1>تقارير الحضور والانصراف</h1>
-  <div><small id="deviceInfo">غير متصل</small><a id="logoutLink" href="/logout" style="display:none;color:#9fb0c2;font-size:13px;margin-right:14px">خروج</a></div>
+  <div class="who">
+    <small id="deviceInfo">غير متصل</small>
+    <span id="whoBox" hidden>
+      <span id="whoName"></span><span class="chip" id="whoRole"></span>
+      <a href="#" id="myPassLink">تغيير كلمة السر</a>
+      <a href="/logout" id="logoutLink">خروج</a>
+    </span>
+  </div>
 </header>
 <main>
   <section class="card no-print">
@@ -122,11 +151,11 @@
       <div class="row">
         <button data-cmd="info">معلومات الجهاز والذاكرة</button>
         <button data-cmd="getTime">قراءة وقت الجهاز</button>
-        <button data-cmd="syncTime">مزامنة الوقت مع الحاسبة</button>
-        <button data-cmd="refresh">تحديث بيانات الجهاز</button>
+        <button data-cmd="syncTime" data-min="supervisor" hidden>مزامنة الوقت مع الحاسبة</button>
+        <button data-cmd="refresh" data-min="supervisor" hidden>تحديث بيانات الجهاز</button>
       </div>
     </div>
-    <div class="ctl">
+    <div class="ctl" data-min="supervisor" hidden>
       <div class="ctl-label">الباب والصوت</div>
       <div class="row">
         <label>مدة فتح الباب (ثانية) <input type="number" id="unlockSec" value="5" min="1" max="60" style="min-width:70px"></label>
@@ -161,7 +190,7 @@
       </div>
       <div class="hint">أسماء الأصوات من توثيق مكتبة pyzk، وقد تختلف حسب إصدار الجهاز.</div>
     </div>
-    <div class="ctl">
+    <div class="ctl" data-min="supervisor" hidden>
       <div class="ctl-label">رسالة على الشاشة</div>
       <div class="row">
         <label>النص <input id="lcdText" maxlength="40" placeholder="مثال: اجتماع الساعة 10" style="min-width:220px"></label>
@@ -170,24 +199,182 @@
       </div>
       <div class="hint">هذا الأمر مصمم لشاشات الأجهزة القديمة، وممكن شاشة iFace ما تعرض النص.</div>
     </div>
-    <div class="ctl">
+    <div class="ctl" data-min="supervisor" hidden>
       <div class="ctl-label">حالة الجهاز</div>
       <div class="row">
         <button data-cmd="disable">إيقاف البصمة مؤقتاً</button>
         <button data-cmd="enable">إعادة تفعيل البصمة</button>
       </div>
     </div>
-    <div class="ctl">
+    <div class="ctl" data-min="supervisor" hidden>
       <div class="ctl-label">تحتاج تأكيد</div>
       <div class="row">
         <button data-cmd="restart" class="danger">إعادة تشغيل الجهاز</button>
-        <button data-cmd="powerOff" class="danger">إطفاء الجهاز</button>
-        <button data-cmd="clearLogs" class="danger">مسح سجل البصمات (بعد حفظ نسخة)</button>
+        <button data-cmd="powerOff" class="danger" data-min="admin" hidden>إطفاء الجهاز</button>
+        <button data-cmd="clearLogs" class="danger" data-min="admin" hidden>مسح سجل البصمات (بعد حفظ نسخة)</button>
       </div>
     </div>
     <div id="cmdStatus" style="margin-top:12px;font-size:13px"></div>
     <div id="infoPanel"></div>
   </section>
+
+  <details class="card no-print" id="scanCard" data-min="supervisor" hidden>
+    <summary>فحص أمان الجهاز <small>هل بيانات الجهاز محمية من التعديل غير المصرّح به؟</small></summary>
+    <div class="hint" style="margin:-4px 0 10px">
+      فحص قراءة فقط — ما يغيّر ولا شي بالجهاز. يتأكد هل الجهاز محمي بكلمة سر اتصال، وهل عليه مدير، ويبيّن مخاطر الشبكة والبرنامج الثابت.
+      <br><b>جواب مهم:</b> بيانات الموظفين والبطاقات والأرقام السرية والصلاحيات <b>قابلة للتعديل</b> عبر الشبكة لمن يتصل بالجهاز — ولهذا يهمّ وجود كلمة سر اتصال ومدير على الجهاز. سجل البصمات يُقرأ أو يُمسح كامل، بس ما يُعدّل سجل مفرد.
+    </div>
+    <div class="row">
+      <button id="scanBtn" class="primary">ابدأ فحص الجهاز</button>
+      <button id="scanPrintBtn" class="no-print" hidden>طباعة النتيجة</button>
+    </div>
+    <div id="scanStatus" style="margin-top:10px;font-size:13px"></div>
+    <div id="scanResult" style="margin-top:12px"></div>
+  </details>
+
+  <details class="card no-print danger-zone" id="adminCard" data-min="admin" hidden>
+    <summary>أوامر الصلاحية المطلقة: الخطرة والمخفية <small>تظهر للمدير بس</small></summary>
+    <div class="hint" style="margin:-4px 0 10px">كل أمر يمسح أو يغير شي يحفظ نسخة احتياطية بمجلد backups قبله، وكل شي ينسجل بسجل العمليات باسمك.</div>
+    <div class="ctl">
+      <div class="ctl-label">إضافة موظف جديد للجهاز</div>
+      <div class="row">
+        <label>رقم الموظف <input id="nuId" inputmode="numeric" autocomplete="off" style="min-width:90px"></label>
+        <label>الاسم بالجهاز <input id="nuName" maxlength="40" autocomplete="off"></label>
+        <label>رقم البطاقة <input id="nuCard" inputmode="numeric" placeholder="اختياري" autocomplete="off" style="min-width:110px"></label>
+        <label>الصلاحية بالجهاز <select id="nuPriv"><option value="0">مستخدم عادي</option><option value="14">مدير</option></select></label>
+        <label>الرقم السري <input id="nuPin" type="password" inputmode="numeric" placeholder="اختياري" autocomplete="new-password" style="min-width:100px"></label>
+        <button id="nuBtn" class="primary">إضافة للجهاز</button>
+      </div>
+      <div class="hint">بعد الإضافة، الموظف يسجل بصمته أو وجهه من قائمة الجهاز نفسه. ترميز الاسم يتحدد حسب الأسماء الموجودة بالجهاز.</div>
+    </div>
+    <div class="ctl">
+      <div class="ctl-label">وقت محدد</div>
+      <div class="row">
+        <label>التاريخ والوقت <input type="datetime-local" id="customTime" step="1"></label>
+        <button data-admin="setTime">ضبط وقت الجهاز على هذا الوقت</button>
+      </div>
+      <div class="hint">للوقت الصحيح استخدم "مزامنة الوقت مع الحاسبة". هذا للحالات الخاصة، والبصمات الجديدة تنسجل بالوقت اللي تختاره.</div>
+    </div>
+    <div class="ctl">
+      <div class="ctl-label">إعدادات الجهاز المخفية</div>
+      <div class="row">
+        <label>اسم الإعداد <input id="optKey" list="optKeys" dir="ltr" placeholder="~DeviceName" autocomplete="off" autocapitalize="none" spellcheck="false" style="min-width:170px"></label>
+        <label>القيمة الجديدة <input id="optVal" dir="ltr" autocomplete="off" autocapitalize="none" spellcheck="false" style="min-width:150px"></label>
+        <button data-admin="readOption">قراءة</button>
+        <button data-admin="writeOption" class="danger">كتابة</button>
+      </div>
+      <datalist id="optKeys">
+        <option value="~DeviceName">اسم الجهاز</option><option value="~SerialNumber">الرقم التسلسلي</option><option value="~Platform">المنصة</option>
+        <option value="MAC">عنوان MAC</option><option value="IPAddress">عنوان IP</option><option value="NetMask">قناع الشبكة</option>
+        <option value="GATEIPAddress">البوابة</option><option value="~ZKFPVersion">إصدار خوارزمية البصمة</option><option value="ZKFaceVersion">إصدار خوارزمية الوجه</option>
+        <option value="FaceFunOn">ميزة الوجه</option><option value="~ExtendFmt">الصيغة الموسعة</option><option value="~UserExtFmt">صيغة الموظفين الموسعة</option>
+        <option value="CompatOldFirmware">التوافق مع البرامج القديمة</option><option value="SDKBuild">SDKBuild</option>
+      </datalist>
+      <div class="hint">أسماء الإعدادات بالقائمة من مكتبة pyzk، وتگدر تكتب أي اسم ثاني يعرفه جهازك. القراءة آمنة، أما الكتابة فتغير الإعداد بالجهاز مباشرة:
+        إذا غيرت IPAddress أو NetMask أو GATEIPAddress ممكن ينقطع الاتصال، وإذا غيرت COMKey لازم تكتب كلمة سر الاتصال الجديدة بالبرنامج.</div>
+    </div>
+    <div class="ctl" id="comkeyCtl">
+      <div class="ctl-label">كلمة سر اتصال الجهاز (Comm Key)</div>
+      <div class="row">
+        <label>كلمة سر جديدة (رقم 1–999999) <input id="comkeyVal" inputmode="numeric" autocomplete="off" style="min-width:150px"></label>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="comkeyChange" style="width:auto"> بدّل كلمة السر الموجودة</label>
+        <button id="comkeyBtn" class="primary">ضبط / تغيير</button>
+      </div>
+      <div class="hint">
+        للمدير فقط. يضبط كلمة سر اتصال للجهاز <b>إذا ما كانت موجودة</b>، فيمنع أي جهاز ثاني على الشبكة من التحكم بالجهاز.<br>
+        <b>لتغييرها لاحقاً:</b> فعّل «بدّل كلمة السر الموجودة» — البرنامج يستخدم المكتوبة بخانة «كلمة سر الاتصال» كالحالية ويبدّلها للجديدة. (خليها 0 ويا «بدّل» حتى تعطّلها — ينقص الأمان).<br>
+        بعد العملية البرنامج يحفظ المفتاح ويكمل الاتصال — اكتبه بمكان آمن لأنك تحتاجه لو غيّرت الحاسبة.
+      </div>
+      <div id="comkeyStatus" style="margin-top:8px;font-size:13px"></div>
+    </div>
+    <div class="ctl">
+      <div class="ctl-label">مسح وتصفير</div>
+      <div class="row">
+        <button data-admin="clearOplog" class="danger">مسح سجل عمليات الجهاز</button>
+        <button data-admin="clearAdmins" class="danger">إلغاء صلاحية المدير من كل الموظفين</button>
+        <button data-admin="clearAccess" class="danger">تصفير إعدادات الأبواب</button>
+        <button data-admin="clearAllData" class="danger">مسح كل بيانات الجهاز</button>
+      </div>
+      <div class="hint">
+        سجل العمليات: منو دخل قائمة الجهاز وشنو غيّر (البرنامج يحفظ سجل البصمات قبله احتياطاً).
+        إلغاء المدراء: يفيد إذا نسيتوا رمز مدير الجهاز وما تگدرون تفتحون قائمته.
+        تصفير الأبواب: يرجّع المناطق الزمنية والمجموعات وتركيبات الفتح للوضع الافتراضي.
+        مسح كل البيانات: يمسح الموظفين وبصماتهم ووجوههم وسجل الحضور، بعد حفظ نسخة من الموظفين والسجل (البصمات والوجوه نفسها ما تنحفظ).
+      </div>
+    </div>
+    <div class="ctl">
+      <div class="ctl-label">استرجاع الموظفين من نسخة احتياطية</div>
+      <div class="row"><button id="backupsBtn">عرض النسخ</button></div>
+      <div class="hint">يرجّع للجهاز الموظفين اللي مو موجودين بيه (الاسم والبطاقة والصلاحية والرقم السري)، بدون البصمات والوجوه.</div>
+      <div class="tablewrap" id="backupsList" style="margin-top:8px"></div>
+    </div>
+    <div id="adminStatus" style="margin-top:12px;font-size:13px"></div>
+  </details>
+
+  <details class="card no-print" id="manualCard" data-min="admin" hidden>
+    <summary>البصمات اليدوية <small>لموظف نسى يبصم أو كان بواجب</small></summary>
+    <div class="hint" style="margin:-4px 0 10px">تنحفظ بالبرنامج مو بالجهاز، وتدخل بالتقارير مكتوب يمها «يدوية» ويا السبب واسم اللي ضافها، وتنسجل بسجل العمليات.</div>
+    <div class="row">
+      <label>الموظف <input id="mpEmp" list="mpEmps" inputmode="numeric" placeholder="رقم الموظف" autocomplete="off" style="min-width:150px"></label>
+      <datalist id="mpEmps"></datalist>
+      <label>التاريخ <input type="date" id="mpDate"></label>
+      <label>النوع
+        <select id="mpType">
+          <option value="both">دخول وخروج (يوم كامل)</option>
+          <option value="in">دخول فقط</option>
+          <option value="out">خروج فقط</option>
+        </select>
+      </label>
+      <label id="mpInL">وقت الدخول <input type="time" id="mpIn"></label>
+      <label id="mpOutL">وقت الخروج <input type="time" id="mpOut"></label>
+      <label>السبب
+        <select id="mpReason">
+          <option value="forgot">نسى يبصم</option>
+          <option value="duty">واجب رسمي</option>
+          <option value="device">عطل بالجهاز</option>
+          <option value="other">سبب آخر</option>
+        </select>
+      </label>
+      <label>ملاحظة <input id="mpNote" maxlength="200" placeholder="اختياري" autocomplete="off" style="min-width:180px"></label>
+      <button id="mpBtn" class="primary">إضافة</button>
+    </div>
+    <div id="mpStatus" style="margin-top:8px;font-size:13px"></div>
+    <div class="sec-title">البصمات اليدوية المضافة</div>
+    <div class="tablewrap" id="mpTable"><div class="empty">ما أكو بصمات يدوية</div></div>
+  </details>
+
+  <details class="card no-print" id="usersCard" data-min="admin" hidden>
+    <summary>مستخدمو البرنامج وصلاحياتهم</summary>
+    <div class="tablewrap" id="usersTable"><div class="empty">جارِ التحميل...</div></div>
+    <div class="sec-title">إضافة مستخدم</div>
+    <div class="row">
+      <label>اسم المستخدم <input id="auName" autocomplete="off" autocapitalize="none" spellcheck="false" dir="auto"></label>
+      <label>كلمة السر <input id="auPass" type="password" autocomplete="new-password" placeholder="6 أحرف أو أكثر"></label>
+      <label>الصلاحية
+        <select id="auRole">
+          <option value="viewer">مشاهد</option>
+          <option value="supervisor">مشرف</option>
+          <option value="admin">مدير (صلاحية مطلقة)</option>
+        </select>
+      </label>
+      <button id="auBtn" class="primary">إضافة</button>
+    </div>
+    <div class="hint">
+      مشاهد: يسحب البيانات ويشوف التقارير ويصدّرها ويطبعها، ويقرا معلومات الجهاز ووقته، بدون أي تغيير.<br>
+      مشرف: كل شي بالمشاهد، ويا أوامر الجهاز العادية (مزامنة الوقت، فتح الباب، الصوت، رسالة الشاشة، إيقاف وتفعيل البصمة، إعادة التشغيل)، وفحص أمان الجهاز، وتعديل أسماء الموظفين وبطاقاتهم وبياناتهم الإضافية.<br>
+      مدير: كل شي، ويا الأوامر الخطرة والمخفية (الإطفاء، المسح، حذف وإضافة الموظفين، صلاحياتهم وأرقامهم السرية، إعدادات الجهاز المخفية)، والبصمات اليدوية، وإدارة المستخدمين وسجل العمليات.
+    </div>
+    <div id="usersStatus" style="margin-top:10px;font-size:13px"></div>
+  </details>
+
+  <details class="card no-print" id="auditCard" data-min="admin" hidden>
+    <summary>سجل العمليات <small>منو سوّى شنو ومتى</small></summary>
+    <div class="row" style="margin-bottom:10px">
+      <button id="auditBtn">تحديث</button>
+      <label>المستخدم <select id="auditUser"><option value="">الكل</option></select></label>
+    </div>
+    <div class="tablewrap" id="auditTable"></div>
+  </details>
 
   <section class="card no-print">
     <h2>إعدادات الدوام والتصفية</h2>
@@ -218,19 +405,28 @@
       <button data-tab="summary">ملخص الموظفين</button>
       <button data-tab="raw">سجل البصمات</button>
       <button data-tab="users">الموظفون</button>
+      <button data-tab="leaves">التصفية والإجازات</button>
     </div>
     <div class="row no-print" style="margin-bottom:10px">
       <button id="csvBtn">تصدير Excel (CSV)</button>
       <button id="printBtn">طباعة / PDF</button>
       <div class="tools" id="usersTools" style="display:none">
         <button id="profExportBtn">تصدير كل بيانات الموظفين</button>
-        <button id="profImportBtn">استيراد من Excel (CSV)</button>
-        <button id="mdbImportBtn">استيراد من برنامج ZKTeco القديم (att2000.mdb)</button>
+        <button id="profImportBtn" data-min="supervisor" hidden>استيراد من Excel (CSV)</button>
+        <button id="mdbImportBtn" data-min="supervisor" hidden>استيراد من برنامج ZKTeco القديم (att2000.mdb)</button>
         <input type="file" id="profFile" accept=".csv,.txt" hidden>
         <input type="file" id="mdbFile" accept=".mdb" hidden>
       </div>
+      <div class="tools" id="leavesTools" style="display:none">
+        <button id="lvUploadBtn" class="primary" data-min="admin" hidden>رفع تقرير الإجازات (Excel / CSV)</button>
+        <button id="lvClearBtn" class="danger" data-min="admin" hidden>مسح بيانات الإجازات</button>
+        <label class="chk"><input type="checkbox" id="lvOnlyBad"> غير المبرّر فقط</label>
+        <label class="chk"><input type="checkbox" id="lvHourLate"> الزمنية تغطي التأخير والخروج المبكر</label>
+        <input type="file" id="lvFile" accept=".xlsx,.csv,.txt" hidden>
+      </div>
     </div>
     <div id="tabStatus" class="no-print"></div>
+    <div id="leavesInfo" class="no-print" hidden></div>
     <div class="tablewrap" id="tableArea"><div class="empty">اسحب البيانات من الجهاز أولاً</div></div>
   </section>
 </main>
@@ -252,6 +448,30 @@
       </select>
     </label>
     <div class="hint">رقم الموظف والصلاحية وكلمة السر والبصمات والوجه ما تتغير. البرنامج يحفظ نسخة من كل الموظفين قبل التعديل، ويتأكد من الحفظ بعده.</div>
+    </div>
+    <div id="adminSection" data-min="admin" hidden>
+      <div class="sec-title">صلاحية مطلقة: أوامر خطرة على هذا الموظف</div>
+      <div class="row">
+        <label>الصلاحية بالجهاز <select id="edPriv"><option value="0">مستخدم عادي</option><option value="14">مدير</option></select></label>
+        <button id="edPrivBtn">حفظ الصلاحية</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label>رقم سري جديد <input id="edPin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="أرقام لحد 8"></label>
+        <button id="edPinBtn">تغيير الرقم السري</button>
+        <button id="edPinClear" class="danger">مسح الرقم السري</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label>بصمات الأصابع
+          <select id="edFinger"><option value="-1">كل الأصابع</option>
+            <option value="0">إصبع 0</option><option value="1">إصبع 1</option><option value="2">إصبع 2</option><option value="3">إصبع 3</option><option value="4">إصبع 4</option>
+            <option value="5">إصبع 5</option><option value="6">إصبع 6</option><option value="7">إصبع 7</option><option value="8">إصبع 8</option><option value="9">إصبع 9</option>
+          </select>
+        </label>
+        <button id="edFingerBtn" class="danger">حذف البصمات</button>
+        <button id="edDeleteBtn" class="danger">حذف الموظف من الجهاز</button>
+      </div>
+      <div class="hint">الرقم السري الحالي ما يظهر أبداً. حذف الموظف يحذف بصماته ووجهه من الجهاز، وسجل حضوره القديم وبياناته الإضافية تبقى. كل أمر يحفظ نسخة من الموظفين قبله.</div>
+      <div id="edAdminStatus" style="font-size:13px;margin-top:8px;min-height:18px"></div>
     </div>
     <div class="hint" id="devNote" style="display:none"></div>
     <div class="sec-title">بيانات إضافية (تنحفظ بالحاسبة، مو بالجهاز)</div>
@@ -278,13 +498,58 @@
   </div>
 </div>
 
+<div class="overlay no-print" id="passOverlay">
+  <div class="modal" role="dialog" aria-labelledby="passTitle" style="width:min(420px,94vw)">
+    <h3 id="passTitle">تغيير كلمة السر</h3>
+    <div class="sub" id="passSub"></div>
+    <label>كلمة السر الحالية <input type="password" id="pwCur" autocomplete="current-password"></label>
+    <label>كلمة السر الجديدة (6 أحرف أو أكثر) <input type="password" id="pwNew" autocomplete="new-password"></label>
+    <label>أعد كتابة الجديدة <input type="password" id="pwNew2" autocomplete="new-password"></label>
+    <div id="passStatus" style="font-size:13px;min-height:18px"></div>
+    <div class="actions"><button class="primary" id="passSave">حفظ</button><button id="passCancel">إلغاء</button></div>
+  </div>
+</div>
+
+<div class="overlay no-print" id="askOverlay">
+  <div class="modal" role="dialog" aria-labelledby="askTitle" style="width:min(460px,94vw)">
+    <h3 id="askTitle"></h3>
+    <div class="sub" id="askText" style="white-space:pre-line;font-size:13px;color:var(--text)"></div>
+    <label id="askLabel"><span id="askLabelText"></span> <input id="askInput" autocomplete="off"></label>
+    <div id="askStatus" class="err" style="font-size:13px;min-height:18px"></div>
+    <div class="actions"><button class="primary" id="askOk">موافق</button><button id="askCancel">إلغاء</button></div>
+  </div>
+</div>
+
 <script>
 const $ = (id) => document.getElementById(id);
 
-// وضع الشبكة: إذا انتهت الجلسة نرجع لصفحة الدخول
+// إذا انتهت الجلسة نرجع لصفحة الدخول
 const _fetch = window.fetch.bind(window);
 window.fetch = async (...args) => { const r = await _fetch(...args); if (r.status === 401) location.href = '/login'; return r; };
-fetch('/api/session').then(r => r.json()).then(j => { if (j.auth) $('logoutLink').style.display = ''; }).catch(() => {});
+
+// ---------- المستخدم وصلاحيته ----------
+// الخادم يتأكد من الصلاحية بكل طلب، وهنا بس نخفي اللي ما يخصه
+const RANK = { viewer: 1, supervisor: 2, admin: 3 };
+const ROLE_LABELS = { admin: 'مدير (صلاحية مطلقة)', supervisor: 'مشرف', viewer: 'مشاهد' };
+let ME = { username: '', role: 'viewer' };
+const can = (min) => (RANK[ME.role] || 0) >= RANK[min];
+function applyRole() { document.querySelectorAll('[data-min]').forEach(el => { el.hidden = !can(el.dataset.min); }); }
+async function initSession() {
+  try {
+    const j = await (await fetch('/api/session')).json();
+    if (j.auth && !j.user) { location.href = '/login'; return; }
+    if (j.user) ME = j.user;
+    if (!j.auth) { $('usersCard').remove(); $('myPassLink').remove(); } // بدون نظام دخول (تطبيق الموبايل)
+    if (j.auth) {
+      $('whoName').textContent = ME.username;
+      $('whoRole').textContent = ME.roleLabel || ROLE_LABELS[ME.role] || ME.role;
+      $('whoRole').className = 'chip ' + ME.role;
+      $('whoBox').hidden = false;
+    }
+  } catch (_) {}
+  applyRole();
+  if (DATA) render();
+}
 // يخلي البرنامج يتثبت كتطبيق على الشاشة الرئيسية
 if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
 let DATA = null;          // { info, users, logs }
@@ -350,7 +615,7 @@ async function fetchData() {
 
 function fillEmpSelect() {
   const cur = $('emp').value;
-  const ids = [...new Set([...DATA.users.map(u=>u.userId), ...DATA.logs.map(l=>l.userId)])].sort((a,b)=>Number(a)-Number(b)||a.localeCompare(b));
+  const ids = [...new Set([...DATA.users.map(u=>u.userId), ...DATA.logs.map(l=>l.userId), ...MANUAL.map(p=>p.userId)])].sort((a,b)=>Number(a)-Number(b)||a.localeCompare(b));
   $('emp').innerHTML = '<option value="">الكل</option>' + ids.map(id => `<option value="${esc(id)}">${esc(id)} - ${esc(userName(id))}</option>`).join('');
   if (ids.includes(cur)) $('emp').value = cur;
 }
@@ -373,32 +638,50 @@ function setData(j) {
 }
 
 // ---------- الحسابات ----------
+// سجل الجهاز ويا البصمات اليدوية (كل يدوية معلّمة manual حتى تبين بالتقارير)
+let MANUAL = [];
+function allLogs() {
+  if (!MANUAL.length) return DATA.logs;
+  const m = MANUAL.map(p => ({ userId: p.userId, time: p.time, d: new Date(p.time), manual: p }));
+  return [...DATA.logs, ...m].sort((a, b) => a.d - b.d);
+}
+const manualText = (p) => `يدوية: ${p.reason}${p.note ? ' - ' + p.note : ''} (أضافها ${p.by || '—'})`;
 function filteredLogs() {
   const f = $('from').value, t = $('to').value, emp = $('emp').value, dept = $('dept').value;
-  return DATA.logs.filter(l => { const k = dateKey(l.d); return (!f || k >= f) && (!t || k <= t) && (!emp || l.userId === emp) && (!dept || deptOf(l.userId) === dept); });
+  return allLogs().filter(l => { const k = dateKey(l.d); return (!f || k >= f) && (!t || k <= t) && (!emp || l.userId === emp) && (!dept || deptOf(l.userId) === dept); });
 }
 
 function dailyRows() {
   const dedupMs = (+$('dedup').value || 0) * 60000;
   const startM = toMin($('start').value), endM = toMin($('end').value), grace = +$('grace').value || 0;
+  const midM = (startM + endM) / 2;
   const groups = new Map();
   for (const l of filteredLogs()) {
     const k = l.userId + '|' + dateKey(l.d);
     if (!groups.has(k)) groups.set(k, []);
-    const arr = groups.get(k);
-    if (!arr.length || l.d - arr[arr.length-1] > dedupMs) arr.push(l.d);
+    const arr = groups.get(k), prev = arr[arr.length-1];
+    if (!prev || l.d - prev.d > dedupMs) arr.push(l);
+    else if (prev.manual && !l.manual) arr[arr.length-1] = l; // بصمة الجهاز أولى من اليدوية القريبة منها
   }
   const rows = [];
   for (const [k, punches] of groups) {
     const [userId, day] = k.split('|');
-    const first = punches[0], last = punches.length > 1 ? punches[punches.length-1] : null;
-    const inM = first.getHours()*60 + first.getMinutes();
+    let firstP = punches[0], lastP = punches.length > 1 ? punches[punches.length-1] : null;
+    if (!lastP) {
+      // بصمة وحدة باليوم: قبل منتصف الدوام = دخول (ناقصه خروج)، وبعده = خروج (ناقصه دخول). اليدوية حسب نوعها
+      const m = firstP.d.getHours()*60 + firstP.d.getMinutes();
+      if (firstP.manual ? firstP.manual.type === 'out' : m >= midM) { lastP = firstP; firstP = null; }
+    }
+    const first = firstP ? firstP.d : null, last = lastP ? lastP.d : null;
+    const inM = first ? first.getHours()*60 + first.getMinutes() : null;
     const outM = last ? last.getHours()*60 + last.getMinutes() : null;
-    const late = Math.max(0, inM - startM - grace) > 0 ? inM - startM : 0;
+    const late = inM != null && inM - startM - grace > 0 ? inM - startM : 0;
     const early = outM != null && outM < endM ? endM - outM : 0;
     const overtime = outM != null && outM > endM ? outM - endM : 0;
-    rows.push({ userId, name: userName(userId), day, dow: DAYS[first.getDay()], first, last,
-      worked: last ? (last - first) / 60000 : null, late, early, overtime, count: punches.length });
+    rows.push({ userId, name: userName(userId), day, dow: DAYS[(first || last).getDay()], first, last,
+      worked: first && last ? (last - first) / 60000 : null, late, early, overtime, count: punches.length,
+      missingIn: !first, missingOut: !last,
+      manualIn: firstP && firstP.manual || null, manualOut: lastP && lastP.manual || null, manualCount: punches.filter(p => p.manual).length });
   }
   rows.sort((a,b) => a.day.localeCompare(b.day) || Number(a.userId) - Number(b.userId));
   return rows;
@@ -412,18 +695,141 @@ function workingDays() {
   return out;
 }
 
-function summaryRows(daily) {
+function summaryRows(daily, recon) {
   const wd = workingDays(); const emp = $('emp').value, dept = $('dept').value;
   const ids = (emp ? [emp] : [...new Set([...DATA.users.map(u=>u.userId), ...daily.map(r=>r.userId)])]).filter(id => !dept || deptOf(id) === dept);
   return ids.map(id => {
     const rs = daily.filter(r => r.userId === id);
+    const rc = recon ? recon.filter(x => x.userId === id) : [];
     const present = new Set(rs.map(r => r.day));
     return { userId: id, name: userName(id), present: present.size,
       absent: wd.filter(d => !present.has(d)).length,
       lateCount: rs.filter(r => r.late).length, lateMin: rs.reduce((s,r)=>s+r.late,0),
       earlyMin: rs.reduce((s,r)=>s+r.early,0), overtime: rs.reduce((s,r)=>s+r.overtime,0),
-      missingOut: rs.filter(r => !r.last).length, worked: rs.reduce((s,r)=>s+(r.worked||0),0) };
+      missingOut: rs.filter(r => r.missingOut).length, missingIn: rs.filter(r => r.missingIn).length,
+      worked: rs.reduce((s,r)=>s+(r.worked||0),0), manual: rs.reduce((s,r)=>s+r.manualCount,0),
+      excLeave: rc.filter(x => x.code === 'leave').length, excHour: rc.filter(x => x.code === 'hour').length,
+      pend: rc.filter(x => x.code === 'pending').length,
+      badAbsent: rc.filter(x => x.code === 'bad' && x.absent).length,
+      badMissing: rc.filter(x => (x.code === 'bad' && !x.absent) || x.code === 'partial').length };
   }).sort((a,b) => Number(a.userId) - Number(b.userId));
+}
+
+
+// ---------- تصفية الغياب ونقص البصمة بالإجازات والزمنيات ----------
+// الربط برقم البصمة بس (الأسماء تختلف بالكتابة). المعتمد يبرّر، «بانتظار» ينعرض بدون تبرير، والمسحوب ينهمل.
+const nid = (id) => String(id ?? '').trim().replace(/^0+(?=\d)/, '');
+let LEAVES = [], LEAVE_IMPORTS = [], LEAVE_IDX = new Map(), LEAVE_WARN = [];
+const hasLeaves = () => LEAVES.length > 0;
+const LV_STATUS = { approved: 'معتمد', pending: 'بانتظار الموافقة', withdrawn: 'مسحوب' };
+const RECON = {
+  leave:   { label: 'مبرّر بإجازة', cls: 't-ok' },
+  hour:    { label: 'مبرّر بزمنية', cls: 't-hour' },
+  pending: { label: 'بانتظار الموافقة', cls: 't-late' },
+  partial: { label: 'مبرّر جزئياً', cls: 't-late' },
+  bad:     { label: 'غير مبرّر', cls: 't-miss' },
+  presentLeave: { label: 'إجازة مع حضور', cls: 't-info' },
+};
+function buildLeaveIndex() {
+  LEAVE_IDX = new Map();
+  for (const l of LEAVES) {
+    if (l.status === 'withdrawn') continue;
+    const d = new Date(l.from + 'T00:00:00'), end = new Date(l.to + 'T00:00:00');
+    for (let i = 0; d <= end && i < 400; i++, d.setDate(d.getDate() + 1)) {
+      const k = nid(l.userId) + '|' + dateKey(d);
+      if (!LEAVE_IDX.has(k)) LEAVE_IDX.set(k, { day: [], hour: [] });
+      LEAVE_IDX.get(k)[l.kind === 'hour' ? 'hour' : 'day'].push(l);
+    }
+  }
+}
+const fmtLeave = (l) => l.kind === 'hour' ? `زمنية ${fmtDur(l.minutes || 0)}` : `${l.type || 'إجازة'}${l.days ? ' (' + l.days + ' يوم)' : ''}`;
+async function loadLeaves() {
+  try {
+    const r = await fetch('/api/leaves'); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || '');
+    LEAVES = j.leaves || []; LEAVE_IMPORTS = j.imports || [];
+  } catch (_) { LEAVES = []; LEAVE_IMPORTS = []; }
+  buildLeaveIndex();
+  render();
+}
+
+// لكل موظف ولكل يوم دوام بالفترة: غياب أو نقص بصمة (ويا التأخير إذا الخيار مفعّل) ومطابقته بالإجازات
+function reconcile(daily) {
+  const coverLate = $('lvHourLate').checked;
+  const emp = $('emp').value, dept = $('dept').value;
+  const byKey = new Map(daily.map(r => [r.userId + '|' + r.day, r]));
+  const ids = (emp ? [emp] : [...new Set([...DATA.users.map(u => u.userId), ...daily.map(r => r.userId)])])
+    .filter(id => !dept || deptOf(id) === dept);
+  const out = [];
+  for (const id of ids) for (const day of workingDays()) {
+    const r = byKey.get(id + '|' + day) || null;
+    const lv = LEAVE_IDX.get(nid(id) + '|' + day) || { day: [], hour: [] };
+    const dayOk = lv.day.some(l => l.status === 'approved'), hourOk = lv.hour.some(l => l.status === 'approved');
+    const dayPend = !dayOk && lv.day.length > 0, hourPend = !hourOk && lv.hour.length > 0;
+    const hourMin = lv.hour.filter(l => l.status === 'approved').reduce((s, l) => s + (l.minutes || 0), 0);
+    let state, code, note = '', absent = false;
+    if (!r) {
+      state = 'غائب'; absent = true;
+      if (dayOk) code = 'leave';
+      else if (dayPend) code = 'pending';
+      else { code = 'bad'; note = hourOk ? 'عنده زمنية بس غاب اليوم كامل' : hourPend ? 'عنده زمنية بانتظار الموافقة' : ''; }
+    } else if (r.missingIn || r.missingOut) {
+      state = r.missingIn ? 'بدون دخول' : 'بدون خروج';
+      if (hourOk) code = 'hour';
+      else if (dayOk) { code = 'leave'; note = 'إجازة ويا بصمة وحدة'; }
+      else if (hourPend || dayPend) code = 'pending';
+      else code = 'bad';
+    } else if (dayOk) {
+      state = 'حاضر'; code = 'presentLeave'; note = 'عنده إجازة معتمدة بس بصم دخول وخروج';
+    } else if (coverLate && (r.late || r.early) && (hourOk || hourPend)) {
+      const le = (r.late || 0) + (r.early || 0);
+      state = [r.late ? 'متأخر ' + fmtDur(r.late) : '', r.early ? 'خروج مبكر ' + fmtDur(r.early) : ''].filter(Boolean).join(' و');
+      if (!hourOk) code = 'pending';
+      else if (le <= hourMin) code = 'hour';
+      else { code = 'partial'; note = `الزمنية ${fmtDur(hourMin)} والتأخير/الخروج المبكر ${fmtDur(le)}، الباقي ${fmtDur(le - hourMin)} غير مبرّر`; }
+    } else continue; // ما أكو شي يحتاج تصفية
+    const lvs = [...lv.day, ...lv.hour];
+    out.push({ day, dow: DAYS[new Date(day + 'T00:00:00').getDay()], userId: id, name: userName(id), state, code, note, absent,
+      leaveText: lvs.map(l => `${fmtLeave(l)} — ${l.statusText || LV_STATUS[l.status]}`).join('، '),
+      fileName: (lvs.find(l => l.name) || {}).name || '' });
+  }
+  out.sort((a, b) => a.day.localeCompare(b.day) || Number(a.userId) - Number(b.userId));
+  return out;
+}
+
+function renderLeavesInfo(recon) {
+  const box = $('leavesInfo');
+  box.hidden = currentTab !== 'leaves';
+  if (box.hidden) return;
+  const last = LEAVE_IMPORTS[LEAVE_IMPORTS.length - 1];
+  let h = '';
+  if (!hasLeaves()) {
+    h += `<div class="lv-box">ما مرفوع تقرير إجازات بعد${can('admin') ? '. ارفعه من زر «رفع تقرير الإجازات» فوق' : '. يرفعه المدير'}.
+      الجدول يبيّن الغياب ونقص البصمة كلها «غير مبرّر» لحد ما ينرفع التقرير.</div>`;
+  } else if (last) {
+    h += `<div class="lv-box">آخر تقرير: <b>${esc(last.file || '—')}</b> · رفعه ${esc(last.by || '—')} · ${esc(fmtWhen(last.at))}
+      · يغطي ${esc(last.from)} إلى ${esc(last.to)} · ${last.rows} طلب (${last.approved} معتمد، ${last.pending} بانتظار، ${last.withdrawn} مسحوب)
+      · عمود رقم البصمة: «${esc(last.idColumn || '—')}» · المحفوظ كلياً: ${LEAVES.length} طلب</div>`;
+  }
+  if (LEAVE_WARN.length) h += `<div class="lv-box"><b>ملاحظات القراءة:</b><br>${LEAVE_WARN.map(esc).join('<br>')}</div>`;
+  if (DATA && hasLeaves()) {
+    const known = new Set([...DATA.users.map(u => nid(u.userId)), ...Object.keys(PROFILES).map(nid)]);
+    const miss = new Map();
+    for (const l of LEAVES) if (l.status !== 'withdrawn' && !known.has(nid(l.userId))) miss.set(nid(l.userId), l.name || '');
+    if (miss.size) h += `<div class="lv-box err"><b>أرقام بتقرير الإجازات ما موجودة بالجهاز (${miss.size}):</b> ` +
+      [...miss].map(([id, nm]) => `${esc(id)}${nm ? ' (' + esc(nm) + ')' : ''}`).join('، ') + '<br><small>تأكد إن رقم البصمة بالتقرير نفسه بالجهاز.</small></div>';
+  }
+  if (recon) {
+    const c = (code, abs) => recon.filter(x => x.code === code && (abs === undefined || x.absent === abs)).length;
+    h += `<div class="lv-box"><b>نتيجة التصفية للفترة المختارة:</b><div class="lv-counts">
+      <span><span class="tag t-ok">مبرّر بإجازة</span> ${c('leave')}</span>
+      <span><span class="tag t-hour">مبرّر بزمنية</span> ${c('hour')}</span>
+      <span><span class="tag t-late">بانتظار الموافقة</span> ${c('pending')}</span>
+      <span><span class="tag t-miss">غياب غير مبرّر</span> ${c('bad', true)}</span>
+      <span><span class="tag t-miss">نقص بصمة غير مبرّر</span> ${c('bad', false) + c('partial')}</span>
+      <span><span class="tag t-info">إجازة مع حضور</span> ${c('presentLeave')}</span></div></div>`;
+  }
+  box.innerHTML = h;
 }
 
 // ---------- العرض ----------
@@ -433,39 +839,72 @@ function table(headers, rows, htmlRows, extraTh = '') {
   return `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}${extraTh}</tr></thead><tbody>${htmlRows.join('')}</tbody></table>`;
 }
 
+function syncTools() {
+  $('usersTools').style.display = currentTab === 'users' ? 'flex' : 'none';
+  $('leavesTools').style.display = currentTab === 'leaves' ? 'flex' : 'none';
+}
 function render() {
-  if (!DATA) return;
+  syncTools();
+  if (!DATA) { renderLeavesInfo(null); return; }
   saveSettings();
   const daily = dailyRows();
-  const summ = summaryRows(daily);
+  const recon = reconcile(daily);
+  const recIdx = new Map(recon.map(x => [x.userId + '|' + x.day, x]));
+  const summ = summaryRows(daily, recon);
   // بطاقات
-  const s = { emp: summ.length, days: workingDays().length, late: daily.filter(r=>r.late).length, miss: daily.filter(r=>!r.last).length };
-  $('stats').innerHTML = [
-    ['عدد الموظفين', s.emp], ['أيام العمل بالفترة', s.days], ['حالات التأخير', s.late], ['بدون بصمة خروج', s.miss]
-  ].map(([k,v]) => `<div class="stat">${k}<b>${v}</b></div>`).join('');
+  const s = { emp: summ.length, days: workingDays().length, late: daily.filter(r=>r.late).length, miss: daily.filter(r=>r.missingIn || r.missingOut).length };
+  const cards = [['عدد الموظفين', s.emp], ['أيام العمل بالفترة', s.days], ['حالات التأخير', s.late], ['نقص بصمة (دخول أو خروج)', s.miss]];
+  if (hasLeaves()) cards.push(['غير مبرّر بعد التصفية', recon.filter(x => x.code === 'bad' || x.code === 'partial').length]);
+  $('stats').innerHTML = cards.map(([k,v]) => `<div class="stat">${k}<b>${v}</b></div>`).join('');
 
   const period = `${$('from').value || '...'} إلى ${$('to').value || '...'}`;
   let html = '';
   if (currentTab === 'daily') {
     $('printTitleText').textContent = 'التقرير اليومي للحضور: ' + period;
     const H = ['التاريخ','اليوم','الرقم','الاسم','الدخول','الخروج','ساعات العمل','التأخير','خروج مبكر','إضافي','الحالة'];
-    const rows = daily.map(r => [r.day, r.dow, r.userId, r.name, hhmm(r.first), hhmm(r.last), fmtDur(r.worked), fmtDur(r.late||null), fmtDur(r.early||null), fmtDur(r.overtime||null),
-      !r.last ? 'بدون خروج' : r.late ? 'متأخر' : 'منتظم']);
+    const mark = (t, p) => p ? `${t} (يدوية)` : t;
+    const baseSt = (r) => r.missingIn ? 'بدون دخول' : r.missingOut ? 'بدون خروج' : r.late ? 'متأخر' : 'منتظم';
+    const recOf = (r) => recIdx.get(r.userId + '|' + r.day);
+    const rows = daily.map(r => { const x = recOf(r);
+      return [r.day, r.dow, r.userId, r.name, mark(hhmm(r.first), r.manualIn), mark(hhmm(r.last), r.manualOut), fmtDur(r.worked), fmtDur(r.late||null), fmtDur(r.early||null), fmtDur(r.overtime||null),
+        baseSt(r) + (x ? ' — ' + RECON[x.code].label : '')]; });
+    const quick = can('admin');
+    const timeCell = (t, p) => `<td class="num">${esc(t)}${p ? ` <span class="tag t-man" title="${esc(manualText(p))}">يدوية</span>` : ''}</td>`;
     html = table(H, rows, daily.map((r,i) => {
-      const st = !r.last ? '<span class="tag t-miss">بدون خروج</span>' : r.late ? '<span class="tag t-late">متأخر</span>' : '<span class="tag t-ok">منتظم</span>';
-      return `<tr>${rows[i].slice(0,10).map((c,j)=>`<td class="${j>=4?'num':''}">${esc(c)}</td>`).join('')}<td>${st}</td></tr>`;
+      const x = recOf(r);
+      const recTag = x ? ` <span class="tag ${RECON[x.code].cls}" title="${esc(x.leaveText || x.note)}">${RECON[x.code].label}</span>` : '';
+      const fixable = !x || x.code === 'bad' || x.code === 'pending';
+      const st = r.missingIn ? '<span class="tag t-miss">بدون دخول</span>' + recTag + (quick && fixable ? ` <button class="small no-print" data-addin="${esc(r.userId)}|${r.day}">إضافة دخول</button>` : '')
+        : r.missingOut ? '<span class="tag t-miss">بدون خروج</span>' + recTag + (quick && fixable ? ` <button class="small no-print" data-addout="${esc(r.userId)}|${r.day}">إضافة خروج</button>` : '')
+        : (r.late ? '<span class="tag t-late">متأخر</span>' : '<span class="tag t-ok">منتظم</span>') + recTag;
+      const c = rows[i];
+      return `<tr>${c.slice(0,4).map(x=>`<td>${esc(x)}</td>`).join('')}${timeCell(hhmm(r.first), r.manualIn)}${timeCell(hhmm(r.last), r.manualOut)}` +
+        `${c.slice(6,10).map(x=>`<td class="num">${esc(x)}</td>`).join('')}<td>${st}</td></tr>`;
     }));
   } else if (currentTab === 'summary') {
     $('printTitleText').textContent = 'ملخص حضور الموظفين: ' + period;
-    const H = ['الرقم','الاسم','القسم','أيام الحضور','أيام الغياب','مرات التأخير','مجموع التأخير','مجموع الخروج المبكر','مجموع الإضافي','بدون خروج','مجموع ساعات العمل'];
-    const rows = summ.map(r => [r.userId, r.name, deptOf(r.userId), r.present, r.absent, r.lateCount, fmtDur(r.lateMin), fmtDur(r.earlyMin), fmtDur(r.overtime), r.missingOut, fmtDur(r.worked)]);
+    const H = ['الرقم','الاسم','القسم','أيام الحضور','أيام الغياب','مرات التأخير','مجموع التأخير','مجموع الخروج المبكر','مجموع الإضافي','بدون خروج','بدون دخول','مجموع ساعات العمل','بصمات يدوية'];
+    const lvCols = hasLeaves();
+    if (lvCols) H.push('مبرّر بإجازة','مبرّر بزمنية','بانتظار الموافقة','غياب غير مبرّر','نقص بصمة غير مبرّر');
+    const rows = summ.map(r => [r.userId, r.name, deptOf(r.userId), r.present, r.absent, r.lateCount, fmtDur(r.lateMin), fmtDur(r.earlyMin), fmtDur(r.overtime), r.missingOut, r.missingIn, fmtDur(r.worked), r.manual,
+      ...(lvCols ? [r.excLeave, r.excHour, r.pend, r.badAbsent, r.badMissing] : [])]);
     html = table(H, rows, rows.map(r => `<tr>${r.map((c,j)=>`<td class="${j>=3?'num':''}">${esc(c)}</td>`).join('')}</tr>`));
+  } else if (currentTab === 'leaves') {
+    $('printTitleText').textContent = 'تصفية الغياب ونقص البصمة بالإجازات والزمنيات: ' + period;
+    const list = $('lvOnlyBad').checked ? recon.filter(x => x.code === 'bad' || x.code === 'partial') : recon;
+    const H = ['التاريخ','اليوم','الرقم','الاسم','الحالة بالجهاز','الإجازة / الزمنية','النتيجة','ملاحظة'];
+    const rows = list.map(x => [x.day, x.dow, x.userId, x.name, x.state, x.leaveText || '—', RECON[x.code].label, x.note]);
+    html = table(H, rows, list.map((x, i) => `<tr>${rows[i].slice(0, 4).map(c => `<td>${esc(c)}</td>`).join('')}` +
+      `<td>${esc(x.state)}</td><td style="white-space:normal;min-width:180px"${x.fileName && x.fileName !== x.name ? ` title="الاسم بتقرير الإجازات: ${esc(x.fileName)}"` : ''}>${esc(rows[i][5])}</td>` +
+      `<td><span class="tag ${RECON[x.code].cls}">${RECON[x.code].label}</span></td><td style="white-space:normal">${esc(x.note)}</td></tr>`));
   } else if (currentTab === 'raw') {
     $('printTitleText').textContent = 'سجل البصمات: ' + period;
     const logs = filteredLogs();
-    const H = ['التاريخ','اليوم','الوقت','الرقم','الاسم'];
-    const rows = logs.map(l => [dateKey(l.d), DAYS[l.d.getDay()], `${hhmm(l.d)}:${pad(l.d.getSeconds())}`, l.userId, userName(l.userId)]);
-    html = table(H, rows, rows.map(r => `<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`));
+    const H = ['التاريخ','اليوم','الوقت','الرقم','الاسم','المصدر'];
+    const rows = logs.map(l => [dateKey(l.d), DAYS[l.d.getDay()], `${hhmm(l.d)}:${pad(l.d.getSeconds())}`, l.userId, userName(l.userId), l.manual ? manualText(l.manual) : 'الجهاز']);
+    const del = can('admin');
+    html = table(H, rows, rows.map((r, i) => `<tr>${r.slice(0,5).map(c=>`<td>${esc(c)}</td>`).join('')}<td style="white-space:normal">` +
+      (logs[i].manual ? `<span class="tag t-man">يدوية</span> ${esc(r[5].slice(7))}` + (del ? ` <button class="small danger no-print" data-mpdel="${esc(logs[i].manual.id)}">حذف</button>` : '') : 'الجهاز') + '</td></tr>'));
   } else {
     $('printTitleText').textContent = 'قائمة الموظفين المسجلين بالجهاز';
     const dept = $('dept').value;
@@ -474,12 +913,14 @@ function render() {
     const pinText = (u) => !u.onDevice || u.hasPassword == null ? '' : u.hasPassword ? 'موجود' : 'لا يوجد';
     const rows = list.map(u => { const p = prof(u.userId); return [u.userId, u.onDevice ? u.name : 'غير موجود بالجهاز',
       p.fullName || '', p.department || '', p.title || '', p.mobile || '', u.cardno || '', u.onDevice ? roleName(u.role) : '', pinText(u)]; });
+    const editable = can('supervisor');
     html = table(H, rows, rows.map((r, i) =>
-      `<tr>${r.map((c,j)=>`<td${j===5?' dir="ltr" style="text-align:right"':''}>${esc(c)}</td>`).join('')}<td class="no-print"><button class="small" data-edit="${esc(list[i].userId)}">تعديل</button></td></tr>`
-    ), '<th class="no-print"></th>');
+      `<tr>${r.map((c,j)=>`<td${j===5?' dir="ltr" style="text-align:right"':''}>${esc(c)}</td>`).join('')}` +
+      (editable ? `<td class="no-print"><button class="small" data-edit="${esc(list[i].userId)}">تعديل</button></td>` : '') + '</tr>'
+    ), editable ? '<th class="no-print"></th>' : '');
   }
   $('tableArea').innerHTML = html;
-  $('usersTools').style.display = currentTab === 'users' ? 'flex' : 'none';
+  renderLeavesInfo(recon);
 }
 
 // كل الموظفين: الموجودين بالجهاز + اللي إلهم بيانات بالحاسبة بس
@@ -525,9 +966,9 @@ function cmdParams(action) {
   return {};
 }
 
-async function sendCmd(action) {
+async function sendCmd(action, params) {
   const r = await fetch('/api/cmd', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ip: $('ip').value.trim(), port: $('port').value, key: $('commKey').value.trim(), action, params: cmdParams(action) }) });
+    body: JSON.stringify({ ip: $('ip').value.trim(), port: $('port').value, key: $('commKey').value.trim(), action, params: params || cmdParams(action) }) });
   const j = await r.json();
   if (!r.ok) throw new Error(j.error || 'خطأ');
   return j;
@@ -589,6 +1030,56 @@ async function runCmd(btn) {
 }
 document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => runCmd(b));
 
+// ---------- فحص أمان الجهاز ----------
+const SEV = {
+  critical: { label: 'حرجة', bg: '#fde8e8', fg: '#b3261e', bd: '#f1c4c4' },
+  high:     { label: 'عالية', bg: '#fdeee0', fg: '#d84315', bd: '#f3d4bd' },
+  medium:   { label: 'متوسطة', bg: '#fff7e0', fg: '#9a6b00', bd: '#efe0a6' },
+  info:     { label: 'معلومة', bg: '#eaf1fb', fg: '#1b50a8', bd: '#cfe0f6' },
+  ok:       { label: 'سليم', bg: '#e9f6ec', fg: '#2e7d32', bd: '#cde9d3' },
+};
+function sevBadge(s) { const v = SEV[s] || SEV.info; return `<span style="background:${v.fg};color:#fff;padding:1px 9px;border-radius:12px;font-size:12px;white-space:nowrap">${v.label}</span>`; }
+function renderScan(j) {
+  const dev = j.device || {};
+  const di = [['اسم الجهاز', dev.name], ['الرقم التسلسلي', dev.serial], ['المنصة', dev.platform], ['البرنامج الثابت', dev.firmware]]
+    .filter(([, v]) => v).map(([k, v]) => `${esc(k)}: <bdi dir="ltr">${esc(v)}</bdi>`).join(' · ');
+  const rv = SEV[j.risk] || SEV.ok;
+  const banner = `<div style="background:${rv.bg};border:1px solid ${rv.bd};color:${rv.fg};border-radius:10px;padding:10px 14px;font-weight:bold;margin-bottom:10px">
+    أعلى مستوى خطورة: ${rv.label}${di ? `<div style="font-weight:normal;color:var(--muted);font-size:12.5px;margin-top:4px">${di}</div>` : ''}</div>`;
+  const rows = (j.findings || []).map(f => {
+    const v = SEV[f.severity] || SEV.info;
+    return `<tr style="background:${f.severity === 'ok' || f.severity === 'info' ? '#fff' : v.bg}">
+      <td>${sevBadge(f.severity)}</td>
+      <td><b>${esc(f.title)}</b><div style="color:var(--muted);font-size:13px;margin-top:2px;white-space:normal">${esc(f.detail)}</div>
+      ${f.fix ? `<div style="font-size:13px;margin-top:4px;white-space:normal"><b>المعالجة:</b> ${esc(f.fix)}</div>` : ''}</td></tr>`;
+  }).join('');
+  $('scanResult').innerHTML = banner + `<div class="tablewrap"><table><thead><tr><th>الخطورة</th><th>النقطة والمعالجة</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  if (can('admin') && (j.findings || []).some(f => f.id === 'commkey' && f.severity === 'critical')) {
+    const b = document.createElement('button');
+    b.className = 'primary no-print'; b.style.marginTop = '10px'; b.textContent = 'اضبط كلمة سر اتصال الجهاز الآن';
+    b.onclick = () => { $('adminCard').open = true; $('comkeyCtl').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('comkeyVal').focus(); };
+    $('scanResult').appendChild(b);
+  }
+  $('scanPrintBtn').hidden = false;
+}
+$('scanBtn').onclick = async () => {
+  saveSettings();
+  $('scanBtn').disabled = true; $('scanResult').innerHTML = '';
+  $('scanStatus').className = ''; $('scanStatus').textContent = 'جارِ فحص الجهاز... (قراءة فقط، ما يتغير شي بالجهاز)';
+  try {
+    const j = await sendCmd('deviceSecurityCheck', {});
+    $('scanStatus').className = 'okc'; $('scanStatus').textContent = j.message || 'خلص الفحص';
+    renderScan(j);
+  } catch (e) { $('scanStatus').className = 'err'; $('scanStatus').textContent = e.message; }
+  finally { $('scanBtn').disabled = false; }
+};
+$('scanPrintBtn').onclick = () => {
+  const w = window.open('', '_blank');
+  w.document.write('<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>فحص أمان الجهاز</title></head><body style="font-family:Tahoma,Arial;padding:20px">' +
+    '<h2>تقرير فحص أمان الجهاز</h2><div>' + $('scanStatus').textContent + '</div>' + $('scanResult').innerHTML + '</body></html>');
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+};
+
 // ---------- تعديل موظف ----------
 let editing = null;
 const utf8Len = (t) => new TextEncoder().encode(t).length;
@@ -609,16 +1100,28 @@ function openEdit(userId) {
   editing = { userId, dev };
   const p = prof(userId);
   $('editTitle').textContent = 'تعديل الموظف: ' + userName(userId);
-  $('editSub').textContent = `رقم الموظف ${userId}` + (dev ? ` · ${roleName(dev.role)}` + (dev.hasPassword ? ' · عنده رقم سري' : dev.hasPassword === false ? ' · بدون رقم سري' : '') : ' · غير موجود بالجهاز');
+  $('editSub').textContent = editSubText(userId, dev);
+  setEdAdminStatus('');
   const canDev = !!(dev && dev.uid != null);
   $('devSection').style.display = canDev ? '' : 'none';
   $('devNote').style.display = canDev ? 'none' : '';
   $('devNote').textContent = dev ? 'حتى تعدل الاسم أو البطاقة بالجهاز، اسحب البيانات من الجهاز أولاً (هذه نسخة محفوظة).' : 'هذا الموظف موجود ببيانات الحاسبة فقط، مو مسجل بجهاز البصمة.';
   if (canDev) { $('editName').value = dev.name || ''; $('editCard').value = dev.cardno || 0; $('editEnc').value = 'auto'; updateBytes(); }
+  $('adminSection').style.display = canDev ? '' : 'none';
+  if (canDev) {
+    const sel = $('edPriv');
+    sel.querySelectorAll('option[data-extra]').forEach(o => o.remove());
+    if (dev.role !== 0 && dev.role !== 14) sel.insertAdjacentHTML('beforeend', `<option data-extra value="${dev.role}" disabled>${esc(roleName(dev.role))} (الحالية)</option>`);
+    sel.value = String(dev.role === 14 ? 14 : dev.role === 0 ? 0 : dev.role);
+    $('edPin').value = ''; $('edFinger').value = '-1';
+  }
   document.querySelectorAll('[data-pf]').forEach(el => { el.value = p[el.dataset.pf] || ''; });
   $('editStatus').textContent = ''; $('editStatus').className = '';
   $('editOverlay').classList.add('open');
   (canDev ? $('editName') : document.querySelector('[data-pf="fullName"]')).focus();
+}
+function editSubText(userId, dev) {
+  return `رقم الموظف ${userId}` + (dev ? ` · ${roleName(dev.role)}` + (dev.hasPassword ? ' · عنده رقم سري' : dev.hasPassword === false ? ' · بدون رقم سري' : '') : ' · غير موجود بالجهاز');
 }
 function closeEdit() { $('editOverlay').classList.remove('open'); editing = null; }
 async function postJSON(url, body) {
@@ -795,7 +1298,418 @@ $('editEnc').addEventListener('change', updateBytes);
 $('editSave').onclick = saveEdit;
 $('editCancel').onclick = closeEdit;
 $('editOverlay').addEventListener('click', (e) => { if (e.target.id === 'editOverlay') closeEdit(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && editing) closeEdit(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || $('askOverlay').classList.contains('open')) return;
+  if ($('passOverlay').classList.contains('open')) closePass(); else if (editing) closeEdit();
+});
+
+
+// ---------- نافذة سؤال داخل الصفحة (بدل prompt حتى تشتغل بكل الأجهزة) ----------
+function askText({ title, text = '', label = '', type = 'text', okText = 'موافق', danger = false, validate }) {
+  return new Promise((resolve) => {
+    $('askTitle').textContent = title; $('askText').textContent = text;
+    $('askLabel').hidden = !label; $('askLabelText').textContent = label;
+    const inp = $('askInput'); inp.value = ''; inp.type = type;
+    $('askOk').textContent = okText; $('askOk').className = danger ? 'danger' : 'primary';
+    $('askStatus').textContent = '';
+    $('askOverlay').classList.add('open');
+    (label ? inp : $('askOk')).focus();
+    const done = (v) => { $('askOverlay').classList.remove('open'); $('askOk').onclick = $('askCancel').onclick = inp.onkeydown = null; resolve(v); };
+    $('askOk').onclick = () => { const v = label ? inp.value : ''; const er = validate && validate(v); if (er) { $('askStatus').textContent = er; return; } done(v); };
+    $('askCancel').onclick = () => done(null);
+    inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('askOk').click(); } else if (e.key === 'Escape') done(null); };
+  });
+}
+
+// ---------- أوامر الصلاحية المطلقة ----------
+function setAdminStatus(m, cls = '') { $('adminStatus').className = cls; $('adminStatus').textContent = m; }
+function setEdAdminStatus(m, cls = '') { $('edAdminStatus').className = cls; $('edAdminStatus').textContent = m; }
+const msgOf = (j) => j.message + (j.note ? ' · ' + j.note : '');
+const ADMIN_BUSY = '[data-admin], #nuBtn, #backupsBtn, #adminSection button, [data-restore]';
+
+async function adminCmd(action, params, statusFn = setAdminStatus) {
+  saveSettings();
+  document.querySelectorAll(ADMIN_BUSY).forEach(b => b.disabled = true);
+  statusFn(['clearAllData', 'clearOplog'].includes(action) ? 'جارِ سحب السجل وحفظ النسخة ثم التنفيذ... لا تسكر الصفحة' : 'جارِ التنفيذ...');
+  try { const j = await sendCmd(action, params); statusFn(msgOf(j), 'okc'); return j; }
+  catch (e) { statusFn(e.message, 'err'); return null; }
+  finally { document.querySelectorAll(ADMIN_BUSY).forEach(b => b.disabled = false); }
+}
+
+const ADMIN_CONFIRM = {
+  clearOplog: 'راح ينمسح سجل عمليات الجهاز (منو دخل قائمة الجهاز وشنو غيّر).\nقبل المسح البرنامج يسحب سجل البصمات ويحفظه بنسخة احتياطية.',
+  clearAdmins: 'راح تنلغي صلاحية المدير من كل الموظفين بالجهاز.\nبعدها أي شخص يگدر يفتح قائمة الجهاز ويغير إعداداته، لحد ما ترجّع مدير من «تعديل» الموظف.\nالبرنامج يحفظ نسخة من الموظفين قبله.',
+  clearAccess: 'راح ترجع إعدادات التحكم بالأبواب (المناطق الزمنية والمجموعات وتركيبات الفتح) للوضع الافتراضي.\nهذي الإعدادات ما تنحفظ بنسخة احتياطية.',
+};
+async function runAdmin(btn) {
+  const action = btn.dataset.admin;
+  let params = {};
+  if (action === 'setTime') {
+    const t = $('customTime').value;
+    if (!t) return setAdminStatus('اختار التاريخ والوقت أولاً', 'err');
+    params = { time: t.length === 16 ? t + ':00' : t };
+    if (!confirm(`راح يتغير وقت الجهاز إلى ${params.time.replace('T', ' ')}.\nالبصمات الجديدة تنسجل بهذا الوقت. متأكد؟`)) return;
+  } else if (action === 'readOption' || action === 'writeOption') {
+    const key = $('optKey').value.trim();
+    if (!key) return setAdminStatus('اكتب اسم الإعداد', 'err');
+    params = { key };
+    if (action === 'writeOption') {
+      params.value = $('optVal').value.trim();
+      if (!confirm(`راح ينكتب الإعداد ${key} = ${params.value || '(فارغ)'} بالجهاز مباشرة.\nإذا القيمة غلط ممكن الجهاز يتصرف بشكل غريب أو ينقطع الاتصال بيه.\nمتأكد؟`)) return;
+    }
+  } else if (action === 'clearAllData') {
+    if (!confirm('راح ينمسح كل شي بجهاز البصمة: الموظفين وبصمات أصابعهم ووجوههم وسجل الحضور.\nالبرنامج يحفظ نسخة من الموظفين والسجل قبل المسح، بس البصمات والوجوه نفسها ما تنحفظ ولازم تتسجل من جديد.\nتكمل؟')) return;
+    const v = await askText({ title: 'تأكيد مسح كل البيانات', text: 'حتى تأكد، اكتب العبارة: امسح الكل', label: 'العبارة',
+      okText: 'امسح كل البيانات', danger: true, validate: (x) => x.trim() === 'امسح الكل' ? '' : 'اكتب العبارة نفسها: امسح الكل' });
+    if (v == null) return;
+    params = { confirm: v.trim() };
+  } else if (ADMIN_CONFIRM[action] && !confirm(ADMIN_CONFIRM[action] + '\nمتأكد؟')) return;
+  const j = await adminCmd(action, params);
+  if (j && action === 'readOption' && j.value != null) $('optVal').value = j.value;
+  if (j && ['clearAllData', 'clearAdmins', 'restoreUsers'].includes(action)) setStatus('اسحب البيانات من جديد حتى تشوف الجهاز بعد التغيير');
+}
+document.querySelectorAll('[data-admin]').forEach(b => b.onclick = () => runAdmin(b));
+
+// ضبط كلمة سر اتصال الجهاز (Comm Key)
+function setComkeyStatus(m, cls = '') { $('comkeyStatus').className = cls; $('comkeyStatus').textContent = m; }
+$('comkeyBtn').onclick = async () => {
+  const v = $('comkeyVal').value.trim();
+  const change = $('comkeyChange').checked;
+  const lo = change ? 0 : 1;
+  if (!/^\d{1,6}$/.test(v) || +v < lo || +v > 999999)
+    return setComkeyStatus(change ? 'كلمة سر الاتصال لازم تكون رقم بين 0 و 999999 (0 = تعطيل)' : 'كلمة سر الاتصال لازم تكون رقم بين 1 و 999999', 'err');
+  let q;
+  if (change && +v === 0) q = 'راح تتعطّل كلمة سر اتصال الجهاز ويصير مفتوح لأي جهاز على الشبكة (ينقص الأمان). متأكد؟';
+  else if (change) q = `راح تتبدّل كلمة سر اتصال الجهاز إلى ${v} (البرنامج يستخدم الحالية المكتوبة بالبرنامج).\nبعدها أي اتصال يحتاج الرقم الجديد. اكتبه بمكان آمن. متأكد؟`;
+  else q = `راح تنضبط كلمة سر اتصال الجهاز إلى ${v} (إذا ما كانت موجودة).\nبعدها أي اتصال بالجهاز يحتاج هذا الرقم. اكتبه بمكان آمن. متأكد؟`;
+  if (!confirm(q)) return;
+  document.querySelectorAll('#comkeyCtl button, #comkeyCtl input').forEach(e => e.disabled = true);
+  setComkeyStatus('جارِ العملية والتأكد منها...');
+  try {
+    const j = await adminCmd('setDeviceCommKey', { password: v, change }, setComkeyStatus);
+    if (j && j.applied) {
+      $('commKey').value = j.disabled ? '' : (j.key || '');   // نحفظ/نمسح المفتاح حتى يكمل الاتصال
+      saveSettings();
+      $('comkeyVal').value = ''; $('comkeyChange').checked = false;
+    }
+  } finally { document.querySelectorAll('#comkeyCtl button, #comkeyCtl input').forEach(e => e.disabled = false); }
+};
+
+const nowLocal = () => { const d = new Date(); return `${dateKey(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+$('adminCard').addEventListener('toggle', () => { if ($('adminCard').open && !$('customTime').value) $('customTime').value = nowLocal(); });
+
+$('nuBtn').onclick = async () => {
+  const p = { userId: $('nuId').value.trim(), name: $('nuName').value.trim(), card: $('nuCard').value.trim(), privilege: +$('nuPriv').value, pin: $('nuPin').value.trim() };
+  if (!/^\d+$/.test(p.userId)) return setAdminStatus('رقم الموظف لازم يكون أرقام فقط', 'err');
+  if (!p.name) return setAdminStatus('اكتب اسم الموظف', 'err');
+  if (p.card && !/^\d+$/.test(p.card)) return setAdminStatus('رقم البطاقة لازم يكون أرقام فقط', 'err');
+  if (p.pin && !/^\d{1,8}$/.test(p.pin)) return setAdminStatus('الرقم السري لازم يكون أرقام، لحد 8', 'err');
+  if (p.privilege === 14 && !confirm('هذا الموظف راح يصير مدير بالجهاز، ويگدر يفتح قائمة الجهاز ويغير كل إعداداته. متأكد؟')) return;
+  const j = await adminCmd('addUser', p);
+  if (!j) return;
+  ['nuId', 'nuName', 'nuCard', 'nuPin'].forEach(id => $(id).value = ''); $('nuPriv').value = '0';
+  if (DATA && j.user && !DATA.users.some(u => u.userId === j.user.userId)) { DATA.users.push(j.user); fillEmpSelect(); render(); }
+};
+
+$('backupsBtn').onclick = async () => {
+  $('backupsList').innerHTML = '<div class="empty">جارِ التحميل...</div>';
+  try {
+    const r = await fetch('/api/backups'); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'خطأ');
+    if (!j.backups.length) { $('backupsList').innerHTML = '<div class="empty">ما أكو نسخ بيها موظفين لحد هسه</div>'; return; }
+    $('backupsList').innerHTML = '<table><thead><tr><th>الوقت</th><th>النوع</th><th>الموظفين</th><th></th></tr></thead><tbody>' +
+      j.backups.map(b => `<tr><td dir="ltr" style="text-align:right">${esc(b.time.replace('T', ' '))}</td><td>${esc(b.kind)}</td><td>${b.users}</td><td><button class="small" data-restore="${esc(b.name)}">استرجاع</button></td></tr>`).join('') + '</tbody></table>';
+  } catch (e) { $('backupsList').innerHTML = ''; setAdminStatus(e.message, 'err'); }
+};
+$('backupsList').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-restore]'); if (!b) return;
+  if (!confirm(`راح يرجع للجهاز الموظفين اللي بالنسخة ومو موجودين بيه (بدون بصماتهم ووجوههم).\nالموظفين الموجودين ما يتغيرون.\nالنسخة: ${b.dataset.restore}\nتكمل؟`)) return;
+  const j = await adminCmd('restoreUsers', { file: b.dataset.restore });
+  if (j) setStatus('اسحب البيانات من جديد حتى تشوف الموظفين اللي رجعوا');
+});
+
+// أوامر خطرة على موظف واحد (من نافذة التعديل)
+async function editAdmin(action, params, confirmText) {
+  if (!editing || !editing.dev) return null;
+  if (confirmText && !confirm(confirmText)) return null;
+  const dev = editing.dev;
+  const j = await adminCmd(action, { uid: dev.uid, userId: dev.userId, ...params }, setEdAdminStatus);
+  if (j && j.user) {
+    Object.assign(dev, { role: j.user.role, hasPassword: j.user.hasPassword, name: j.user.name, cardno: j.user.cardno });
+    $('editSub').textContent = editSubText(dev.userId, dev);
+    render();
+  }
+  return j;
+}
+$('edPrivBtn').onclick = () => {
+  const v = +$('edPriv').value, id = editing && editing.userId;
+  editAdmin('setPrivilege', { privilege: v }, v === 14 ? `الموظف ${id} راح يصير مدير بالجهاز، ويگدر يفتح قائمته ويغير كل إعداداته. متأكد؟` : `الموظف ${id} راح يصير مستخدم عادي بالجهاز. متأكد؟`);
+};
+$('edPinBtn').onclick = async () => {
+  const pin = $('edPin').value.trim();
+  if (!/^\d{1,8}$/.test(pin)) return setEdAdminStatus('الرقم السري لازم يكون أرقام، لحد 8', 'err');
+  if (await editAdmin('setPin', { pin }, `راح يتغير الرقم السري للموظف ${editing.userId} بالجهاز. متأكد؟`)) $('edPin').value = '';
+};
+$('edPinClear').onclick = () => editAdmin('setPin', { pin: '' }, `راح ينمسح الرقم السري للموظف ${editing.userId}، وما يگدر يدخل بالرقم السري بعدها. متأكد؟`);
+$('edFingerBtn').onclick = () => {
+  const f = +$('edFinger').value, id = editing.userId;
+  editAdmin('deleteFingers', { finger: f }, `راح تنحذف ${f === -1 ? 'كل بصمات أصابع الموظف ' + id : 'بصمة الإصبع ' + f + ' للموظف ' + id} من الجهاز، ولازم يسجلها من جديد.\nالبصمات نفسها ما تنحفظ بنسخة احتياطية. متأكد؟`);
+};
+$('edDeleteBtn').onclick = async () => {
+  const id = editing.userId, name = userName(id);
+  const j = await editAdmin('deleteUser', {}, `راح ينحذف الموظف ${id} (${name}) من الجهاز ويا بصماته ووجهه.\nسجل حضوره القديم وبياناته الإضافية يبقون، والبرنامج يحفظ نسخة من بياناته بالجهاز قبل الحذف.\nمتأكد؟`);
+  if (j && DATA) { DATA.users = DATA.users.filter(u => u.userId !== id); fillEmpSelect(); closeEdit(); render(); setTabStatus(j.message, 'okc'); }
+};
+
+
+// ---------- البصمات اليدوية ----------
+function setMpStatus(m, cls = '') { $('mpStatus').className = cls; $('mpStatus').textContent = m; }
+async function loadManual() {
+  try {
+    const r = await fetch('/api/manual'); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'خطأ');
+    MANUAL = j.punches || [];
+  } catch (_) { MANUAL = []; }
+  renderManualList();
+  if (DATA) { fillEmpSelect(); render(); }
+}
+function renderManualList() {
+  if (!$('mpTable') || !can('admin')) return;
+  if (!MANUAL.length) { $('mpTable').innerHTML = '<div class="empty">ما أكو بصمات يدوية</div>'; return; }
+  const list = [...MANUAL].sort((a, b) => b.time.localeCompare(a.time));
+  $('mpTable').innerHTML = '<table><thead><tr><th>الرقم</th><th>الاسم</th><th>التاريخ</th><th>الوقت</th><th>النوع</th><th>السبب</th><th>أضافها</th><th>وقت الإضافة</th><th></th></tr></thead><tbody>' +
+    list.map(p => `<tr><td>${esc(p.userId)}</td><td>${esc(userName(p.userId))}</td><td>${esc(p.time.slice(0, 10))}</td><td class="num">${esc(p.time.slice(11, 16))}</td>
+      <td>${p.type === 'out' ? 'خروج' : 'دخول'}</td><td style="white-space:normal">${esc(p.reason + (p.note ? ' - ' + p.note : ''))}</td><td>${esc(p.by || '—')}</td>
+      <td dir="ltr" style="text-align:right">${esc(fmtWhen(p.created))}</td><td><button class="small danger" data-mpdel="${esc(p.id)}">حذف</button></td></tr>`).join('') + '</tbody></table>';
+}
+function fillMpEmps() {
+  const ids = DATA ? employeeList().map(u => u.userId) : Object.keys(PROFILES);
+  $('mpEmps').innerHTML = ids.map(id => `<option value="${esc(id)}">${esc(userName(id))}</option>`).join('');
+}
+function syncMpType() {
+  const t = $('mpType').value;
+  $('mpInL').hidden = t === 'out'; $('mpOutL').hidden = t === 'in';
+}
+function openManualForm(userId, day, type) {
+  $('manualCard').open = true;
+  fillMpEmps();
+  if (userId) $('mpEmp').value = userId;
+  if (day) $('mpDate').value = day;
+  if (type) { $('mpType').value = type; syncMpType(); }
+  $('manualCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  (type === 'out' ? $('mpOut') : type === 'in' ? $('mpIn') : $('mpEmp')).focus();
+}
+$('manualCard').addEventListener('toggle', () => {
+  if (!$('manualCard').open) return;
+  fillMpEmps(); renderManualList();
+  if (!$('mpDate').value) $('mpDate').value = dateKey(new Date());
+  if (!$('mpIn').value) $('mpIn').value = $('start').value || '08:00';
+  if (!$('mpOut').value) $('mpOut').value = $('end').value || '14:00';
+  syncMpType();
+});
+$('mpType').onchange = syncMpType;
+$('mpBtn').onclick = async () => {
+  const type = $('mpType').value;
+  const body = { userId: $('mpEmp').value.trim(), date: $('mpDate').value, in: type === 'out' ? '' : $('mpIn').value,
+    out: type === 'in' ? '' : $('mpOut').value, reason: $('mpReason').value, note: $('mpNote').value.trim() };
+  if (!/^\d+$/.test(body.userId)) return setMpStatus('اختار الموظف (رقمه)', 'err');
+  if (!body.date) return setMpStatus('اختار التاريخ', 'err');
+  if ((type !== 'out' && !body.in) || (type !== 'in' && !body.out)) return setMpStatus('اكتب الوقت', 'err');
+  if (body.reason === 'other' && !body.note) return setMpStatus('اكتب السبب بالملاحظة', 'err');
+  const what = type === 'both' ? `دخول ${body.in} وخروج ${body.out}` : type === 'in' ? `دخول ${body.in}` : `خروج ${body.out}`;
+  if (!confirm(`راح تنضاف بصمة يدوية للموظف ${body.userId} (${userName(body.userId)}) بتاريخ ${body.date}: ${what}.\nتطلع بالتقارير مكتوب يمها «يدوية» ويا اسمك والسبب. متأكد؟`)) return;
+  $('mpBtn').disabled = true;
+  try {
+    await postJSON('/api/manual/add', body);
+    $('mpNote').value = '';
+    await loadManual();
+    setMpStatus(`انضافت البصمة اليدوية للموظف ${body.userId} بتاريخ ${body.date}: ${what}`, 'okc');
+  } catch (x) { setMpStatus(x.message, 'err'); }
+  finally { $('mpBtn').disabled = false; }
+};
+document.addEventListener('click', async (e) => {
+  const d = e.target.closest('[data-mpdel]'), q = e.target.closest('[data-addout]'), qi = e.target.closest('[data-addin]');
+  if (q) { const [id, day] = q.dataset.addout.split('|'); openManualForm(id, day, 'out'); return; }
+  if (qi) { const [id, day] = qi.dataset.addin.split('|'); openManualForm(id, day, 'in'); return; }
+  if (!d) return;
+  const p = MANUAL.find(x => x.id === d.dataset.mpdel);
+  if (!p || !confirm(`راح تنحذف البصمة اليدوية للموظف ${p.userId} (${userName(p.userId)}) بوقت ${p.time.replace('T', ' ')}. متأكد؟`)) return;
+  try { await postJSON('/api/manual/delete', { id: p.id }); await loadManual(); setMpStatus('انحذفت البصمة اليدوية', 'okc'); }
+  catch (x) { setMpStatus(x.message, 'err'); alert(x.message); }
+});
+
+// ---------- مستخدمو البرنامج ----------
+function setUsersStatus(m, cls = '') { $('usersStatus').className = cls; $('usersStatus').textContent = m; }
+const fmtWhen = (t) => t ? String(t).replace('T', ' ').slice(0, 16) : '—';
+async function loadUsers() {
+  try {
+    const r = await fetch('/api/users'); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'خطأ');
+    const roleSel = (u) => `<select data-urole="${esc(u.username)}"${u.me ? ' disabled' : ''}>` +
+      Object.entries(ROLE_LABELS).map(([k, v]) => `<option value="${k}"${k === u.role ? ' selected' : ''}>${v}</option>`).join('') + '</select>';
+    $('usersTable').innerHTML = '<table><thead><tr><th>اسم المستخدم</th><th>الصلاحية</th><th>آخر دخول</th><th>تاريخ الإضافة</th><th></th></tr></thead><tbody>' +
+      j.users.map(u => `<tr><td>${esc(u.username)}${u.me ? ' <span class="tag t-ok">أنت</span>' : ''}</td><td>${roleSel(u)}</td>
+        <td dir="ltr" style="text-align:right">${fmtWhen(u.lastLogin)}</td><td dir="ltr" style="text-align:right">${fmtWhen(u.created)}</td>
+        <td>${u.me ? '' : `<div class="row"><button class="small" data-upass="${esc(u.username)}">كلمة سر جديدة</button><button class="small danger" data-udel="${esc(u.username)}">حذف</button></div>`}</td></tr>`).join('') + '</tbody></table>';
+  } catch (e) { $('usersTable').innerHTML = ''; setUsersStatus(e.message, 'err'); }
+}
+$('usersCard').addEventListener('toggle', () => { if ($('usersCard').open) loadUsers(); });
+$('usersTable').addEventListener('change', async (e) => {
+  const sel = e.target.closest('[data-urole]'); if (!sel) return;
+  const name = sel.dataset.urole, role = sel.value;
+  if (confirm(`راح تصير صلاحية ${name}: ${ROLE_LABELS[role]}. متأكد؟`)) {
+    try { await postJSON('/api/users/save', { username: name, role }); setUsersStatus(`تغيرت صلاحية ${name} إلى: ${ROLE_LABELS[role]}`, 'okc'); }
+    catch (x) { setUsersStatus(x.message, 'err'); }
+  }
+  loadUsers();
+});
+$('usersTable').addEventListener('click', async (e) => {
+  const pb = e.target.closest('[data-upass]'), db = e.target.closest('[data-udel]');
+  if (pb) {
+    const name = pb.dataset.upass;
+    const pass = await askText({ title: 'كلمة سر جديدة', text: `كلمة سر جديدة للمستخدم ${name}. راح ينطلع من كل الأجهزة المسجل بيها.`,
+      label: 'كلمة السر الجديدة (6 أحرف أو أكثر)', type: 'password', okText: 'حفظ', validate: (v) => v.length >= 6 ? '' : 'كلمة السر لازم تكون 6 أحرف أو أكثر' });
+    if (pass == null) return;
+    try { await postJSON('/api/users/save', { username: name, password: pass }); setUsersStatus(`تغيرت كلمة سر ${name}، وانطلع من كل الأجهزة`, 'okc'); }
+    catch (x) { setUsersStatus(x.message, 'err'); }
+  } else if (db) {
+    const name = db.dataset.udel;
+    if (!confirm(`راح ينحذف المستخدم ${name} وينطلع من كل الأجهزة. متأكد؟`)) return;
+    try { await postJSON('/api/users/delete', { username: name }); setUsersStatus(`انحذف المستخدم ${name}`, 'okc'); }
+    catch (x) { setUsersStatus(x.message, 'err'); }
+    loadUsers();
+  }
+});
+$('auBtn').onclick = async () => {
+  const username = $('auName').value.trim(), password = $('auPass').value, role = $('auRole').value;
+  if (!username) return setUsersStatus('اكتب اسم المستخدم', 'err');
+  if (password.length < 6) return setUsersStatus('كلمة السر لازم تكون 6 أحرف أو أكثر', 'err');
+  if (role === 'admin' && !confirm(`${username} راح يصير مدير بصلاحية مطلقة: يگدر يمسح بيانات الجهاز ويضيف ويحذف مستخدمين. متأكد؟`)) return;
+  $('auBtn').disabled = true;
+  try {
+    await postJSON('/api/users/save', { create: true, username, password, role });
+    setUsersStatus(`انضاف المستخدم ${username} بصلاحية: ${ROLE_LABELS[role]}`, 'okc');
+    $('auName').value = ''; $('auPass').value = ''; $('auRole').value = 'viewer';
+    loadUsers();
+  } catch (x) { setUsersStatus(x.message, 'err'); }
+  finally { $('auBtn').disabled = false; }
+};
+
+// ---------- سجل العمليات ----------
+const ACTION_LABELS = {
+  data: 'سحب البيانات', login: 'دخول', loginFailed: 'محاولة دخول فاشلة', logout: 'خروج', setup: 'إنشاء حساب المدير', myPassword: 'غيّر كلمة سره',
+  userCreate: 'إضافة مستخدم', userUpdate: 'تعديل مستخدم', userDelete: 'حذف مستخدم', denied: 'محاولة بدون صلاحية',
+  profileSave: 'تعديل بيانات إضافية', profileImport: 'استيراد بيانات الموظفين',
+  syncTime: 'مزامنة الوقت', refresh: 'تحديث بيانات الجهاز', testVoice: 'تشغيل صوت', unlock: 'فتح الباب', lcdWrite: 'رسالة على الشاشة',
+  lcdClear: 'مسح الشاشة', disable: 'إيقاف البصمة', enable: 'تفعيل البصمة', restart: 'إعادة تشغيل الجهاز', powerOff: 'إطفاء الجهاز',
+  clearLogs: 'مسح سجل البصمات', updateUser: 'تعديل موظف بالجهاز', addUser: 'إضافة موظف للجهاز', setPrivilege: 'تغيير صلاحية موظف',
+  setPin: 'تغيير رقم سري', deleteUser: 'حذف موظف من الجهاز', deleteFingers: 'حذف بصمات أصابع', clearAdmins: 'إلغاء مدراء الجهاز',
+  clearOplog: 'مسح سجل عمليات الجهاز', clearAccess: 'تصفير إعدادات الأبواب', clearAllData: 'مسح كل بيانات الجهاز',
+  readOption: 'قراءة إعداد مخفي', writeOption: 'كتابة إعداد مخفي', setTime: 'ضبط وقت محدد', restoreUsers: 'استرجاع موظفين',
+  manualAdd: 'إضافة بصمة يدوية', manualDelete: 'حذف بصمة يدوية', leavesImport: 'رفع تقرير الإجازات', leavesClear: 'مسح بيانات الإجازات', deviceSecurityCheck: 'فحص أمان الجهاز', setDeviceCommKey: 'ضبط كلمة سر اتصال الجهاز',
+};
+let AUDIT = [];
+function auditDetail(e) {
+  const p = [];
+  if (e.target) p.push('المستخدم: ' + e.target);
+  if (e.newRole) p.push('الصلاحية: ' + (ROLE_LABELS[e.newRole] || e.newRole));
+  if (e.passwordChanged) p.push('كلمة سر جديدة');
+  if (e.userId) p.push('الموظف ' + e.userId + (e.name ? ' (' + e.name + ')' : ''));
+  if (e.privilege != null) p.push('بالجهاز: ' + (e.privilege == 14 ? 'مدير' : 'مستخدم عادي'));
+  if (e.cleared) p.push('مسح الرقم السري');
+  if (e.finger != null) p.push(e.finger == -1 ? 'كل الأصابع' : 'إصبع ' + e.finger);
+  if (e.key) p.push(e.key + (e.value != null ? ' = ' + e.value : ''));
+  if (e.time) p.push(String(e.time).replace(/T/g, ' '));
+  if (e.seconds) p.push(e.seconds + ' ثانية');
+  if (e.text) p.push('«' + e.text + '»');
+  if (e.file) p.push(e.file);
+  if (e.reason) p.push('السبب: ' + e.reason + (e.note ? ' - ' + e.note : ''));
+  if (e.action === 'data' && e.users != null) p.push(`${e.users} موظف، ${e.logs} بصمة`);
+  if (e.action === 'leavesImport' && e.rows != null) p.push(`${e.rows} طلب، ${e.approved} معتمد`);
+  if (e.action === 'leavesClear' && e.rows != null) p.push(`${e.rows} طلب`);
+  if (e.action === 'profileImport' && e.added != null) p.push(`${e.added} جديد، ${e.updated} تحدث`);
+  if (e.what) p.push(ACTION_LABELS[e.what] || e.what);
+  if (e.backup) p.push('نسخة: ' + e.backup);
+  if (e.device && e.device !== 'demo') p.push('الجهاز ' + e.device);
+  return p.join(' · ');
+}
+function renderAudit() {
+  const u = $('auditUser').value;
+  const list = AUDIT.filter(e => !u || e.user === u);
+  if (!list.length) { $('auditTable').innerHTML = '<div class="empty">ما أكو عمليات</div>'; return; }
+  $('auditTable').innerHTML = '<table><thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th><th>النتيجة</th><th>من جهاز</th></tr></thead><tbody>' +
+    list.map(e => `<tr><td dir="ltr" style="text-align:right">${esc(String(e.t || '').replace('T', ' '))}</td><td>${esc(e.user || '—')}</td>
+      <td>${esc(ACTION_LABELS[e.action] || e.action)}</td><td style="white-space:normal;min-width:220px">${esc(auditDetail(e))}</td>
+      <td style="white-space:normal">${e.ok ? '<span class="tag t-ok">تم</span>' : '<span class="tag t-miss">ما تم</span>' + (e.error ? ' <small>' + esc(String(e.error).slice(0, 140)) + '</small>' : '')}</td>
+      <td dir="ltr" style="text-align:right">${esc(e.ip || '')}</td></tr>`).join('') + '</tbody></table>';
+}
+async function loadAudit() {
+  $('auditTable').innerHTML = '<div class="empty">جارِ التحميل...</div>';
+  try {
+    const r = await fetch('/api/audit?limit=500'); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'خطأ');
+    AUDIT = j.entries || [];
+    const cur = $('auditUser').value;
+    const users = [...new Set(AUDIT.map(e => e.user).filter(Boolean))].sort();
+    $('auditUser').innerHTML = '<option value="">الكل</option>' + users.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
+    if (users.includes(cur)) $('auditUser').value = cur;
+    renderAudit();
+  } catch (e) { $('auditTable').innerHTML = `<div class="empty err">${esc(e.message)}</div>`; }
+}
+$('auditCard').addEventListener('toggle', () => { if ($('auditCard').open) loadAudit(); });
+$('auditBtn').onclick = loadAudit;
+$('auditUser').onchange = renderAudit;
+
+// ---------- تغيير كلمة السر ----------
+function openPass() {
+  ['pwCur', 'pwNew', 'pwNew2'].forEach(id => $(id).value = '');
+  $('passStatus').textContent = ''; $('passStatus').className = '';
+  $('passSub').textContent = 'المستخدم: ' + ME.username;
+  $('passOverlay').classList.add('open'); $('pwCur').focus();
+}
+function closePass() { $('passOverlay').classList.remove('open'); }
+$('myPassLink').onclick = (e) => { e.preventDefault(); openPass(); };
+$('passCancel').onclick = closePass;
+$('passOverlay').addEventListener('click', (e) => { if (e.target.id === 'passOverlay') closePass(); });
+$('passSave').onclick = async () => {
+  const st = (m, c = 'err') => { $('passStatus').className = c; $('passStatus').textContent = m; };
+  const cur = $('pwCur').value, n1 = $('pwNew').value, n2 = $('pwNew2').value;
+  if (!cur) return st('اكتب كلمة السر الحالية');
+  if (n1.length < 6) return st('كلمة السر الجديدة لازم تكون 6 أحرف أو أكثر');
+  if (n1 !== n2) return st('كلمتين السر الجديدة غير متطابقة');
+  $('passSave').disabled = true;
+  try { const j = await postJSON('/api/me/password', { current: cur, new: n1 }); st(j.message, 'okc'); setTimeout(closePass, 1800); }
+  catch (x) { st(x.message); }
+  finally { $('passSave').disabled = false; }
+};
+
+// ---------- تقرير الإجازات ----------
+$('lvUploadBtn').onclick = () => $('lvFile').click();
+$('lvFile').onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  setTabStatus('جارِ قراءة تقرير الإجازات...');
+  $('lvUploadBtn').disabled = true;
+  try {
+    const r = await fetch('/api/leaves/import?name=' + encodeURIComponent(f.name), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: f });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'خطأ');
+    const im = j.import;
+    LEAVE_WARN = j.warnings || [];
+    setTabStatus(`انرفع التقرير: ${im.rows} طلب (${im.approved} معتمد، ${im.pending} بانتظار، ${im.withdrawn} مسحوب) — ${im.day} إجازة و${im.hour} زمنية، من ${im.from} إلى ${im.to}` +
+      (im.replaced ? `. حلّ محل ${im.replaced} طلب سابق بنفس الفترة` : '') + (j.skipped ? `. ${j.skipped} سطر انهمل (التفاصيل تحت)` : ''), j.skipped ? 'err' : 'okc');
+    await loadLeaves();
+  } catch (x) { setTabStatus(x.message === 'Failed to fetch' ? 'ما گدرت أتصل بالبرنامج' : x.message, 'err'); }
+  finally { $('lvUploadBtn').disabled = false; }
+};
+$('lvClearBtn').onclick = async () => {
+  if (!confirm('راح تنمسح كل بيانات الإجازات والزمنيات المرفوعة بالبرنامج (التقرير الأصلي عندك ما يتأثر).\nبعدها كل الغياب يطلع غير مبرّر لحد ما ترفع التقرير مرة ثانية. متأكد؟')) return;
+  try { const j = await postJSON('/api/leaves/clear', {}); LEAVE_WARN = []; setTabStatus(`انمسحت بيانات الإجازات (${j.removed} طلب)`, 'okc'); await loadLeaves(); }
+  catch (x) { setTabStatus(x.message, 'err'); }
+};
+$('lvOnlyBad').onchange = render;
+try { $('lvHourLate').checked = localStorage.getItem('zkHourLate') === '1'; } catch (_) {}
+$('lvHourLate').onchange = () => { try { localStorage.setItem('zkHourLate', $('lvHourLate').checked ? '1' : ''); } catch (_) {} render(); };
 
 // ---------- الأحداث ----------
 $('fetchBtn').onclick = fetchData;
@@ -815,7 +1729,10 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
 });
 ['from','to','emp','dept','start','end','grace','weekend','dedup'].forEach(id => $(id).addEventListener('change', render));
 loadSettings();
+initSession();
 loadProfiles();
+loadManual();
+loadLeaves();
 </script>
 </body>
 </html>

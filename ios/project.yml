@@ -5,8 +5,8 @@ options:
     iOS: "15.0"
 settings:
   base:
-    MARKETING_VERSION: "2.2.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "2.6.0"
+    CURRENT_PROJECT_VERSION: "2"
 targets:
   ZKAttendance:
     type: application

@@ -1,0 +1,6 @@
+
+التحديث من نسخة سابقة (بدّل linux-x64 بمجلد جهازك):
+  sudo systemctl stop zk-attendance
+  sudo cp linux-x64/zk-attendance /opt/zk-attendance/
+  sudo systemctl start zk-attendance
+  مجلد data ومجلد backups يبقون مثل ما هم.

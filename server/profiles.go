@@ -48,14 +48,14 @@ func saveProfiles(all map[string]profile) error {
 		return err
 	}
 	if old, err := os.ReadFile(f); err == nil {
-		os.WriteFile(f+".bak", old, 0o644)
+		os.WriteFile(f+".bak", old, 0o600)
 	}
 	b, err := json.MarshalIndent(all, "", " ")
 	if err != nil {
 		return err
 	}
 	tmp := f + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
 		return err
 	}
 	var check map[string]profile
@@ -159,7 +159,9 @@ func handleProfileSave(w http.ResponseWriter, r *http.Request) {
 	} else {
 		delete(all, id)
 	}
-	if err := saveProfiles(all); err != nil {
+	err := saveProfiles(all)
+	audit(r, "profileSave", map[string]any{"userId": id}, err)
+	if err != nil {
 		writeErr(w, err, "ما گدرت أحفظ البيانات: ")
 		return
 	}
@@ -180,6 +182,11 @@ func handleProfileImport(w http.ResponseWriter, r *http.Request) {
 		mode = "merge"
 	}
 	res, err := importProfiles(req.Profiles, mode)
+	detail := map[string]any{"mode": mode}
+	if err == nil {
+		detail["added"], detail["updated"] = res["added"], res["updated"]
+	}
+	audit(r, "profileImport", detail, err)
 	if err != nil {
 		writeErr(w, err, "ما گدرت أستورد البيانات: ")
 		return
