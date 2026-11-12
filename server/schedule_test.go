@@ -303,3 +303,24 @@ func TestSessionPrune(t *testing.T) {
 		t.Fatalf("%d sessions kept", len(s.m))
 	}
 }
+
+func TestShareLinks(t *testing.T) {
+	store := newStore(t)
+	store.create("owner1", "Owner#2026x", RoleSuper, "")
+	store.create("emp", "emp12345", RoleEmployee, "4")
+	h := NewHandler(store)
+	SetShareInfo("", nil)
+	sup := login(t, h, "owner1", "Owner#2026x")
+	if _, j, _ := sup.do("GET", "/api/share", ""); j["mode"] != ShareLocal {
+		t.Fatalf("default must be local: %v", j)
+	}
+	SetShareInfo(ShareNetwork, []string{"http://192.168.1.10:3000", "http://172.20.0.1:3000"})
+	_, j, _ := sup.do("GET", "/api/share", "")
+	if urls, _ := j["urls"].([]any); j["mode"] != ShareNetwork || len(urls) != 2 || urls[0] != "http://192.168.1.10:3000" {
+		t.Fatalf("network links: %v", j)
+	}
+	if code, _, _ := login(t, h, "emp", "emp12345").do("GET", "/api/share", ""); code != 403 {
+		t.Fatal("employees do not need the members link")
+	}
+	SetShareInfo("", nil)
+}

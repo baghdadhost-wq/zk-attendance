@@ -26,7 +26,8 @@ func Start(dataDir, timeZone string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	users.AllowWebSetup() // البرنامج يسمع من الموبايل نفسه بس (127.0.0.1)
+	users.AllowWebSetup()                     // البرنامج يسمع من الموبايل نفسه بس (127.0.0.1)
+	server.SetShareInfo(server.ShareApp, nil) // فما أكو رابط للأعضاء
 	server.SetConnectHint(". بالآيفون والآيباد: تأكد إن الجهاز على نفس الواي فاي، وإن التطبيق مسموحله بالشبكة المحلية (الإعدادات ← الحضور ← الشبكة المحلية)")
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

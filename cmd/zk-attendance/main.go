@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -154,18 +155,25 @@ func main() {
 	}
 	if server.DemoMode() {
 		fmt.Println("DEMO MODE (fake data) / وضع التجربة - بيانات وهمية")
-		fmt.Println("Demo accounts / حسابات التجربة: admin, supervisor, viewer  (password / كلمة السر: 123456)")
+		fmt.Println("Demo accounts / حسابات التجربة: owner, admin, supervisor, viewer, employee  (password / كلمة السر: 123456)")
 	}
 	fmt.Println("Running / البرنامج يعمل:", localURL)
 	if *network {
-		fmt.Println("Open from any device on the network / افتحه من أي جهاز بالشبكة:")
+		var urls []string
 		for _, ip := range lanIPs() {
-			fmt.Printf("   http://%s:%d\n", ip, *port)
+			urls = append(urls, fmt.Sprintf("%s://%s:%d", scheme, ip, *port))
+		}
+		server.SetShareInfo(server.ShareNetwork, urls)
+		fmt.Println("Open from any device on the network / افتحه من أي جهاز بالشبكة:")
+		for _, u := range urls {
+			fmt.Println("  ", u)
 		}
 		fmt.Println("Log in with your username and password. / ادخل باسم المستخدم وكلمة السر.")
+		fmt.Println("The link is also at the top of the program, tap it to copy. / الرابط موجود فوق بالبرنامج، اضغطه حتى تنسخه.")
 	} else {
+		server.SetShareInfo(server.ShareLocal, nil)
 		if webSetup {
-			fmt.Println("First run: create the admin account in the browser. / أول تشغيل: أنشئ حساب المدير بالمتصفح.")
+			fmt.Println("First run: create the full-permission account in the browser. / أول تشغيل: أنشئ حساب الصلاحية المطلقة بالمتصفح.")
 		}
 		fmt.Println("Keep this window open while using the program. / خلي هذي النافذة مفتوحة طول ما تستخدم البرنامج.")
 		if !*noBrowser {
@@ -231,19 +239,53 @@ func chooseDataDir(flagDir string) string {
 	return "."
 }
 
+// lanIPs عناوين الحاسبة بالشبكة، الأرجح يشتغل أولاً: عنوان الشبكة الأساسية (اللي يطلع منها الاتصال)،
+// بعدها العناوين الخاصة العادية، وبالأخير الشبكات الوهمية (VirtualBox، Hyper-V، WSL، Docker...) والـ VPN.
 func lanIPs() []string {
-	var ips []string
+	primary := ""
+	if c, err := net.Dial("udp", "8.8.8.8:80"); err == nil { // UDP ما يرسل شي، بس يختار الواجهة الأساسية
+		if a, ok := c.LocalAddr().(*net.UDPAddr); ok {
+			primary = a.IP.String()
+		}
+		c.Close()
+	}
+	type cand struct {
+		ip    string
+		score int
+	}
+	var list []cand
 	ifaces, _ := net.Interfaces()
 	for _, ifc := range ifaces {
 		if ifc.Flags&net.FlagUp == 0 || ifc.Flags&net.FlagLoopback != 0 {
 			continue
 		}
+		name := strings.ToLower(ifc.Name)
+		virtual := false
+		for _, w := range []string{"vethernet", "virtualbox", "vmware", "vmnet", "docker", "wsl", "hyper-v", "vbox", "br-", "veth", "tailscale", "zerotier", "utun", "bluetooth"} {
+			virtual = virtual || strings.Contains(name, w)
+		}
 		addrs, _ := ifc.Addrs()
 		for _, a := range addrs {
-			if ipn, ok := a.(*net.IPNet); ok && ipn.IP.To4() != nil {
-				ips = append(ips, ipn.IP.String())
+			ipn, ok := a.(*net.IPNet)
+			if !ok || ipn.IP.To4() == nil || ipn.IP.IsLinkLocalUnicast() {
+				continue
 			}
+			ip, score := ipn.IP.String(), 2
+			switch {
+			case ip == primary:
+				score = 0
+			case virtual || !ipn.IP.IsPrivate():
+				score = 3
+			case ipn.IP.IsPrivate():
+				score = 1
+			}
+			list = append(list, cand{ip, score})
 		}
+	}
+	sort.SliceStable(list, func(i, j int) bool { return list[i].score < list[j].score })
+	var ips []string
+	for _, c := range list {
+		ips = append(ips, c.ip)
 	}
 	return ips
 }

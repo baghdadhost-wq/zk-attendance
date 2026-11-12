@@ -95,6 +95,17 @@
   .days label.chk input:disabled + span { color:var(--muted); }
   .t-off { background:#eceff1; color:#546e7a; white-space:nowrap; }
   .chip.super { background:#5b1f78; color:#fff; }
+  /* رابط البرنامج للأعضاء: شريط تحت الرأس، الضغط عليه ينسخ الرابط */
+  .sharebar { background:#e8f0fe; border-bottom:1px solid #c9dafc; padding:8px 22px; display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; font-size:13px; }
+  .sharebar .lbl { color:#1a3d7c; font-weight:bold; }
+  .sharebar #shareBtn { display:inline-flex; align-items:center; gap:10px; background:#fff; border:1px solid #9dbcf5; border-radius:8px; padding:6px 12px; font-size:15px; color:#0b3a8c; }
+  .sharebar #shareBtn bdi { font-family: Consolas, "Courier New", monospace; letter-spacing:.2px; }
+  .sharebar #shareState { background:var(--accent); color:#fff; border-radius:6px; padding:2px 10px; font-size:12px; white-space:nowrap; }
+  .sharebar #shareState.done { background:var(--ok); }
+  .sharebar #shareNote { color:#1a3d7c; }
+  .sharebar details { font-size:12px; } .sharebar details summary { cursor:pointer; color:#1a56c4; }
+  .sharebar details button { margin:4px 0 0 6px; }
+  @media (max-width:640px) { .sharebar { padding:8px 12px; } .sharebar #shareBtn { width:100%; justify-content:space-between; } }
   #leavesInfo { font-size:13px; margin:0 0 10px; }
   #leavesInfo .lv-box { background:#f8fafc; border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; }
   #leavesInfo .lv-counts { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:6px; }
@@ -134,6 +145,12 @@
     </span>
   </div>
 </header>
+<div class="sharebar no-print" id="shareBar" hidden>
+  <span class="lbl">رابط الدخول للأعضاء:</span>
+  <button type="button" id="shareBtn" title="اضغط حتى تنسخ الرابط وترسله للأعضاء"><bdi id="shareUrl" dir="ltr"></bdi><span id="shareState">نسخ</span></button>
+  <details id="shareMore" hidden><summary>روابط ثانية للحاسبة</summary><div id="shareList"></div></details>
+  <span id="shareNote"></span>
+</div>
 <main>
   <section class="card no-print">
     <h2>الاتصال بالجهاز</h2>
@@ -590,9 +607,60 @@ async function initSession() {
   } catch (_) {}
   applyRole();
   applyGenLock();
+  loadShare();
   await loadGeneral();
   if (DATA) render();
 }
+
+// ---------- رابط الدخول للأعضاء ----------
+// الخادم يعرف عناوين الحاسبة بالشبكة. إذا فاتح البرنامج من جهاز ثاني، الرابط اللي تستخدمه هسه أكيد يشتغل فيصير الأول.
+async function loadShare() {
+  try {
+    const r = await fetch('/api/share'); if (!r.ok) return;
+    const j = await r.json();
+    if (j.mode === 'app') return; // تطبيق الموبايل: يشتغل داخل الموبايل بس
+    $('shareBar').hidden = false;
+    if (j.mode !== 'network') {
+      $('shareBtn').hidden = true;
+      $('shareNote').textContent = `البرنامج مفتوح لهذي الحاسبة بس. حتى يدخل الأعضاء من أجهزتهم، ${j.hint || 'شغّله للشبكة'}، والرابط يطلع هنا.`;
+      return;
+    }
+    const local = ['localhost', '127.0.0.1', '[::1]', '::1'].includes(location.hostname);
+    let urls = (j.urls || []).slice();
+    if (!local) urls = [location.origin, ...urls.filter(u => u !== location.origin)];
+    if (!urls.length) {
+      $('shareBtn').hidden = true;
+      $('shareNote').textContent = 'ما لگيت عنوان الحاسبة بالشبكة. تأكد إنها متصلة بالواي فاي أو كيبل الشبكة، وأعد تشغيل البرنامج.';
+      return;
+    }
+    setShareUrl(urls[0]);
+    $('shareNote').textContent = 'الأعضاء لازم يكونون على نفس الشبكة، والحاسبة والبرنامج شغالين.';
+    if (urls.length > 1) {
+      $('shareMore').hidden = false;
+      $('shareList').innerHTML = urls.slice(1).map(u => `<button type="button" class="small" data-share="${esc(u)}"><bdi dir="ltr">${esc(u)}</bdi></button>`).join('');
+    }
+  } catch (_) {}
+}
+function setShareUrl(u) { $('shareUrl').textContent = u; $('shareBtn').dataset.url = u; }
+// النسخ: الطريقة الحديثة تحتاج https أو نفس الحاسبة، وبغيرها نستخدم الطريقة القديمة
+async function copyText(t) {
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(t); return true; } } catch (_) {}
+  const ta = document.createElement('textarea');
+  ta.value = t; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;opacity:0';
+  document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, t.length);
+  let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
+  ta.remove();
+  return ok;
+}
+let shareTimer = null;
+$('shareBtn').onclick = async () => {
+  const u = $('shareBtn').dataset.url, st = $('shareState');
+  const ok = await copyText(u);
+  st.textContent = ok ? 'انسخ ✓' : 'حدده وانسخه'; st.className = ok ? 'done' : '';
+  if (!ok) { const rg = document.createRange(); rg.selectNodeContents($('shareUrl')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); }
+  clearTimeout(shareTimer); shareTimer = setTimeout(() => { st.textContent = 'نسخ'; st.className = ''; }, 3000);
+};
+$('shareList').addEventListener('click', (e) => { const b = e.target.closest('[data-share]'); if (b) { setShareUrl(b.dataset.share); $('shareBtn').click(); } });
 
 // يخلي البرنامج يتثبت كتطبيق على الشاشة الرئيسية
 if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});

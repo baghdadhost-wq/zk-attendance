@@ -9,7 +9,7 @@ import (
 )
 
 // Version رقم نسخة البرنامج
-const Version = "2.8.0"
+const Version = "2.8.1"
 
 //go:embed public
 var publicFS embed.FS
@@ -54,6 +54,7 @@ func NewHandler(users *UserStore) http.Handler {
 	mux.HandleFunc("/api/manual/add", need(RoleSuper, handleManualAdd))
 	mux.HandleFunc("/api/manual/delete", need(RoleSuper, handleManualDelete))
 	mux.HandleFunc("/api/settings", need(RoleViewer, handleSettings))
+	mux.HandleFunc("/api/share", need(RoleViewer, handleShare))
 	mux.HandleFunc("/api/settings/schedule", need(RoleSuper, handleScheduleSave))
 	// التقارير المحفوظة للموظفين
 	mux.HandleFunc("/api/reports", need(RoleAdmin, handleReports))
