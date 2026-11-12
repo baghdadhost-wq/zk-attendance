@@ -637,8 +637,9 @@ async function loadShare() {
     $('shareBtn').hidden = false;
     setShareUrl(urls[0]);
     $('shareNote').textContent = phone
-      ? 'الأعضاء لازم يكونون على نفس الواي فاي، وخلي التطبيق مفتوح بالشاشة: إذا سكرته أو قفلت الموبايل ما يگدرون يدخلون. إذا الرابط بطّل يشتغل انسخه من جديد (الراوتر ممكن يبدّل IP الموبايل)، وشبكة الضيوف ما تنفع لأنها تعزل الأجهزة عن بعض.'
+      ? 'يبقى شغال إذا طلعت من التطبيق أو قفلت الموبايل، بس لا تسحبه لفوق: إذا سديته ما يگدرون يدخلون. الأعضاء لازم يكونون على نفس الواي فاي (مو شبكة الضيوف)، وإذا الرابط بطّل يشتغل انسخه من جديد.'
       : 'الأعضاء لازم يكونون على نفس الشبكة، والحاسبة والبرنامج شغالين.';
+    $('shareMore').querySelector('summary').textContent = phone ? 'روابط ثانية للموبايل' : 'روابط ثانية للحاسبة';
     $('shareMore').hidden = urls.length < 2;
     if (urls.length > 1) {
       $('shareList').innerHTML = urls.slice(1).map(u => `<button type="button" class="small" data-share="${esc(u)}"><bdi dir="ltr">${esc(u)}</bdi></button>`).join('');

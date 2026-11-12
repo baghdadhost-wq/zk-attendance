@@ -16,9 +16,14 @@ for path in sys.argv[1:]:
         'excel export reached the share sheet': r.get('download', {}).get('bytes', 0) > 0,
         'no script error': 'error' not in r,
     }
-    net_file = path.replace('-selftest.json', '-net.json')
-    net = json.load(open(net_file)) if os.path.exists(net_file) else {}
-    checks['another device opens the phone link'] = any(v.get('status') == 200 for v in net.values())
+    def side(name):
+        f = path.replace('-selftest.json', name)
+        return json.load(open(f)) if os.path.exists(f) else {}
+    answered = lambda res: any(v.get('status') == 200 for v in res.values())
+    checks['another device opens the phone link'] = answered(side('-net.json'))
+    checks['keep-alive started (stays running in the background)'] = r.get('keepAlive') == 'on'
+    checks['another device opens it while the app is in the background'] = answered(side('-bg-on.json'))
+    control = side('-bg-off.json')
     m = re.search(r'(\d\d):(\d\d):\d\d', r.get('jsTime', ''))
     g = r.get('goTime', '')
     if m and len(g) >= 16:
@@ -31,4 +36,7 @@ for path in sys.argv[1:]:
     for name, passed in checks.items():
         print(('  PASS  ' if passed else '  FAIL  ') + name)
         ok &= passed
+    # للمقارنة بس: بدون البقاء بالخلفية المفروض iOS يجمّده، فما يجاوب
+    if control:
+        print('  INFO  without keep-alive the app ' + ('still answered (simulator did not freeze it)' if answered(control) else 'was frozen (no answer), as expected'))
 sys.exit(0 if ok else 1)

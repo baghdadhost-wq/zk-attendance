@@ -27,6 +27,27 @@ shot() {
   rm -f "$OUT/tmp.png"
 }
 
+# يطلع من التطبيق للشاشة الرئيسية (يفتح الإعدادات)، ينتظر، وجهاز ثاني يحاول يفتح رابط الموبايل
+bg_check() {
+  local udid=$1 kind=$2 mode=$3
+  xcrun simctl launch "$udid" com.apple.Preferences > /dev/null 2>&1 || echo "could not open Settings"
+  sleep 40
+  python3 - "$OUT/$kind-selftest.json" "$OUT/$kind-bg-$mode.json" "$mode" << 'PY'
+import json, sys, time, urllib.request
+urls = json.load(open(sys.argv[1])).get('shareUrls') or []
+out = {}
+for u in urls:
+    t0 = time.time()
+    try:
+        with urllib.request.urlopen(u + '/api/session', timeout=8) as resp:
+            out[u] = {'status': resp.status, 'ms': int((time.time() - t0) * 1000)}
+    except Exception as e:
+        out[u] = {'error': str(e), 'ms': int((time.time() - t0) * 1000)}
+json.dump(out, open(sys.argv[2], 'w'), ensure_ascii=False)
+print('app in background 40s, keep-alive %s:' % sys.argv[3], out)
+PY
+}
+
 run_on() {
   local kind=$1 udid data="" result=""
   udid=$(pick "$kind")
@@ -62,6 +83,12 @@ PY
   shot "$udid" "$kind-share"
   cp "$data/Documents/selftest.json" "$OUT/$kind-selftest.json"
   echo "--- $kind:"; cat "$OUT/$kind-selftest.json"
+  # يبقى شغال بالخلفية؟ وللمقارنة نفس الشي بدون البقاء بالخلفية (المفروض iOS يجمّده)
+  bg_check "$udid" "$kind" on
+  xcrun simctl terminate "$udid" "$BID" || true
+  xcrun simctl launch "$udid" "$BID" -zkNoKeepAlive
+  sleep 8
+  bg_check "$udid" "$kind" off
   xcrun simctl shutdown "$udid" || true
   [ "$result" = done ] || echo "WARNING: $kind self-test did not finish"
 }

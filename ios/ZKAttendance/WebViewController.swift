@@ -18,6 +18,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         return nil
     }()
 
+    /// للاختبار على المحاكي بس: -zkNoKeepAlive يطفي البقاء بالخلفية، حتى نقارن
+    private let keepAliveDisabled = ProcessInfo.processInfo.arguments.contains("-zkNoKeepAlive")
+
     /// ملفات البرنامج تنحفظ هنا، وتبين بتطبيق "الملفات"
     private var documentsURL: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -54,9 +57,16 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
         NotificationCenter.default.addObserver(self, selector: #selector(appBecameActive),
                                                name: UIApplication.didBecomeActiveNotification, object: nil)
-        // التطبيق سيرفر للأجهزة الثانية طول ما هو مفتوح، فالشاشة ما تطفي وحدها
-        UIApplication.shared.isIdleTimerDisabled = true
+        keepServing()
         startServer()
+    }
+
+    /// التطبيق سيرفر للأجهزة الثانية: يبقى شغال إذا طلعت منه أو قفلت الموبايل.
+    /// وإذا ما گدر يبقى بالخلفية، الشاشة ما تطفي وحدها طول ما هو مفتوح.
+    private func keepServing() {
+        let running = !keepAliveDisabled && KeepAlive.shared.start()
+        UIApplication.shared.isIdleTimerDisabled = !running
+        recordTest(["keepAlive": running ? "on" : (KeepAlive.shared.lastError ?? "off")])
     }
 
     private func startServer() {
@@ -73,7 +83,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     /// إذا التطبيق بقى بالخلفية فترة طويلة ممكن iOS يوقف البرنامج، فنتأكد منه كل ما يرجع
     @objc private func appBecameActive() {
-        UIApplication.shared.isIdleTimerDisabled = true
+        keepServing()
         guard let base = serverURL, let ping = URL(string: "api/session", relativeTo: base) else { return }
         var request = URLRequest(url: ping)
         request.timeoutInterval = 2
