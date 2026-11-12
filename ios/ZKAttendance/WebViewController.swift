@@ -84,7 +84,12 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         loadFailures = 0
-        if let ip = selfTestIP, !selfTestStarted {
+        guard let ip = selfTestIP else { return }
+        if webView.url?.path == "/login" { // الاختبار يدخل أول (أول فتح: ينشئ الحساب)
+            webView.evaluateJavaScript(Self.selfTestLoginScript, completionHandler: nil)
+            return
+        }
+        if !selfTestStarted {
             selfTestStarted = true
             webView.evaluateJavaScript(Self.selfTestScript(ip: ip), completionHandler: nil)
         }
@@ -226,6 +231,22 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         document.querySelectorAll('input[type=file]').forEach(function (input) { input.removeAttribute('accept'); });
       });
     })();
+    """
+
+    /// صفحة الدخول بالاختبار: بأول فتح تطلب إنشاء الحساب، فينشئ حساب تجربة ويدخل
+    static let selfTestLoginScript = """
+    (async function () {
+      var post = function (o) { window.webkit.messageHandlers.zkTest.postMessage(o); };
+      var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+      var el = function (id) { return document.getElementById(id); };
+      try {
+        for (var i = 0; i < 20 && el('pw2').hidden; i++) await wait(250);
+        var setup = !el('pw2').hidden;
+        post({ login: setup ? 'setup' : 'login', loginTitle: el('title').textContent });
+        el('user').value = 'selftest'; el('pw').value = 'selftest-2026'; el('pw2').value = 'selftest-2026';
+        el('btn').click();
+      } catch (e) { post({ error: 'login: ' + String(e) }); }
+    })(); 0;
     """
 
     static func selfTestScript(ip: String) -> String {

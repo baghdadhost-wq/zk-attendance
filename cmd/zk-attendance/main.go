@@ -5,9 +5,10 @@ package main
 //   تشغيل عادي (على نفس الحاسبة):   zk-attendance
 //   للشبكة:                          zk-attendance --network
 //   وضع التجربة بدون جهاز:           zk-attendance --demo
-//   نسيت كلمة سر المدير:             zk-attendance --reset-admin
+//   نسيت كلمة سر الصلاحية المطلقة:   zk-attendance --reset-admin
+//   حذف كل حسابات البرنامج:           zk-attendance --reset-users  (أول دخول بعدها يطلب إنشاء حساب الصلاحية المطلقة)
 //
-// الدخول دائماً باسم مستخدم وكلمة سر، وكل مستخدم إله صلاحية: مدير (مطلقة) أو مشرف أو مشاهد.
+// الدخول دائماً باسم مستخدم وكلمة سر، وكل مستخدم إله صلاحية: مطلقة، مدير، مشرف، أساسي، أو موظف (يشوف تقريره بس).
 
 import (
 	"bufio"
@@ -35,10 +36,11 @@ func main() {
 		port        = flag.Int("port", envInt("PORT", 3000), "منفذ البرنامج")
 		demo        = flag.Bool("demo", os.Getenv("MOCK") == "1", "وضع التجربة ببيانات وهمية")
 		data        = flag.String("data", "", "مجلد حفظ البيانات (الافتراضي: جنب البرنامج)")
-		resetAdm    = flag.Bool("reset-admin", false, "أنشئ حساب مدير أو غيّر كلمة سره (إذا نسيتها)")
+		resetAdm    = flag.Bool("reset-admin", false, "أنشئ حساب بصلاحية مطلقة أو غيّر كلمة سره (إذا نسيتها)")
+		resetUsers  = flag.Bool("reset-users", false, "احذف كل حسابات البرنامج (بعد نسخة احتياطية). أول دخول بعدها يطلب إنشاء حساب الصلاحية المطلقة")
 		setPass     = flag.Bool("set-password", false, "نفس --reset-admin (من النسخ السابقة)")
-		adminUser   = flag.String("admin-user", "admin", "اسم حساب المدير ويا --password أو --reset-admin")
-		password    = flag.String("password", os.Getenv("APP_PASSWORD"), "كلمة سر حساب المدير بدون سؤال (للخدمات)")
+		adminUser   = flag.String("admin-user", "admin", "اسم حساب الصلاحية المطلقة ويا --password أو --reset-admin")
+		password    = flag.String("password", os.Getenv("APP_PASSWORD"), "كلمة سر حساب الصلاحية المطلقة بدون سؤال (للخدمات)")
 		noBrowser   = flag.Bool("no-browser", false, "لا تفتح المتصفح تلقائياً")
 		verifyAudit = flag.Bool("verify-audit", false, "تحقق من سلامة سجل التدقيق (hash chain) واخرج")
 		auditMirror = flag.String("audit-mirror", os.Getenv("AUDIT_MIRROR"), "انسخ كل قيد تدقيق لهذا الملف أيضاً (يُفضّل مجلد إلحاق-فقط أو جهاز آخر)")
@@ -72,9 +74,25 @@ func main() {
 	if users.Migrated() {
 		fmt.Println("Your old password now belongs to user \"admin\" (full permissions). / كلمة السر القديمة صارت لحساب admin (صلاحية مطلقة).")
 	}
+	if *resetUsers {
+		backup, n, err := users.ResetAll()
+		if err != nil {
+			fatal(err.Error())
+		}
+		fmt.Printf("Deleted all %d program users. Backup: %s\n", n, backup)
+		fmt.Printf("انحذفت كل حسابات البرنامج (%d). نسختها: %s\n", n, backup)
+		fmt.Println("Next start asks you to create the full-permission account. / أول ما تشغّل البرنامج يطلب إنشاء حساب الصلاحية المطلقة.")
+		if !*network && *password == "" {
+			return
+		}
+	}
 	switch {
 	case *resetAdm || *setPass:
-		if err := resetAdmin(users, *adminUser, *password); err != nil {
+		name := *adminUser
+		if *password == "" && !flagGiven("admin-user") {
+			name = "" // بالسؤال: ما نقترح "admin" لأنه صار اسم حساب المدير المحدود
+		}
+		if err := resetAdmin(users, name, *password); err != nil {
 			fatal(err.Error())
 		}
 		if !*network {
@@ -86,7 +104,7 @@ func main() {
 			fatal(err.Error())
 		}
 		if created {
-			fmt.Printf("Admin account %q created. / انعمل حساب المدير %s.\n", *adminUser, *adminUser)
+			fmt.Printf("Full-permission account %q created. / انعمل حساب الصلاحية المطلقة %s.\n", *adminUser, *adminUser)
 		} else if changed {
 			fmt.Printf("Password of %q changed. / تغيرت كلمة سر %s.\n", *adminUser, *adminUser)
 		}
@@ -98,7 +116,7 @@ func main() {
 				fatal(err.Error())
 			}
 		} else {
-			users.AllowWebSetup() // البرنامج يسمع من نفس الحاسبة بس، فنخلي إنشاء المدير من المتصفح
+			users.AllowWebSetup() // البرنامج يسمع من نفس الحاسبة بس، فنخلي إنشاء أول حساب من المتصفح
 			webSetup = true
 		}
 	}
@@ -249,15 +267,22 @@ func openBrowser(url string) {
 	cmd.Start()
 }
 
+// flagGiven هل انكتب هذا الخيار صراحة بأمر التشغيل
+func flagGiven(name string) bool {
+	given := false
+	flag.Visit(func(f *flag.Flag) { given = given || f.Name == name })
+	return given
+}
+
 // ---------- حسابات الدخول ----------
 
 func createFirstAdmin(users *server.UserStore) error {
 	if !stdinIsTerminal() {
-		return errors.New("no users yet. Run once in a terminal, or use --password / ما أكو مستخدمين. شغّل البرنامج مرة بنافذة الأوامر حتى تنشئ حساب المدير، أو استخدم --password")
+		return errors.New("no users yet. Run once in a terminal, or use --password / ما أكو مستخدمين. شغّل البرنامج مرة بنافذة الأوامر حتى تنشئ حساب الصلاحية المطلقة، أو استخدم --password")
 	}
 	fmt.Println()
-	fmt.Println("Create the main admin account (full permissions) / إنشاء حساب المدير الأساسي (صلاحية مطلقة)")
-	return promptAdmin(users, "admin")
+	fmt.Println("Create the full-permission account / إنشاء حساب الصلاحية المطلقة (يدير كل شي ويضيف كل أنواع المستخدمين)")
+	return promptAdmin(users, "")
 }
 
 func resetAdmin(users *server.UserStore, name, given string) error {
@@ -265,13 +290,13 @@ func resetAdmin(users *server.UserStore, name, given string) error {
 		if _, _, err := users.EnsureAdmin(name, given); err != nil {
 			return err
 		}
-		fmt.Printf("Admin %q saved. / انحفظ حساب المدير %s.\n", name, name)
+		fmt.Printf("Full-permission account %q saved. / انحفظ حساب الصلاحية المطلقة %s.\n", name, name)
 		return nil
 	}
 	if !stdinIsTerminal() {
 		return errors.New("run it in a terminal, or add --password / شغّله بنافذة الأوامر، أو أضف --password")
 	}
-	fmt.Println("Create an admin account, or give it a new password / إنشاء حساب مدير، أو كلمة سر جديدة إله")
+	fmt.Println("Create a full-permission account, or give it a new password / إنشاء حساب بصلاحية مطلقة، أو كلمة سر جديدة إله")
 	return promptAdmin(users, name)
 }
 
@@ -279,7 +304,11 @@ func promptAdmin(users *server.UserStore, defName string) error {
 	in := bufio.NewReader(os.Stdin)
 	name := ""
 	for {
-		fmt.Printf("Username [%s] / اسم المستخدم [%s]: ", defName, defName)
+		if defName != "" {
+			fmt.Printf("Username [%s] / اسم المستخدم [%s]: ", defName, defName)
+		} else {
+			fmt.Print("Username / اسم المستخدم: ")
+		}
 		line, err := in.ReadString('\n')
 		if err != nil && line == "" {
 			return errors.New("input closed / انقطع الإدخال")

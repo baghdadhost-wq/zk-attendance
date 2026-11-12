@@ -90,6 +90,11 @@
   .t-info { background:#e8f0fe; color:#1a56c4; white-space:nowrap; }
   label.chk { flex-direction:row; align-items:center; gap:6px; font-size:13px; }
   label.chk input { width:auto; min-width:0; }
+  .days { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; margin-top:10px; font-size:13px; }
+  .days > span { color:var(--muted); font-size:12px; }
+  .days label.chk input:disabled + span { color:var(--muted); }
+  .t-off { background:#eceff1; color:#546e7a; white-space:nowrap; }
+  .chip.super { background:#5b1f78; color:#fff; }
   #leavesInfo { font-size:13px; margin:0 0 10px; }
   #leavesInfo .lv-box { background:#f8fafc; border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; }
   #leavesInfo .lv-counts { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:6px; }
@@ -151,11 +156,11 @@
       <div class="row">
         <button data-cmd="info">معلومات الجهاز والذاكرة</button>
         <button data-cmd="getTime">قراءة وقت الجهاز</button>
-        <button data-cmd="syncTime" data-min="supervisor" hidden>مزامنة الوقت مع الحاسبة</button>
-        <button data-cmd="refresh" data-min="supervisor" hidden>تحديث بيانات الجهاز</button>
+        <button data-cmd="syncTime" data-min="super" hidden>مزامنة الوقت مع الحاسبة</button>
+        <button data-cmd="refresh">تحديث بيانات الجهاز</button>
       </div>
     </div>
-    <div class="ctl" data-min="supervisor" hidden>
+    <div class="ctl">
       <div class="ctl-label">الباب والصوت</div>
       <div class="row">
         <label>مدة فتح الباب (ثانية) <input type="number" id="unlockSec" value="5" min="1" max="60" style="min-width:70px"></label>
@@ -190,7 +195,7 @@
       </div>
       <div class="hint">أسماء الأصوات من توثيق مكتبة pyzk، وقد تختلف حسب إصدار الجهاز.</div>
     </div>
-    <div class="ctl" data-min="supervisor" hidden>
+    <div class="ctl">
       <div class="ctl-label">رسالة على الشاشة</div>
       <div class="row">
         <label>النص <input id="lcdText" maxlength="40" placeholder="مثال: اجتماع الساعة 10" style="min-width:220px"></label>
@@ -199,18 +204,18 @@
       </div>
       <div class="hint">هذا الأمر مصمم لشاشات الأجهزة القديمة، وممكن شاشة iFace ما تعرض النص.</div>
     </div>
-    <div class="ctl" data-min="supervisor" hidden>
+    <div class="ctl">
       <div class="ctl-label">حالة الجهاز</div>
       <div class="row">
         <button data-cmd="disable">إيقاف البصمة مؤقتاً</button>
         <button data-cmd="enable">إعادة تفعيل البصمة</button>
       </div>
     </div>
-    <div class="ctl" data-min="supervisor" hidden>
+    <div class="ctl">
       <div class="ctl-label">تحتاج تأكيد</div>
       <div class="row">
         <button data-cmd="restart" class="danger">إعادة تشغيل الجهاز</button>
-        <button data-cmd="powerOff" class="danger" data-min="admin" hidden>إطفاء الجهاز</button>
+        <button data-cmd="powerOff" class="danger">إطفاء الجهاز</button>
         <button data-cmd="clearLogs" class="danger" data-min="admin" hidden>مسح سجل البصمات (بعد حفظ نسخة)</button>
       </div>
     </div>
@@ -218,7 +223,7 @@
     <div id="infoPanel"></div>
   </section>
 
-  <details class="card no-print" id="scanCard" data-min="supervisor" hidden>
+  <details class="card no-print" id="scanCard">
     <summary>فحص أمان الجهاز <small>هل بيانات الجهاز محمية من التعديل غير المصرّح به؟</small></summary>
     <div class="hint" style="margin:-4px 0 10px">
       فحص قراءة فقط — ما يغيّر ولا شي بالجهاز. يتأكد هل الجهاز محمي بكلمة سر اتصال، وهل عليه مدير، ويبيّن مخاطر الشبكة والبرنامج الثابت.
@@ -233,7 +238,7 @@
   </details>
 
   <details class="card no-print danger-zone" id="adminCard" data-min="admin" hidden>
-    <summary>أوامر الصلاحية المطلقة: الخطرة والمخفية <small>تظهر للمدير بس</small></summary>
+    <summary>الأوامر الخطرة والمخفية <small>إضافة وحذف الموظفين للمدير، والوقت وخصائص الجهاز والمسح للصلاحية المطلقة بس</small></summary>
     <div class="hint" style="margin:-4px 0 10px">كل أمر يمسح أو يغير شي يحفظ نسخة احتياطية بمجلد backups قبله، وكل شي ينسجل بسجل العمليات باسمك.</div>
     <div class="ctl">
       <div class="ctl-label">إضافة موظف جديد للجهاز</div>
@@ -241,13 +246,13 @@
         <label>رقم الموظف <input id="nuId" inputmode="numeric" autocomplete="off" style="min-width:90px"></label>
         <label>الاسم بالجهاز <input id="nuName" maxlength="40" autocomplete="off"></label>
         <label>رقم البطاقة <input id="nuCard" inputmode="numeric" placeholder="اختياري" autocomplete="off" style="min-width:110px"></label>
-        <label>الصلاحية بالجهاز <select id="nuPriv"><option value="0">مستخدم عادي</option><option value="14">مدير</option></select></label>
+        <label data-min="super" hidden>الصلاحية بالجهاز <select id="nuPriv"><option value="0">مستخدم عادي</option><option value="14">مدير</option></select></label>
         <label>الرقم السري <input id="nuPin" type="password" inputmode="numeric" placeholder="اختياري" autocomplete="new-password" style="min-width:100px"></label>
         <button id="nuBtn" class="primary">إضافة للجهاز</button>
       </div>
       <div class="hint">بعد الإضافة، الموظف يسجل بصمته أو وجهه من قائمة الجهاز نفسه. ترميز الاسم يتحدد حسب الأسماء الموجودة بالجهاز.</div>
     </div>
-    <div class="ctl">
+    <div class="ctl" data-min="super" hidden>
       <div class="ctl-label">وقت محدد</div>
       <div class="row">
         <label>التاريخ والوقت <input type="datetime-local" id="customTime" step="1"></label>
@@ -255,7 +260,7 @@
       </div>
       <div class="hint">للوقت الصحيح استخدم "مزامنة الوقت مع الحاسبة". هذا للحالات الخاصة، والبصمات الجديدة تنسجل بالوقت اللي تختاره.</div>
     </div>
-    <div class="ctl">
+    <div class="ctl" data-min="super" hidden>
       <div class="ctl-label">إعدادات الجهاز المخفية</div>
       <div class="row">
         <label>اسم الإعداد <input id="optKey" list="optKeys" dir="ltr" placeholder="~DeviceName" autocomplete="off" autocapitalize="none" spellcheck="false" style="min-width:170px"></label>
@@ -273,7 +278,7 @@
       <div class="hint">أسماء الإعدادات بالقائمة من مكتبة pyzk، وتگدر تكتب أي اسم ثاني يعرفه جهازك. القراءة آمنة، أما الكتابة فتغير الإعداد بالجهاز مباشرة:
         إذا غيرت IPAddress أو NetMask أو GATEIPAddress ممكن ينقطع الاتصال، وإذا غيرت COMKey لازم تكتب كلمة سر الاتصال الجديدة بالبرنامج.</div>
     </div>
-    <div class="ctl" id="comkeyCtl">
+    <div class="ctl" id="comkeyCtl" data-min="super" hidden>
       <div class="ctl-label">كلمة سر اتصال الجهاز (Comm Key)</div>
       <div class="row">
         <label>كلمة سر جديدة (رقم 1–999999) <input id="comkeyVal" inputmode="numeric" autocomplete="off" style="min-width:150px"></label>
@@ -281,13 +286,13 @@
         <button id="comkeyBtn" class="primary">ضبط / تغيير</button>
       </div>
       <div class="hint">
-        للمدير فقط. يضبط كلمة سر اتصال للجهاز <b>إذا ما كانت موجودة</b>، فيمنع أي جهاز ثاني على الشبكة من التحكم بالجهاز.<br>
+        للصلاحية المطلقة فقط. يضبط كلمة سر اتصال للجهاز <b>إذا ما كانت موجودة</b>، فيمنع أي جهاز ثاني على الشبكة من التحكم بالجهاز.<br>
         <b>لتغييرها لاحقاً:</b> فعّل «بدّل كلمة السر الموجودة» — البرنامج يستخدم المكتوبة بخانة «كلمة سر الاتصال» كالحالية ويبدّلها للجديدة. (خليها 0 ويا «بدّل» حتى تعطّلها — ينقص الأمان).<br>
         بعد العملية البرنامج يحفظ المفتاح ويكمل الاتصال — اكتبه بمكان آمن لأنك تحتاجه لو غيّرت الحاسبة.
       </div>
       <div id="comkeyStatus" style="margin-top:8px;font-size:13px"></div>
     </div>
-    <div class="ctl">
+    <div class="ctl" data-min="super" hidden>
       <div class="ctl-label">مسح وتصفير</div>
       <div class="row">
         <button data-admin="clearOplog" class="danger">مسح سجل عمليات الجهاز</button>
@@ -311,7 +316,7 @@
     <div id="adminStatus" style="margin-top:12px;font-size:13px"></div>
   </details>
 
-  <details class="card no-print" id="manualCard" data-min="admin" hidden>
+  <details class="card no-print" id="manualCard" data-min="super" hidden>
     <summary>البصمات اليدوية <small>لموظف نسى يبصم أو كان بواجب</small></summary>
     <div class="hint" style="margin:-4px 0 10px">تنحفظ بالبرنامج مو بالجهاز، وتدخل بالتقارير مكتوب يمها «يدوية» ويا السبب واسم اللي ضافها، وتنسجل بسجل العمليات.</div>
     <div class="row">
@@ -351,20 +356,28 @@
       <label>اسم المستخدم <input id="auName" autocomplete="off" autocapitalize="none" spellcheck="false" dir="auto"></label>
       <label>كلمة السر <input id="auPass" type="password" autocomplete="new-password" placeholder="6 أحرف أو أكثر"></label>
       <label>الصلاحية
-        <select id="auRole">
-          <option value="viewer">مشاهد</option>
-          <option value="supervisor">مشرف</option>
-          <option value="admin">مدير (صلاحية مطلقة)</option>
-        </select>
+        <select id="auRole"></select>
       </label>
+      <label id="auEmpBox" hidden>رقم بصمة الموظف <input id="auEmp" list="empIdList" inputmode="numeric" autocomplete="off" style="min-width:150px"></label>
+      <datalist id="empIdList"></datalist>
       <button id="auBtn" class="primary">إضافة</button>
     </div>
-    <div class="hint">
-      مشاهد: يسحب البيانات ويشوف التقارير ويصدّرها ويطبعها، ويقرا معلومات الجهاز ووقته، بدون أي تغيير.<br>
-      مشرف: كل شي بالمشاهد، ويا أوامر الجهاز العادية (مزامنة الوقت، فتح الباب، الصوت، رسالة الشاشة، إيقاف وتفعيل البصمة، إعادة التشغيل)، وفحص أمان الجهاز، وتعديل أسماء الموظفين وبطاقاتهم وبياناتهم الإضافية.<br>
-      مدير: كل شي، ويا الأوامر الخطرة والمخفية (الإطفاء، المسح، حذف وإضافة الموظفين، صلاحياتهم وأرقامهم السرية، إعدادات الجهاز المخفية)، والبصمات اليدوية، وإدارة المستخدمين وسجل العمليات.
+    <div class="hint" id="rolesHint">
+      <span data-min="super" hidden>صلاحية مطلقة: كل شي بدون قيد، ويضيف كل أنواع المستخدمين. وحده يغيّر الأوقات (وقت الجهاز، النظام العام للدوام، دوام كل موظف، البصمات اليدوية) وخصائص الجهاز (كلمة سر الاتصال، الإعدادات المخفية واسم الجهاز)، ويمسح كل بيانات الجهاز ويدير مدراء الجهاز.<br>
+      مدير: كل شي عدا اللي فوق: التقارير ورفع تقارير الإجازات لدمجها وحفظ التقرير للموظفين، إضافة وحذف موظفين بالجهاز (مو مدراءه)، أرقامهم السرية وبصماتهم ومسح سجل البصمات، وإنشاء حسابات الموظفين.<br>
+      مشرف: الأساسية، ويا تعديل أسماء الموظفين وبطاقاتهم وبياناتهم الإضافية.<br>
+      أساسي: سحب البيانات والتقارير وتصديرها وطباعتها والتصفية، وأوامر الجهاز العادية (فتح الباب، الصوت، رسالة الشاشة، إيقاف وتفعيل البصمة، إعادة التشغيل والإطفاء)، وفحص أمان الجهاز.<br></span>
+      موظف: يدخل ويشوف تقريره المحفوظ بس، وما يشوف أي شي عن غيره.
     </div>
+
     <div id="usersStatus" style="margin-top:10px;font-size:13px"></div>
+  </details>
+
+  <details class="card no-print" id="reportsCard" data-min="admin" hidden>
+    <summary>التقارير المحفوظة للموظفين <small>كل موظف عنده حساب يشوف تقريره منها بس</small></summary>
+    <div class="hint" style="margin:-4px 0 10px">حتى تحفظ تقرير: اسحب البيانات، اختار الفترة، ارفع تقرير الإجازات إذا عندك، وبعدها اضغط «حفظ التقرير للموظفين» فوق الجداول.</div>
+    <div class="tablewrap" id="reportsTable"><div class="empty">جارِ التحميل...</div></div>
+    <div id="reportsStatus" style="margin-top:8px;font-size:13px"></div>
   </details>
 
   <details class="card no-print" id="auditCard" data-min="admin" hidden>
@@ -377,23 +390,29 @@
   </details>
 
   <section class="card no-print">
-    <h2>إعدادات الدوام والتصفية</h2>
+    <h2>الفترة والتصفية</h2>
     <div class="row">
       <label>من تاريخ <input type="date" id="from"></label>
       <label>إلى تاريخ <input type="date" id="to"></label>
       <label>الموظف <select id="emp"><option value="">الكل</option></select></label>
       <label>القسم <select id="dept"><option value="">كل الأقسام</option></select></label>
-      <label>بداية الدوام <input type="time" id="start" value="08:00"></label>
-      <label>نهاية الدوام <input type="time" id="end" value="14:00"></label>
-      <label>سماحية التأخير (دقيقة) <input type="number" id="grace" value="10" style="min-width:80px"></label>
-      <label>العطلة الأسبوعية
-        <select id="weekend">
-          <option value="5">الجمعة</option><option value="5,6">الجمعة والسبت</option>
-          <option value="6">السبت</option><option value="0">الأحد</option><option value="">بدون</option>
-        </select>
-      </label>
-      <label>تجاهل البصمة المكررة خلال (دقيقة) <input type="number" id="dedup" value="3" style="min-width:80px"></label>
     </div>
+  </section>
+
+  <section class="card no-print" id="schedCard">
+    <h2>النظام العام للدوام <small style="font-weight:normal;color:var(--muted);font-size:12px">لكل الموظفين، إلا اللي إلهم نظام خاص بقائمة الموظفين</small></h2>
+    <div class="row">
+      <label>بداية الدوام <input type="time" id="start" value="08:00" data-gen></label>
+      <label>نهاية الدوام <input type="time" id="end" value="14:00" data-gen></label>
+      <label>سماحية التأخير (دقيقة) <input type="number" id="grace" value="10" min="0" max="240" style="min-width:80px" data-gen></label>
+      <label>تجاهل البصمة المكررة خلال (دقيقة) <input type="number" id="dedup" value="3" min="0" max="120" style="min-width:80px" data-gen></label>
+    </div>
+    <div class="days" id="genOff"><span>العطلة الأسبوعية:</span></div>
+    <div class="row" style="margin-top:12px" data-min="super" hidden>
+      <button class="primary" id="schedSaveBtn">حفظ النظام العام</button>
+      <button id="schedResetBtn" hidden>رجّع المحفوظ</button>
+    </div>
+    <div id="schedStatus" class="hint" style="font-size:12px"></div>
   </section>
 
   <section class="stats" id="stats"></section>
@@ -410,6 +429,7 @@
     <div class="row no-print" style="margin-bottom:10px">
       <button id="csvBtn">تصدير Excel (CSV)</button>
       <button id="printBtn">طباعة / PDF</button>
+      <button id="publishBtn" class="primary" data-min="admin" hidden>حفظ التقرير للموظفين</button>
       <div class="tools" id="usersTools" style="display:none">
         <button id="profExportBtn">تصدير كل بيانات الموظفين</button>
         <button id="profImportBtn" data-min="supervisor" hidden>استيراد من Excel (CSV)</button>
@@ -450,8 +470,8 @@
     <div class="hint">رقم الموظف والصلاحية وكلمة السر والبصمات والوجه ما تتغير. البرنامج يحفظ نسخة من كل الموظفين قبل التعديل، ويتأكد من الحفظ بعده.</div>
     </div>
     <div id="adminSection" data-min="admin" hidden>
-      <div class="sec-title">صلاحية مطلقة: أوامر خطرة على هذا الموظف</div>
-      <div class="row">
+      <div class="sec-title">أوامر خطرة على هذا الموظف</div>
+      <div class="row" data-min="super" hidden>
         <label>الصلاحية بالجهاز <select id="edPriv"><option value="0">مستخدم عادي</option><option value="14">مدير</option></select></label>
         <button id="edPrivBtn">حفظ الصلاحية</button>
       </div>
@@ -474,6 +494,26 @@
       <div id="edAdminStatus" style="font-size:13px;margin-top:8px;min-height:18px"></div>
     </div>
     <div class="hint" id="devNote" style="display:none"></div>
+    <div class="sec-title">الدوام والبصمة</div>
+    <div class="pgrid">
+      <label>البصمة
+        <select data-pf="attendance" id="edAtt">
+          <option value="مشمول">مشمول بالبصمة</option>
+          <option value="غير مشمول">غير مشمول (ما ينحسب عليه غياب ولا تأخير)</option>
+        </select>
+      </label>
+      <label>نظام الدوام
+        <select data-pf="schedMode" id="edMode">
+          <option value="عام">النظام العام</option>
+          <option value="خاص">نظام خاص لهذا الموظف</option>
+        </select>
+      </label>
+      <label class="edCustom">بداية دوامه <input type="time" data-pf="workStart" id="edStart"></label>
+      <label class="edCustom">نهاية دوامه <input type="time" data-pf="workEnd" id="edEnd"></label>
+      <div class="wide edCustom days" id="edOff" style="margin:0 0 10px"><span>أيام عطلته:</span></div>
+      <input type="hidden" data-pf="offDays" id="edOffVal">
+    </div>
+    <div class="hint" id="edSchedHint" style="margin:-4px 0 4px"></div>
     <div class="sec-title">بيانات إضافية (تنحفظ بالحاسبة، مو بالجهاز)</div>
     <div class="pgrid">
       <label>الاسم الكامل (للتقارير) <input data-pf="fullName"></label>
@@ -529,8 +569,8 @@ window.fetch = async (...args) => { const r = await _fetch(...args); if (r.statu
 
 // ---------- المستخدم وصلاحيته ----------
 // الخادم يتأكد من الصلاحية بكل طلب، وهنا بس نخفي اللي ما يخصه
-const RANK = { viewer: 1, supervisor: 2, admin: 3 };
-const ROLE_LABELS = { admin: 'مدير (صلاحية مطلقة)', supervisor: 'مشرف', viewer: 'مشاهد' };
+const RANK = { employee: 0, viewer: 1, supervisor: 2, admin: 3, super: 4 };
+const ROLE_LABELS = { super: 'صلاحية مطلقة', admin: 'مدير', supervisor: 'مشرف', viewer: 'أساسي', employee: 'موظف' };
 let ME = { username: '', role: 'viewer' };
 const can = (min) => (RANK[ME.role] || 0) >= RANK[min];
 function applyRole() { document.querySelectorAll('[data-min]').forEach(el => { el.hidden = !can(el.dataset.min); }); }
@@ -539,8 +579,9 @@ async function initSession() {
     const j = await (await fetch('/api/session')).json();
     if (j.auth && !j.user) { location.href = '/login'; return; }
     if (j.user) ME = j.user;
-    if (!j.auth) { $('usersCard').remove(); $('myPassLink').remove(); } // بدون نظام دخول (تطبيق الموبايل)
+    if (!j.auth) { ['usersCard', 'myPassLink', 'reportsCard', 'publishBtn'].forEach(id => $(id).remove()); } // بدون نظام دخول (تطبيق الموبايل): ما أكو حسابات موظفين
     if (j.auth) {
+      if (ME.role === 'employee') { location.replace('/me'); return; } // الموظف يشوف تقريره بس
       $('whoName').textContent = ME.username;
       $('whoRole').textContent = ME.roleLabel || ROLE_LABELS[ME.role] || ME.role;
       $('whoRole').className = 'chip ' + ME.role;
@@ -548,8 +589,11 @@ async function initSession() {
     }
   } catch (_) {}
   applyRole();
+  applyGenLock();
+  await loadGeneral();
   if (DATA) render();
 }
+
 // يخلي البرنامج يتثبت كتطبيق على الشاشة الرئيسية
 if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
 let DATA = null;          // { info, users, logs }
@@ -557,7 +601,7 @@ let currentTab = 'daily';
 let lastTable = null;     // { headers, rows } للتصدير
 
 // ---------- حفظ الإعدادات ----------
-const SETTINGS = ['ip','port','commKey','start','end','grace','weekend','dedup','unlockSec','voiceIdx'];
+const SETTINGS = ['ip','port','commKey','unlockSec','voiceIdx']; // النظام العام للدوام صار محفوظ بالبرنامج نفسه
 function saveSettings() { try { const s={}; SETTINGS.forEach(k=>s[k]=$(k).value); localStorage.setItem('zkSettings', JSON.stringify(s)); } catch(_){} }
 function loadSettings() { try { const s=JSON.parse(localStorage.getItem('zkSettings')||'{}'); SETTINGS.forEach(k=>{ if(s[k]!==undefined) $(k).value=s[k]; }); } catch(_){} }
 
@@ -573,9 +617,54 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&l
 function setStatus(msg, cls='') { $('status').className = cls; $('status').textContent = msg; }
 // البيانات الإضافية للموظفين (من ملف data/employees.json بالحاسبة)
 let PROFILES = {};
-const PF = ['fullName','department','title','gender','mobile','officePhone','homePhone','birthday','hireDate','address','nationalId','notes'];
+const PF = ['fullName','department','title','gender','mobile','officePhone','homePhone','birthday','hireDate','address','nationalId','notes',
+  'attendance','schedMode','workStart','workEnd','offDays'];
 const PF_LABELS = { fullName:'الاسم الكامل', department:'القسم', title:'العنوان الوظيفي', gender:'الجنس', mobile:'الهاتف المحمول',
-  officePhone:'هاتف العمل', homePhone:'هاتف المنزل', birthday:'تاريخ الميلاد', hireDate:'تاريخ التعيين', address:'العنوان', nationalId:'رقم الهوية', notes:'ملاحظات' };
+  officePhone:'هاتف العمل', homePhone:'هاتف المنزل', birthday:'تاريخ الميلاد', hireDate:'تاريخ التعيين', address:'العنوان', nationalId:'رقم الهوية', notes:'ملاحظات',
+  attendance:'البصمة', schedMode:'نظام الدوام', workStart:'بداية الدوام الخاص', workEnd:'نهاية الدوام الخاص', offDays:'عطلة الموظف' };
+
+// ---------- الدوام: النظام العام (محفوظ بالبرنامج، نفسه بكل الأجهزة) ونظام خاص لكل موظف ----------
+const ATT_IN = 'مشمول', ATT_EXEMPT = 'غير مشمول', MODE_GEN = 'عام', MODE_CUSTOM = 'خاص', NO_OFF = 'بدون';
+const WEEK = [6, 0, 1, 2, 3, 4, 5]; // السبت أول الأسبوع
+let GEN = { start: '08:00', end: '14:00', off: [5], grace: 10, dedup: 3 }; // آخر نسخة محفوظة
+let GEN_META = {};
+let CUR_GEN = null, SCHED_CACHE = new Map(), RANGE_CACHE = null; // تتصفّر بكل حساب
+const parseOff = (v) => !v || v === NO_OFF ? [] : String(v).split(',').map(Number).filter(n => n >= 0 && n <= 6);
+const offText = (off) => off.length ? WEEK.filter(d => off.includes(d)).map(d => DAYS[d]).join(' و') : 'بدون عطلة';
+const genText = (g) => `${g.start} - ${g.end}، العطلة: ${offText(g.off)}`;
+function dayBoxes(box, attr) {
+  $(box).insertAdjacentHTML('beforeend', WEEK.map(d => `<label class="chk"><input type="checkbox" data-${attr}="${d}"><span>${DAYS[d]}</span></label>`).join(''));
+}
+const offOf = (attr) => [...document.querySelectorAll(`[data-${attr}]`)].filter(x => x.checked).map(x => +x.dataset[attr]).sort((a, b) => a - b);
+function setOff(attr, days) { document.querySelectorAll(`[data-${attr}]`).forEach(x => { x.checked = days.includes(+x.dataset[attr]); }); }
+function genForm() { return { start: $('start').value, end: $('end').value, off: offOf('goff'), grace: +$('grace').value || 0, dedup: +$('dedup').value || 0 }; }
+function fillGen(g) { $('start').value = g.start; $('end').value = g.end; $('grace').value = g.grace; $('dedup').value = g.dedup; setOff('goff', g.off); }
+const sameGen = (a, b) => a.start === b.start && a.end === b.end && +a.grace === +b.grace && +a.dedup === +b.dedup && a.off.join() === b.off.join();
+// دوام الموظف: نظامه الخاص إذا عنده، وإلا النظام العام (مثل ما مكتوب هسه بالشاشة، حتى التجربة قبل الحفظ تبين)
+function schedOf(id) {
+  let sc = SCHED_CACHE.get(id);
+  if (sc) return sc;
+  const p = prof(id), g = CUR_GEN || genForm();
+  const exempt = p.attendance === ATT_EXEMPT;
+  sc = p.schedMode === MODE_CUSTOM && p.workStart && p.workEnd
+    ? { exempt, custom: true, start: p.workStart, end: p.workEnd, off: parseOff(p.offDays) }
+    : { exempt, custom: false, start: g.start, end: g.end, off: g.off };
+  sc.startM = toMin(sc.start); sc.endM = toMin(sc.end);
+  SCHED_CACHE.set(id, sc);
+  return sc;
+}
+function schedText(id) {
+  const sc = schedOf(id);
+  if (sc.exempt) return 'غير مشمول بالبصمة';
+  return sc.custom ? `خاص ${sc.start} - ${sc.end}، العطلة: ${offText(sc.off)}` : 'النظام العام';
+}
+// للمقارنة والتصدير: القيم الافتراضية مكتوبة، والنظام العام بدون أوقات خاصة
+function effProf(p) {
+  const q = { ...p };
+  q.attendance = q.attendance || ATT_IN; q.schedMode = q.schedMode || MODE_GEN;
+  if (q.schedMode !== MODE_CUSTOM) { delete q.workStart; delete q.workEnd; delete q.offDays; } else q.offDays = q.offDays || NO_OFF;
+  return q;
+}
 const prof = (id) => PROFILES[id] || {};
 const deviceUser = (id) => DATA ? DATA.users.find(x => x.userId === id) : null;
 function userName(id) { const u = deviceUser(id); return prof(id).fullName || (u && u.name) || ('رقم ' + id); }
@@ -591,6 +680,60 @@ async function loadProfiles() {
   try { const r = await fetch('/api/profiles'); const j = await r.json(); PROFILES = j.profiles || {}; } catch (_) { PROFILES = {}; }
   fillDeptSelect();
   if (DATA) { fillEmpSelect(); render(); }
+}
+// تغيير الأوقات (النظام العام ودوام كل موظف) للصلاحية المطلقة بس
+function applyGenLock() {
+  const ed = can('super');
+  document.querySelectorAll('[data-gen], [data-goff], #edAtt, #edMode, #edStart, #edEnd, [data-eoff]').forEach(el => { el.disabled = !ed; });
+}
+function genStatus() {
+  const box = $('schedStatus'), dirty = can('super') && !sameGen(genForm(), GEN);
+  $('schedResetBtn').hidden = !dirty;
+  if (box.dataset.keep && !dirty) return; // رسالة حفظ أو نقل ظاهرة
+  delete box.dataset.keep;
+  if (dirty) {
+    box.className = 'hint err';
+    box.textContent = 'التقارير تنحسب هسه بالتغييرات، بس ما انحفظت. اضغط «حفظ النظام العام» حتى تصير لكل الأجهزة والمستخدمين.';
+    return;
+  }
+  const who = GEN_META.scheduleSaved && GEN_META.scheduleBy ? `آخر حفظ: ${GEN_META.scheduleBy}، ${fmtWhen(GEN_META.scheduleAt)}` : '';
+  box.className = 'hint';
+  box.textContent = (can('super') ? '' : 'يتعدل بالصلاحية المطلقة بس. ') + who;
+}
+function genMsg(msg, cls) { const box = $('schedStatus'); box.className = 'hint ' + cls; box.textContent = msg; box.dataset.keep = '1'; }
+async function loadGeneral() {
+  try {
+    const r = await fetch('/api/settings'); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'خطأ');
+    GEN = j.schedule; GEN_META = j; fillGen(GEN);
+    if (!j.scheduleSaved && can('super')) await migrateLocalSchedule();
+  } catch (e) { genMsg('ما گدرت أقرا النظام العام: ' + e.message, 'err'); }
+  genStatus();
+}
+// النسخ السابقة كانت تحفظ الدوام بكل متصفح لحاله: أول ما يدخل صاحب الصلاحية المطلقة ننقل دوامه للبرنامج
+async function migrateLocalSchedule() {
+  let old = null; try { old = JSON.parse(localStorage.getItem('zkSettings') || 'null'); } catch (_) {}
+  if (!old || !old.start || !old.end) return;
+  const g = { start: old.start, end: old.end, grace: old.grace != null ? +old.grace || 0 : GEN.grace, dedup: old.dedup != null ? +old.dedup || 0 : GEN.dedup,
+    off: old.weekend == null ? GEN.off : String(old.weekend).split(',').filter(x => x !== '').map(Number) };
+  if (sameGen(g, GEN)) return;
+  try {
+    const j = await postJSON('/api/settings/schedule', { schedule: g });
+    GEN = j.settings.schedule; GEN_META = j.settings; fillGen(GEN);
+    genMsg('نقلت دوامك من النسخة السابقة وصار هو النظام العام: ' + genText(GEN), 'okc');
+  } catch (_) {}
+}
+async function saveGeneral() {
+  const g = genForm();
+  if (toMin(g.end) <= toMin(g.start)) return genMsg('نهاية الدوام لازم تكون بعد بدايته', 'err');
+  $('schedSaveBtn').disabled = true;
+  try {
+    const j = await postJSON('/api/settings/schedule', { schedule: g });
+    GEN = j.settings.schedule; GEN_META = j.settings; fillGen(GEN);
+    genMsg('انحفظ النظام العام: ' + genText(GEN), 'okc');
+    render();
+  } catch (e) { genMsg(e.message, 'err'); }
+  finally { $('schedSaveBtn').disabled = false; }
 }
 function setTabStatus(msg, cls = '') { $('tabStatus').className = 'no-print ' + cls; $('tabStatus').textContent = msg; }
 
@@ -646,15 +789,16 @@ function allLogs() {
   return [...DATA.logs, ...m].sort((a, b) => a.d - b.d);
 }
 const manualText = (p) => `يدوية: ${p.reason}${p.note ? ' - ' + p.note : ''} (أضافها ${p.by || '—'})`;
+let ALL_EMP = false; // حفظ التقرير للموظفين: كل الموظفين، بدون فلتر الموظف والقسم
+const empFilter = () => ALL_EMP ? '' : $('emp').value, deptFilter = () => ALL_EMP ? '' : $('dept').value;
 function filteredLogs() {
-  const f = $('from').value, t = $('to').value, emp = $('emp').value, dept = $('dept').value;
+  const f = $('from').value, t = $('to').value, emp = empFilter(), dept = deptFilter();
   return allLogs().filter(l => { const k = dateKey(l.d); return (!f || k >= f) && (!t || k <= t) && (!emp || l.userId === emp) && (!dept || deptOf(l.userId) === dept); });
 }
 
 function dailyRows() {
-  const dedupMs = (+$('dedup').value || 0) * 60000;
-  const startM = toMin($('start').value), endM = toMin($('end').value), grace = +$('grace').value || 0;
-  const midM = (startM + endM) / 2;
+  const g = CUR_GEN || genForm();
+  const dedupMs = g.dedup * 60000, grace = g.grace;
   const groups = new Map();
   for (const l of filteredLogs()) {
     const k = l.userId + '|' + dateKey(l.d);
@@ -666,6 +810,9 @@ function dailyRows() {
   const rows = [];
   for (const [k, punches] of groups) {
     const [userId, day] = k.split('|');
+    const sc = schedOf(userId), startM = sc.startM, endM = sc.endM, midM = (startM + endM) / 2;
+    const offDay = sc.off.includes(dowOf(day));
+    const tracked = !sc.exempt && !offDay; // يوم دوام لموظف مشمول: ينحسب عليه التأخير والنقص
     let firstP = punches[0], lastP = punches.length > 1 ? punches[punches.length-1] : null;
     if (!lastP) {
       // بصمة وحدة باليوم: قبل منتصف الدوام = دخول (ناقصه خروج)، وبعده = خروج (ناقصه دخول). اليدوية حسب نوعها
@@ -675,11 +822,13 @@ function dailyRows() {
     const first = firstP ? firstP.d : null, last = lastP ? lastP.d : null;
     const inM = first ? first.getHours()*60 + first.getMinutes() : null;
     const outM = last ? last.getHours()*60 + last.getMinutes() : null;
-    const late = inM != null && inM - startM - grace > 0 ? inM - startM : 0;
-    const early = outM != null && outM < endM ? endM - outM : 0;
-    const overtime = outM != null && outM > endM ? outM - endM : 0;
+    const worked = first && last ? (last - first) / 60000 : null;
+    const late = tracked && inM != null && inM - startM - grace > 0 ? inM - startM : 0;
+    const early = tracked && outM != null && outM < endM ? endM - outM : 0;
+    // بيوم عطلته كل الشغل إضافي
+    const overtime = sc.exempt ? 0 : offDay ? Math.round(worked || 0) : outM != null && outM > endM ? outM - endM : 0;
     rows.push({ userId, name: userName(userId), day, dow: DAYS[(first || last).getDay()], first, last,
-      worked: first && last ? (last - first) / 60000 : null, late, early, overtime, count: punches.length,
+      worked, late, early, overtime, count: punches.length, offDay, exempt: sc.exempt, tracked,
       missingIn: !first, missingOut: !last,
       manualIn: firstP && firstP.manual || null, manualOut: lastP && lastP.manual || null, manualCount: punches.filter(p => p.manual).length });
   }
@@ -687,26 +836,32 @@ function dailyRows() {
   return rows;
 }
 
-function workingDays() {
+function daysInRange() {
+  if (RANGE_CACHE) return RANGE_CACHE;
   const f = $('from').value, t = $('to').value; if (!f || !t) return [];
-  const off = $('weekend').value === '' ? [] : $('weekend').value.split(',').map(Number);
   const out = []; const d = new Date(f + 'T00:00:00'); const end = new Date(t + 'T00:00:00');
-  while (d <= end) { if (!off.includes(d.getDay())) out.push(dateKey(d)); d.setDate(d.getDate()+1); }
-  return out;
+  while (d <= end && out.length < 3700) { out.push(dateKey(d)); d.setDate(d.getDate()+1); }
+  return (RANGE_CACHE = out);
 }
+const dowOf = (day) => new Date(day + 'T00:00:00').getDay();
+// أيام العمل بالنظام العام
+function workingDays() { const off = (CUR_GEN || genForm()).off; return daysInRange().filter(d => !off.includes(dowOf(d))); }
+// أيام دوام موظف معيّن (حسب أيام عطلته). غير المشمول بالبصمة ما عنده أيام مطلوبة
+function workingDaysFor(id) { const sc = schedOf(id); return sc.exempt ? [] : daysInRange().filter(d => !sc.off.includes(dowOf(d))); }
 
 function summaryRows(daily, recon) {
-  const wd = workingDays(); const emp = $('emp').value, dept = $('dept').value;
+  const emp = empFilter(), dept = deptFilter();
   const ids = (emp ? [emp] : [...new Set([...DATA.users.map(u=>u.userId), ...daily.map(r=>r.userId)])]).filter(id => !dept || deptOf(id) === dept);
   return ids.map(id => {
-    const rs = daily.filter(r => r.userId === id);
+    const sc = schedOf(id);
+    const rs = daily.filter(r => r.userId === id), tr = rs.filter(r => r.tracked);
     const rc = recon ? recon.filter(x => x.userId === id) : [];
     const present = new Set(rs.map(r => r.day));
-    return { userId: id, name: userName(id), present: present.size,
-      absent: wd.filter(d => !present.has(d)).length,
-      lateCount: rs.filter(r => r.late).length, lateMin: rs.reduce((s,r)=>s+r.late,0),
+    return { userId: id, name: userName(id), sched: schedText(id), exempt: sc.exempt, present: present.size,
+      absent: sc.exempt ? null : workingDaysFor(id).filter(d => !present.has(d)).length,
+      lateCount: tr.filter(r => r.late).length, lateMin: rs.reduce((s,r)=>s+r.late,0),
       earlyMin: rs.reduce((s,r)=>s+r.early,0), overtime: rs.reduce((s,r)=>s+r.overtime,0),
-      missingOut: rs.filter(r => r.missingOut).length, missingIn: rs.filter(r => r.missingIn).length,
+      missingOut: tr.filter(r => r.missingOut).length, missingIn: tr.filter(r => r.missingIn).length,
       worked: rs.reduce((s,r)=>s+(r.worked||0),0), manual: rs.reduce((s,r)=>s+r.manualCount,0),
       excLeave: rc.filter(x => x.code === 'leave').length, excHour: rc.filter(x => x.code === 'hour').length,
       pend: rc.filter(x => x.code === 'pending').length,
@@ -756,12 +911,12 @@ async function loadLeaves() {
 // لكل موظف ولكل يوم دوام بالفترة: غياب أو نقص بصمة (ويا التأخير إذا الخيار مفعّل) ومطابقته بالإجازات
 function reconcile(daily) {
   const coverLate = $('lvHourLate').checked;
-  const emp = $('emp').value, dept = $('dept').value;
+  const emp = empFilter(), dept = deptFilter();
   const byKey = new Map(daily.map(r => [r.userId + '|' + r.day, r]));
   const ids = (emp ? [emp] : [...new Set([...DATA.users.map(u => u.userId), ...daily.map(r => r.userId)])])
     .filter(id => !dept || deptOf(id) === dept);
   const out = [];
-  for (const id of ids) for (const day of workingDays()) {
+  for (const id of ids) for (const day of workingDaysFor(id)) {
     const r = byKey.get(id + '|' + day) || null;
     const lv = LEAVE_IDX.get(nid(id) + '|' + day) || { day: [], hour: [] };
     const dayOk = lv.day.some(l => l.status === 'approved'), hourOk = lv.hour.some(l => l.status === 'approved');
@@ -845,6 +1000,8 @@ function syncTools() {
 }
 function render() {
   syncTools();
+  CUR_GEN = genForm(); SCHED_CACHE = new Map(); RANGE_CACHE = null;
+  genStatus();
   if (!DATA) { renderLeavesInfo(null); return; }
   saveSettings();
   const daily = dailyRows();
@@ -852,8 +1009,11 @@ function render() {
   const recIdx = new Map(recon.map(x => [x.userId + '|' + x.day, x]));
   const summ = summaryRows(daily, recon);
   // بطاقات
-  const s = { emp: summ.length, days: workingDays().length, late: daily.filter(r=>r.late).length, miss: daily.filter(r=>r.missingIn || r.missingOut).length };
-  const cards = [['عدد الموظفين', s.emp], ['أيام العمل بالفترة', s.days], ['حالات التأخير', s.late], ['نقص بصمة (دخول أو خروج)', s.miss]];
+  const exemptN = summ.filter(r => r.exempt).length, oneEmp = $('emp').value;
+  const s = { emp: summ.length - exemptN, days: (oneEmp ? workingDaysFor(oneEmp) : workingDays()).length,
+    late: daily.filter(r => r.late).length, miss: daily.filter(r => r.tracked && (r.missingIn || r.missingOut)).length };
+  const cards = [[exemptN ? `الموظفين المشمولين (و${exemptN} غير مشمول)` : 'عدد الموظفين', s.emp],
+    [oneEmp ? 'أيام دوامه بالفترة' : 'أيام العمل بالفترة (النظام العام)', s.days], ['حالات التأخير', s.late], ['نقص بصمة (دخول أو خروج)', s.miss]];
   if (hasLeaves()) cards.push(['غير مبرّر بعد التصفية', recon.filter(x => x.code === 'bad' || x.code === 'partial').length]);
   $('stats').innerHTML = cards.map(([k,v]) => `<div class="stat">${k}<b>${v}</b></div>`).join('');
 
@@ -863,18 +1023,20 @@ function render() {
     $('printTitleText').textContent = 'التقرير اليومي للحضور: ' + period;
     const H = ['التاريخ','اليوم','الرقم','الاسم','الدخول','الخروج','ساعات العمل','التأخير','خروج مبكر','إضافي','الحالة'];
     const mark = (t, p) => p ? `${t} (يدوية)` : t;
-    const baseSt = (r) => r.missingIn ? 'بدون دخول' : r.missingOut ? 'بدون خروج' : r.late ? 'متأخر' : 'منتظم';
+    const baseSt = (r) => r.exempt ? 'غير مشمول' : r.offDay ? 'يوم عطلة' + (r.count === 1 ? ' (بصمة وحدة)' : '')
+      : r.missingIn ? 'بدون دخول' : r.missingOut ? 'بدون خروج' : r.late ? 'متأخر' : 'منتظم';
     const recOf = (r) => recIdx.get(r.userId + '|' + r.day);
     const rows = daily.map(r => { const x = recOf(r);
       return [r.day, r.dow, r.userId, r.name, mark(hhmm(r.first), r.manualIn), mark(hhmm(r.last), r.manualOut), fmtDur(r.worked), fmtDur(r.late||null), fmtDur(r.early||null), fmtDur(r.overtime||null),
         baseSt(r) + (x ? ' — ' + RECON[x.code].label : '')]; });
-    const quick = can('admin');
+    const quick = can('super');
     const timeCell = (t, p) => `<td class="num">${esc(t)}${p ? ` <span class="tag t-man" title="${esc(manualText(p))}">يدوية</span>` : ''}</td>`;
     html = table(H, rows, daily.map((r,i) => {
       const x = recOf(r);
       const recTag = x ? ` <span class="tag ${RECON[x.code].cls}" title="${esc(x.leaveText || x.note)}">${RECON[x.code].label}</span>` : '';
       const fixable = !x || x.code === 'bad' || x.code === 'pending';
-      const st = r.missingIn ? '<span class="tag t-miss">بدون دخول</span>' + recTag + (quick && fixable ? ` <button class="small no-print" data-addin="${esc(r.userId)}|${r.day}">إضافة دخول</button>` : '')
+      const st = !r.tracked ? `<span class="tag t-off">${esc(baseSt(r))}</span>`
+        : r.missingIn ? '<span class="tag t-miss">بدون دخول</span>' + recTag + (quick && fixable ? ` <button class="small no-print" data-addin="${esc(r.userId)}|${r.day}">إضافة دخول</button>` : '')
         : r.missingOut ? '<span class="tag t-miss">بدون خروج</span>' + recTag + (quick && fixable ? ` <button class="small no-print" data-addout="${esc(r.userId)}|${r.day}">إضافة خروج</button>` : '')
         : (r.late ? '<span class="tag t-late">متأخر</span>' : '<span class="tag t-ok">منتظم</span>') + recTag;
       const c = rows[i];
@@ -883,12 +1045,14 @@ function render() {
     }));
   } else if (currentTab === 'summary') {
     $('printTitleText').textContent = 'ملخص حضور الموظفين: ' + period;
-    const H = ['الرقم','الاسم','القسم','أيام الحضور','أيام الغياب','مرات التأخير','مجموع التأخير','مجموع الخروج المبكر','مجموع الإضافي','بدون خروج','بدون دخول','مجموع ساعات العمل','بصمات يدوية'];
+    const H = ['الرقم','الاسم','القسم','الدوام','أيام الحضور','أيام الغياب','مرات التأخير','مجموع التأخير','مجموع الخروج المبكر','مجموع الإضافي','بدون خروج','بدون دخول','مجموع ساعات العمل','بصمات يدوية'];
     const lvCols = hasLeaves();
     if (lvCols) H.push('مبرّر بإجازة','مبرّر بزمنية','بانتظار الموافقة','غياب غير مبرّر','نقص بصمة غير مبرّر');
-    const rows = summ.map(r => [r.userId, r.name, deptOf(r.userId), r.present, r.absent, r.lateCount, fmtDur(r.lateMin), fmtDur(r.earlyMin), fmtDur(r.overtime), r.missingOut, r.missingIn, fmtDur(r.worked), r.manual,
+    const rows = summ.map(r => [r.userId, r.name, deptOf(r.userId), r.sched, r.present, r.absent ?? '—', r.lateCount, fmtDur(r.lateMin), fmtDur(r.earlyMin), fmtDur(r.overtime), r.missingOut, r.missingIn, fmtDur(r.worked), r.manual,
       ...(lvCols ? [r.excLeave, r.excHour, r.pend, r.badAbsent, r.badMissing] : [])]);
-    html = table(H, rows, rows.map(r => `<tr>${r.map((c,j)=>`<td class="${j>=3?'num':''}">${esc(c)}</td>`).join('')}</tr>`));
+    html = table(H, rows, rows.map((r, i) => `<tr>${r.map((c,j)=> j === 3
+      ? `<td>${summ[i].exempt || summ[i].sched !== 'النظام العام' ? `<span class="tag ${summ[i].exempt ? 't-off' : 't-info'}">${esc(c)}</span>` : esc(c)}</td>`
+      : `<td class="${j>=4?'num':''}">${esc(c)}</td>`).join('')}</tr>`));
   } else if (currentTab === 'leaves') {
     $('printTitleText').textContent = 'تصفية الغياب ونقص البصمة بالإجازات والزمنيات: ' + period;
     const list = $('lvOnlyBad').checked ? recon.filter(x => x.code === 'bad' || x.code === 'partial') : recon;
@@ -902,20 +1066,21 @@ function render() {
     const logs = filteredLogs();
     const H = ['التاريخ','اليوم','الوقت','الرقم','الاسم','المصدر'];
     const rows = logs.map(l => [dateKey(l.d), DAYS[l.d.getDay()], `${hhmm(l.d)}:${pad(l.d.getSeconds())}`, l.userId, userName(l.userId), l.manual ? manualText(l.manual) : 'الجهاز']);
-    const del = can('admin');
+    const del = can('super');
     html = table(H, rows, rows.map((r, i) => `<tr>${r.slice(0,5).map(c=>`<td>${esc(c)}</td>`).join('')}<td style="white-space:normal">` +
       (logs[i].manual ? `<span class="tag t-man">يدوية</span> ${esc(r[5].slice(7))}` + (del ? ` <button class="small danger no-print" data-mpdel="${esc(logs[i].manual.id)}">حذف</button>` : '') : 'الجهاز') + '</td></tr>'));
   } else {
     $('printTitleText').textContent = 'قائمة الموظفين المسجلين بالجهاز';
     const dept = $('dept').value;
     const list = employeeList().filter(u => !dept || deptOf(u.userId) === dept);
-    const H = ['الرقم','الاسم بالجهاز','الاسم الكامل','القسم','العنوان الوظيفي','الهاتف المحمول','رقم البطاقة','الصلاحية','رقم سري'];
+    const H = ['الرقم','الاسم بالجهاز','الاسم الكامل','القسم','الدوام','العنوان الوظيفي','الهاتف المحمول','رقم البطاقة','الصلاحية','رقم سري'];
     const pinText = (u) => !u.onDevice || u.hasPassword == null ? '' : u.hasPassword ? 'موجود' : 'لا يوجد';
     const rows = list.map(u => { const p = prof(u.userId); return [u.userId, u.onDevice ? u.name : 'غير موجود بالجهاز',
-      p.fullName || '', p.department || '', p.title || '', p.mobile || '', u.cardno || '', u.onDevice ? roleName(u.role) : '', pinText(u)]; });
+      p.fullName || '', p.department || '', schedText(u.userId), p.title || '', p.mobile || '', u.cardHidden ? 'مخفي' : u.cardno || '', u.onDevice ? roleName(u.role) : '', pinText(u)]; });
     const editable = can('supervisor');
+    const schedCell = (id, t) => { const sc = schedOf(id); return sc.exempt || sc.custom ? `<span class="tag ${sc.exempt ? 't-off' : 't-info'}">${esc(t)}</span>` : esc(t); };
     html = table(H, rows, rows.map((r, i) =>
-      `<tr>${r.map((c,j)=>`<td${j===5?' dir="ltr" style="text-align:right"':''}>${esc(c)}</td>`).join('')}` +
+      `<tr>${r.map((c,j)=> j === 4 ? `<td>${schedCell(list[i].userId, c)}</td>` : `<td${j===6?' dir="ltr" style="text-align:right"':''}>${esc(c)}</td>`).join('')}` +
       (editable ? `<td class="no-print"><button class="small" data-edit="${esc(list[i].userId)}">تعديل</button></td>` : '') + '</tr>'
     ), editable ? '<th class="no-print"></th>' : '');
   }
@@ -1054,7 +1219,7 @@ function renderScan(j) {
       ${f.fix ? `<div style="font-size:13px;margin-top:4px;white-space:normal"><b>المعالجة:</b> ${esc(f.fix)}</div>` : ''}</td></tr>`;
   }).join('');
   $('scanResult').innerHTML = banner + `<div class="tablewrap"><table><thead><tr><th>الخطورة</th><th>النقطة والمعالجة</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  if (can('admin') && (j.findings || []).some(f => f.id === 'commkey' && f.severity === 'critical')) {
+  if (can('super') && (j.findings || []).some(f => f.id === 'commkey' && f.severity === 'critical')) {
     const b = document.createElement('button');
     b.className = 'primary no-print'; b.style.marginTop = '10px'; b.textContent = 'اضبط كلمة سر اتصال الجهاز الآن';
     b.onclick = () => { $('adminCard').open = true; $('comkeyCtl').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('comkeyVal').focus(); };
@@ -1089,12 +1254,22 @@ function updateBytes() {
   $('editBytes').textContent = `الطول: ${n} من 24 بايت (الحرف العربي ياخذ 2 بايت بترميز UTF-8)` + (n > 24 ? ' — طويل، اختصره' : '');
   $('editBytes').style.color = n > 24 ? 'var(--bad)' : '';
 }
+function syncEdSched() {
+  const custom = $('edMode').value === MODE_CUSTOM, exempt = $('edAtt').value === ATT_EXEMPT;
+  document.querySelectorAll('.edCustom').forEach(el => { el.hidden = !custom; });
+  const off = offOf('eoff');
+  $('edOffVal').value = custom ? (off.join(',') || NO_OFF) : '';
+  $('edSchedHint').textContent = (exempt ? 'غير مشمول: ما ينحسب عليه غياب ولا تأخير ولا نقص بصمة، وبصماته (إذا بصم) تبقى بالسجل. ' : '') +
+    (custom ? '' : 'النظام العام: ' + genText(GEN) + '. ') + (can('super') ? '' : 'الدوام يتعدل بالصلاحية المطلقة بس.');
+}
 function profileFromForm() {
+  syncEdSched();
   const p = {};
   document.querySelectorAll('[data-pf]').forEach(el => { const v = el.value.trim(); if (v) p[el.dataset.pf] = v; });
+  if (p.schedMode !== MODE_CUSTOM) { delete p.workStart; delete p.workEnd; delete p.offDays; }
   return p;
 }
-const sameProfile = (a, b) => PF.every(k => (a[k] || '') === (b[k] || ''));
+const sameProfile = (a, b) => { a = effProf(a); b = effProf(b); return PF.every(k => (a[k] || '') === (b[k] || '')); };
 function openEdit(userId) {
   const dev = deviceUser(userId);
   editing = { userId, dev };
@@ -1106,7 +1281,7 @@ function openEdit(userId) {
   $('devSection').style.display = canDev ? '' : 'none';
   $('devNote').style.display = canDev ? 'none' : '';
   $('devNote').textContent = dev ? 'حتى تعدل الاسم أو البطاقة بالجهاز، اسحب البيانات من الجهاز أولاً (هذه نسخة محفوظة).' : 'هذا الموظف موجود ببيانات الحاسبة فقط، مو مسجل بجهاز البصمة.';
-  if (canDev) { $('editName').value = dev.name || ''; $('editCard').value = dev.cardno || 0; $('editEnc').value = 'auto'; updateBytes(); }
+  if (canDev) { $('editName').value = dev.name || ''; $('editCard').value = dev.cardHidden ? '' : dev.cardno || 0; $('editEnc').value = 'auto'; updateBytes(); }
   $('adminSection').style.display = canDev ? '' : 'none';
   if (canDev) {
     const sel = $('edPriv');
@@ -1116,6 +1291,11 @@ function openEdit(userId) {
     $('edPin').value = ''; $('edFinger').value = '-1';
   }
   document.querySelectorAll('[data-pf]').forEach(el => { el.value = p[el.dataset.pf] || ''; });
+  const ep = effProf(p);
+  $('edAtt').value = ep.attendance; $('edMode').value = ep.schedMode;
+  $('edStart').value = ep.workStart || GEN.start; $('edEnd').value = ep.workEnd || GEN.end;
+  setOff('eoff', ep.schedMode === MODE_CUSTOM ? parseOff(ep.offDays) : GEN.off);
+  syncEdSched();
   $('editStatus').textContent = ''; $('editStatus').className = '';
   $('editOverlay').classList.add('open');
   (canDev ? $('editName') : document.querySelector('[data-pf="fullName"]')).focus();
@@ -1139,7 +1319,7 @@ async function saveEdit() {
   let devChange = null;
   if (canDev) {
     const name = $('editName').value.trim(), card = $('editCard').value.trim();
-    if ((name !== (dev.name || '')) || (card !== '' && Number(card) !== Number(dev.cardno || 0))) {
+    if ((name !== (dev.name || '')) || (card !== '' && (dev.cardHidden || Number(card) !== Number(dev.cardno || 0)))) {
       if (!name) return err('الاسم بالجهاز ما يصير يكون فارغ');
       const nBytes = $('editEnc').value === 'cp1256' ? [...name].length : utf8Len(name);
       if (nBytes > 24) return err(`الاسم بالجهاز طويل (${nBytes} بايت)، الحد 24. الاسم الكامل اكتبه بالبيانات الإضافية`);
@@ -1147,8 +1327,13 @@ async function saveEdit() {
       devChange = { uid: dev.uid, userId, name, card: card === '' ? undefined : card, encoding: $('editEnc').value };
     }
   }
-  // البيانات الإضافية
+  // البيانات الإضافية والدوام
   const newProf = profileFromForm();
+  if (newProf.schedMode === MODE_CUSTOM) {
+    if (!newProf.workStart || !newProf.workEnd) return err('اكتب وقت بداية ونهاية دوامه');
+    if (toMin(newProf.workEnd) <= toMin(newProf.workStart)) return err('نهاية دوامه لازم تكون بعد بدايته بنفس اليوم');
+    if (offOf('eoff').length === 7) return err('ما يصير كل أيام الأسبوع عطلة');
+  }
   const profChanged = !sameProfile(newProf, prof(userId));
   if (!devChange && !profChanged) { closeEdit(); setTabStatus('ما أكو أي تغيير'); return; }
 
@@ -1192,7 +1377,10 @@ function exportProfiles() {
   const lines = [head.map(q).join(',')];
   for (const u of employeeList()) {
     const p = prof(u.userId);
-    lines.push([q(u.userId), q(u.onDevice ? u.name : ''), ...PF.map(k => PHONE_FIELDS.includes(k) ? keep0(p[k]) : q(p[k]))].join(','));
+    const e = effProf(p);
+    const val = (k) => k === 'attendance' || k === 'schedMode' ? e[k] : k === 'offDays' ? (e.schedMode === MODE_CUSTOM ? (parseOff(e.offDays).length ? offText(parseOff(e.offDays)) : NO_OFF) : '')
+      : k === 'workStart' || k === 'workEnd' ? (e[k] || '') : p[k];
+    lines.push([q(u.userId), q(u.onDevice ? u.name : ''), ...PF.map(k => PHONE_FIELDS.includes(k) ? keep0(p[k]) : q(val(k)))].join(','));
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
@@ -1228,7 +1416,22 @@ const HEADER_ALIASES = {
   address: ['العنوان', 'address', 'street'],
   nationalId: ['رقم الهوية', 'رقم البطاقة الوطنية', 'ssn', 'national id'],
   notes: ['ملاحظات', 'notes'],
+  attendance: ['البصمة', 'مشمول بالبصمة', 'attendance'],
+  schedMode: ['نظام الدوام', 'الدوام', 'schedule'],
+  workStart: ['بداية الدوام الخاص', 'بداية الدوام', 'وقت الدخول', 'work start'],
+  workEnd: ['نهاية الدوام الخاص', 'نهاية الدوام', 'وقت الخروج', 'work end'],
+  offDays: ['عطلة الموظف', 'أيام العطلة', 'العطلة', 'off days'],
 };
+// وقت من Excel: 8:00 أو 08:00:00 أو 8:00 AM أو 8:00 ص أو كسر يوم (0.333)
+function normTime(v) {
+  v = v.replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).trim();
+  const m = v.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm|ص|م)?$/i);
+  if (!m) { const f = parseFloat(v); if (/^0?\.\d+$/.test(v) && f > 0 && f < 1) { const t = Math.round(f * 1440); return pad(Math.floor(t / 60)) + ':' + pad(t % 60); } return v; }
+  let h = +m[1]; const ap = (m[3] || '').toLowerCase();
+  if ((ap === 'pm' || ap === 'م') && h < 12) h += 12;
+  if ((ap === 'am' || ap === 'ص') && h === 12) h = 0;
+  return pad(h) + ':' + m[2];
+}
 function normDate(v) {
   let m = v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
   if (m) return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
@@ -1242,6 +1445,7 @@ function normValue(k, v) {
   if (!v) return '';
   if (k === 'gender') { const g = v.toLowerCase(); return ['m', 'male', 'ذكر'].includes(g) ? 'ذكر' : ['f', 'female', 'أنثى', 'انثى'].includes(g) ? 'أنثى' : v; }
   if (k === 'birthday' || k === 'hireDate') return normDate(v);
+  if (k === 'workStart' || k === 'workEnd') return normTime(v);
   if (['mobile', 'officePhone', 'homePhone'].includes(k) && /^7\d{9}$/.test(v)) return '0' + v; // Excel يحذف الصفر من أرقام الموبايل العراقية
   return v;
 }
@@ -1274,7 +1478,8 @@ async function finishImport(incoming, mode) {
   const j = await postJSON('/api/profiles/import', { profiles: incoming, mode });
   PROFILES = j.profiles || {};
   fillDeptSelect(); if (DATA) { fillEmpSelect(); render(); }
-  setTabStatus(`تم الاستيراد: ${j.added} موظف جديد، ${j.updated} تحدثت بياناتهم، ${j.unchanged} بدون تغيير`, 'okc');
+  setTabStatus(`تم الاستيراد: ${j.added} موظف جديد، ${j.updated} تحدثت بياناتهم، ${j.unchanged} بدون تغيير` +
+    (j.schedErrors ? ` · ${j.schedErrors} موظف دوامه بالملف غلط (أوقات أو أيام)، فبقى دوامه القديم` : ''), j.schedErrors ? 'err' : 'okc');
 }
 async function importMdbFile(file) {
   setTabStatus(`جارِ قراءة ${file.name} (${(file.size / 1048576).toFixed(1)} ميگا)...`);
@@ -1541,14 +1746,32 @@ document.addEventListener('click', async (e) => {
 // ---------- مستخدمو البرنامج ----------
 function setUsersStatus(m, cls = '') { $('usersStatus').className = cls; $('usersStatus').textContent = m; }
 const fmtWhen = (t) => t ? String(t).replace('T', ' ').slice(0, 16) : '—';
+// حساب الموظف مربوط برقم بصمته: نعرض اسمه من بيانات الجهاز أو البيانات الإضافية
+const empLabel = (id) => id ? `${id} - ${userName(String(id).replace(/^0+(?=.)/, ''))}` : '';
+let USER_ROLES = {};
+function fillRoleSelect(roles) {
+  USER_ROLES = roles || {};
+  const order = ['employee', 'viewer', 'supervisor', 'admin', 'super'].filter(k => USER_ROLES[k]);
+  const cur = $('auRole').value;
+  $('auRole').innerHTML = order.map(k => `<option value="${k}">${esc(ROLE_LABELS[k] || USER_ROLES[k])}</option>`).join('');
+  if (order.includes(cur)) $('auRole').value = cur;
+  syncAuEmp();
+}
+function syncAuEmp() {
+  $('auEmpBox').hidden = $('auRole').value !== 'employee';
+  const ids = [...new Set([...(DATA ? DATA.users.map(u => u.userId) : []), ...Object.keys(PROFILES)])].sort((a, b) => Number(a) - Number(b));
+  $('empIdList').innerHTML = ids.map(id => `<option value="${esc(id)}">${esc(userName(id))}</option>`).join('');
+}
 async function loadUsers() {
   try {
     const r = await fetch('/api/users'); const j = await r.json();
     if (!r.ok) throw new Error(j.error || 'خطأ');
-    const roleSel = (u) => `<select data-urole="${esc(u.username)}"${u.me ? ' disabled' : ''}>` +
-      Object.entries(ROLE_LABELS).map(([k, v]) => `<option value="${k}"${k === u.role ? ' selected' : ''}>${v}</option>`).join('') + '</select>';
-    $('usersTable').innerHTML = '<table><thead><tr><th>اسم المستخدم</th><th>الصلاحية</th><th>آخر دخول</th><th>تاريخ الإضافة</th><th></th></tr></thead><tbody>' +
-      j.users.map(u => `<tr><td>${esc(u.username)}${u.me ? ' <span class="tag t-ok">أنت</span>' : ''}</td><td>${roleSel(u)}</td>
+    fillRoleSelect(j.roles);
+    const isSuper = can('super');
+    const roleCell = (u) => !isSuper || u.me ? esc(u.roleLabel || ROLE_LABELS[u.role] || u.role)
+      : `<select data-urole="${esc(u.username)}">` + Object.entries(ROLE_LABELS).map(([k, v]) => `<option value="${k}"${k === u.role ? ' selected' : ''}>${v}</option>`).join('') + '</select>';
+    $('usersTable').innerHTML = '<table><thead><tr><th>اسم المستخدم</th><th>الصلاحية</th><th>الموظف</th><th>آخر دخول</th><th>تاريخ الإضافة</th><th></th></tr></thead><tbody>' +
+      j.users.map(u => `<tr><td>${esc(u.username)}${u.me ? ' <span class="tag t-ok">أنت</span>' : ''}</td><td>${roleCell(u)}</td><td>${esc(empLabel(u.empId))}</td>
         <td dir="ltr" style="text-align:right">${fmtWhen(u.lastLogin)}</td><td dir="ltr" style="text-align:right">${fmtWhen(u.created)}</td>
         <td>${u.me ? '' : `<div class="row"><button class="small" data-upass="${esc(u.username)}">كلمة سر جديدة</button><button class="small danger" data-udel="${esc(u.username)}">حذف</button></div>`}</td></tr>`).join('') + '</tbody></table>';
   } catch (e) { $('usersTable').innerHTML = ''; setUsersStatus(e.message, 'err'); }
@@ -1557,10 +1780,14 @@ $('usersCard').addEventListener('toggle', () => { if ($('usersCard').open) loadU
 $('usersTable').addEventListener('change', async (e) => {
   const sel = e.target.closest('[data-urole]'); if (!sel) return;
   const name = sel.dataset.urole, role = sel.value;
-  if (confirm(`راح تصير صلاحية ${name}: ${ROLE_LABELS[role]}. متأكد؟`)) {
-    try { await postJSON('/api/users/save', { username: name, role }); setUsersStatus(`تغيرت صلاحية ${name} إلى: ${ROLE_LABELS[role]}`, 'okc'); }
-    catch (x) { setUsersStatus(x.message, 'err'); }
-  }
+  let empId = '';
+  if (role === 'employee') {
+    empId = await askText({ title: 'رقم بصمة الموظف', text: `حساب ${name} راح يصير حساب موظف، يشوف تقريره بس.`, label: 'رقم البصمة', okText: 'حفظ',
+      validate: (v) => v.trim() ? '' : 'اكتب رقم البصمة' });
+    if (empId == null) return loadUsers();
+  } else if (!confirm(`راح تصير صلاحية ${name}: ${ROLE_LABELS[role]}. متأكد؟`)) return loadUsers();
+  try { await postJSON('/api/users/save', { username: name, role, empId: empId.trim() }); setUsersStatus(`تغيرت صلاحية ${name} إلى: ${ROLE_LABELS[role]}`, 'okc'); }
+  catch (x) { setUsersStatus(x.message, 'err'); }
   loadUsers();
 });
 $('usersTable').addEventListener('click', async (e) => {
@@ -1580,24 +1807,91 @@ $('usersTable').addEventListener('click', async (e) => {
     loadUsers();
   }
 });
+$('auRole').addEventListener('change', syncAuEmp);
 $('auBtn').onclick = async () => {
   const username = $('auName').value.trim(), password = $('auPass').value, role = $('auRole').value;
+  const empId = role === 'employee' ? $('auEmp').value.trim() : '';
   if (!username) return setUsersStatus('اكتب اسم المستخدم', 'err');
   if (password.length < 6) return setUsersStatus('كلمة السر لازم تكون 6 أحرف أو أكثر', 'err');
-  if (role === 'admin' && !confirm(`${username} راح يصير مدير بصلاحية مطلقة: يگدر يمسح بيانات الجهاز ويضيف ويحذف مستخدمين. متأكد؟`)) return;
+  if (role === 'employee' && !empId) return setUsersStatus('اكتب رقم بصمة الموظف', 'err');
+  if (role === 'super' && !confirm(`${username} راح يصير بصلاحية مطلقة: كل شي بدون قيد، ويضيف ويحذف كل المستخدمين. متأكد؟`)) return;
   $('auBtn').disabled = true;
   try {
-    await postJSON('/api/users/save', { create: true, username, password, role });
-    setUsersStatus(`انضاف المستخدم ${username} بصلاحية: ${ROLE_LABELS[role]}`, 'okc');
-    $('auName').value = ''; $('auPass').value = ''; $('auRole').value = 'viewer';
+    await postJSON('/api/users/save', { create: true, username, password, role, empId });
+    setUsersStatus(`انضاف المستخدم ${username} بصلاحية: ${ROLE_LABELS[role]}` + (empId ? ` (الموظف ${empLabel(empId)})` : ''), 'okc');
+    $('auName').value = ''; $('auPass').value = ''; $('auEmp').value = '';
     loadUsers();
   } catch (x) { setUsersStatus(x.message, 'err'); }
   finally { $('auBtn').disabled = false; }
 };
 
+// ---------- حفظ التقرير للموظفين ----------
+// يحسب تقرير كل الموظفين بالفترة (بدون فلتر الموظف والقسم) مثل ما يبين بالجداول، ويحفظه بالبرنامج.
+// كل موظف إله حساب يشوف أيامه وملخصه بس.
+function buildPublished() {
+  ALL_EMP = true; SCHED_CACHE = new Map(); RANGE_CACHE = null; CUR_GEN = genForm();
+  try {
+    const daily = dailyRows(), recon = reconcile(daily), summ = summaryRows(daily, recon);
+    const lv = hasLeaves(), employees = {};
+    const byEmp = new Map();
+    for (const r of daily) { if (!byEmp.has(r.userId)) byEmp.set(r.userId, new Map()); byEmp.get(r.userId).set(r.day, { r }); }
+    for (const x of recon) { if (!byEmp.has(x.userId)) byEmp.set(x.userId, new Map()); const m = byEmp.get(x.userId); m.set(x.day, { ...(m.get(x.day) || {}), x }); }
+    const st = (r) => r.exempt ? 'غير مشمول' : r.offDay ? 'يوم عطلة' + (r.count === 1 ? ' (بصمة وحدة)' : '')
+      : r.missingIn ? 'بدون دخول' : r.missingOut ? 'بدون خروج' : r.late ? 'متأخر' : 'منتظم';
+    for (const sm of summ) {
+      const days = [...(byEmp.get(sm.userId) || new Map()).entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([day, { r, x }]) => ({
+        day, dow: DAYS[dowOf(day)],
+        in: r ? hhmm(r.first) : '', out: r ? hhmm(r.last) : '',
+        inManual: r && r.manualIn ? manualText(r.manualIn) : '', outManual: r && r.manualOut ? manualText(r.manualOut) : '',
+        worked: r ? Math.round(r.worked || 0) : 0, late: r ? Math.round(r.late) : 0, early: r ? Math.round(r.early) : 0, overtime: r ? Math.round(r.overtime) : 0,
+        status: r ? st(r) : (x && x.absent ? 'غائب' : (x ? x.state : '')),
+        result: x ? RECON[x.code].label : '', leave: x ? x.leaveText || '' : '', note: x ? x.note || '' : '' }));
+      employees[sm.userId] = { name: sm.name, dept: deptOf(sm.userId), sched: sm.sched, days,
+        summary: { present: sm.present, absent: sm.absent || 0, lateCount: sm.lateCount, lateMin: Math.round(sm.lateMin), earlyMin: Math.round(sm.earlyMin),
+          overtime: Math.round(sm.overtime), missingIn: sm.missingIn, missingOut: sm.missingOut, worked: Math.round(sm.worked), manual: sm.manual,
+          excLeave: sm.excLeave, excHour: sm.excHour, pend: sm.pend, badAbsent: sm.badAbsent, badMissing: sm.badMissing, exempt: sm.exempt } };
+    }
+    return { from: $('from').value, to: $('to').value, general: genText(CUR_GEN), leaves: lv, employees };
+  } finally { ALL_EMP = false; render(); }
+}
+$('publishBtn').onclick = async () => {
+  if (!DATA) return setTabStatus('اسحب البيانات من الجهاز أولاً', 'err');
+  const f = $('from').value, t = $('to').value;
+  if (!f || !t) return setTabStatus('اختار الفترة (من تاريخ وإلى تاريخ)', 'err');
+  if (can('super') && !sameGen(genForm(), GEN)) return setTabStatus('النظام العام بيه تغييرات ما محفوظة. احفظه أو رجّعه قبل ما تحفظ التقرير', 'err');
+  const rep = buildPublished(), n = Object.keys(rep.employees).length;
+  if (!confirm(`راح أحفظ تقرير الفترة من ${f} إلى ${t} لـ ${n} موظف` + (rep.leaves ? ' (ويا تصفية الإجازات)' : '') +
+    `.\nكل موظف عنده حساب يشوف تقريره هو بس. إذا أكو تقرير محفوظ لنفس الفترة يتبدّل.\nتكمل؟`)) return;
+  $('publishBtn').disabled = true; setTabStatus('جارِ حفظ التقرير...');
+  try {
+    const j = await postJSON('/api/reports/publish', rep);
+    setTabStatus(`انحفظ تقرير ${f} إلى ${t} لـ ${j.employees} موظف. الموظفين يشوفونه من حساباتهم`, 'okc');
+    if ($('reportsCard').open) loadReports();
+  } catch (x) { setTabStatus(x.message, 'err'); }
+  finally { $('publishBtn').disabled = false; }
+};
+async function loadReports() {
+  try {
+    const r = await fetch('/api/reports'); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'خطأ');
+    $('reportsTable').innerHTML = j.reports.length ? '<table><thead><tr><th>الفترة</th><th>الموظفين</th><th>حفظه</th><th>وقت الحفظ</th><th></th></tr></thead><tbody>' +
+      j.reports.map(x => `<tr><td dir="ltr" style="text-align:right">${esc(x.from)} → ${esc(x.to)}</td><td class="num">${x.employees}</td><td>${esc(x.savedBy)}</td>
+        <td dir="ltr" style="text-align:right">${fmtWhen(x.savedAt)}</td><td><button class="small danger" data-repdel="${esc(x.id)}">حذف</button></td></tr>`).join('') + '</tbody></table>'
+      : '<div class="empty">ما أكو تقارير محفوظة بعد</div>';
+  } catch (e) { $('reportsTable').innerHTML = ''; $('reportsStatus').className = 'err'; $('reportsStatus').textContent = e.message; }
+}
+$('reportsCard').addEventListener('toggle', () => { if ($('reportsCard').open) loadReports(); });
+$('reportsTable').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-repdel]'); if (!b) return;
+  if (!confirm('راح ينحذف هذا التقرير والموظفين ما يشوفونه بعد (تبقى منه نسخة بمجلد backups). متأكد؟')) return;
+  try { await postJSON('/api/reports/delete', { id: b.dataset.repdel }); $('reportsStatus').className = 'okc'; $('reportsStatus').textContent = 'انحذف التقرير'; }
+  catch (x) { $('reportsStatus').className = 'err'; $('reportsStatus').textContent = x.message; }
+  loadReports();
+});
+
 // ---------- سجل العمليات ----------
 const ACTION_LABELS = {
-  data: 'سحب البيانات', login: 'دخول', loginFailed: 'محاولة دخول فاشلة', logout: 'خروج', setup: 'إنشاء حساب المدير', myPassword: 'غيّر كلمة سره',
+  data: 'سحب البيانات', login: 'دخول', loginFailed: 'محاولة دخول فاشلة', logout: 'خروج', setup: 'إنشاء أول حساب (صلاحية مطلقة)', myPassword: 'غيّر كلمة سره',
   userCreate: 'إضافة مستخدم', userUpdate: 'تعديل مستخدم', userDelete: 'حذف مستخدم', denied: 'محاولة بدون صلاحية',
   profileSave: 'تعديل بيانات إضافية', profileImport: 'استيراد بيانات الموظفين',
   syncTime: 'مزامنة الوقت', refresh: 'تحديث بيانات الجهاز', testVoice: 'تشغيل صوت', unlock: 'فتح الباب', lcdWrite: 'رسالة على الشاشة',
@@ -1607,6 +1901,7 @@ const ACTION_LABELS = {
   clearOplog: 'مسح سجل عمليات الجهاز', clearAccess: 'تصفير إعدادات الأبواب', clearAllData: 'مسح كل بيانات الجهاز',
   readOption: 'قراءة إعداد مخفي', writeOption: 'كتابة إعداد مخفي', setTime: 'ضبط وقت محدد', restoreUsers: 'استرجاع موظفين',
   manualAdd: 'إضافة بصمة يدوية', manualDelete: 'حذف بصمة يدوية', leavesImport: 'رفع تقرير الإجازات', leavesClear: 'مسح بيانات الإجازات', deviceSecurityCheck: 'فحص أمان الجهاز', setDeviceCommKey: 'ضبط كلمة سر اتصال الجهاز',
+  scheduleSave: 'تعديل النظام العام للدوام', reportPublish: 'حفظ تقرير للموظفين', reportDelete: 'حذف تقرير محفوظ',
 };
 let AUDIT = [];
 function auditDetail(e) {
@@ -1614,6 +1909,11 @@ function auditDetail(e) {
   if (e.target) p.push('المستخدم: ' + e.target);
   if (e.newRole) p.push('الصلاحية: ' + (ROLE_LABELS[e.newRole] || e.newRole));
   if (e.passwordChanged) p.push('كلمة سر جديدة');
+  if (e.sched) p.push('الدوام: ' + e.sched);
+  if (e.action === 'scheduleSave') p.push(`من: ${e.old || '—'} ← إلى: ${e.new || '—'}`);
+  if (e.empId) p.push('رقم البصمة ' + e.empId);
+  if (e.action === 'reportPublish') p.push(`${e.from} إلى ${e.to}، ${e.employees} موظف`);
+  if (e.report) p.push(e.report.replace('_', ' إلى '));
   if (e.userId) p.push('الموظف ' + e.userId + (e.name ? ' (' + e.name + ')' : ''));
   if (e.privilege != null) p.push('بالجهاز: ' + (e.privilege == 14 ? 'مدير' : 'مستخدم عادي'));
   if (e.cleared) p.push('مسح الرقم السري');
@@ -1727,7 +2027,15 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
   b.classList.add('active'); currentTab = b.dataset.tab; render();
 });
-['from','to','emp','dept','start','end','grace','weekend','dedup'].forEach(id => $(id).addEventListener('change', render));
+['from','to','emp','dept'].forEach(id => $(id).addEventListener('change', render));
+dayBoxes('genOff', 'goff'); dayBoxes('edOff', 'eoff');
+fillGen(GEN);
+$('schedCard').addEventListener('change', (e) => { if (e.target.matches('[data-gen], [data-goff]')) { delete $('schedStatus').dataset.keep; render(); } });
+$('schedSaveBtn').onclick = saveGeneral;
+$('schedResetBtn').onclick = () => { fillGen(GEN); delete $('schedStatus').dataset.keep; render(); };
+$('edMode').addEventListener('change', syncEdSched);
+$('edAtt').addEventListener('change', syncEdSched);
+$('edOff').addEventListener('change', syncEdSched);
 loadSettings();
 initSession();
 loadProfiles();

@@ -9,7 +9,7 @@ import (
 )
 
 // Version رقم نسخة البرنامج
-const Version = "2.6.0"
+const Version = "2.8.0"
 
 //go:embed public
 var publicFS embed.FS
@@ -18,6 +18,9 @@ var publicFS embed.FS
 func Configure(dir string, demo bool) {
 	dataDir = dir
 	demoMode = demo
+	setMu.Lock()
+	setCache = nil
+	setMu.Unlock()
 }
 
 var connectHint string
@@ -47,8 +50,17 @@ func NewHandler(users *UserStore) http.Handler {
 	mux.HandleFunc("/api/leaves/import", need(RoleAdmin, handleLeavesImport))
 	mux.HandleFunc("/api/leaves/clear", need(RoleAdmin, handleLeavesClear))
 	mux.HandleFunc("/api/manual", need(RoleViewer, handleManual))
-	mux.HandleFunc("/api/manual/add", need(RoleAdmin, handleManualAdd))
-	mux.HandleFunc("/api/manual/delete", need(RoleAdmin, handleManualDelete))
+	// البصمات اليدوية والنظام العام للدوام = تغيير الأوقات: للصلاحية المطلقة بس
+	mux.HandleFunc("/api/manual/add", need(RoleSuper, handleManualAdd))
+	mux.HandleFunc("/api/manual/delete", need(RoleSuper, handleManualDelete))
+	mux.HandleFunc("/api/settings", need(RoleViewer, handleSettings))
+	mux.HandleFunc("/api/settings/schedule", need(RoleSuper, handleScheduleSave))
+	// التقارير المحفوظة للموظفين
+	mux.HandleFunc("/api/reports", need(RoleAdmin, handleReports))
+	mux.HandleFunc("/api/reports/publish", need(RoleAdmin, handleReportPublish))
+	mux.HandleFunc("/api/reports/delete", need(RoleAdmin, handleReportDelete))
+	mux.HandleFunc("/api/my/reports", onlyEmployee(handleMyReports))
+	mux.HandleFunc("/api/my/report", onlyEmployee(handleMyReport))
 	var as *authServer
 	if users != nil {
 		as = newAuthServer(users)
@@ -63,14 +75,25 @@ func NewHandler(users *UserStore) http.Handler {
 	} else {
 		mux.HandleFunc("/api/session", func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 200, map[string]any{"auth": false, "demo": demoMode, "version": Version,
-				"user": map[string]any{"username": "", "role": RoleAdmin, "roleLabel": roleLabels[RoleAdmin]}})
+				"user": map[string]any{"username": "", "role": RoleSuper, "roleLabel": roleLabels[RoleSuper]}})
 		})
 	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		file, ctype := "", ""
+		me, _ := userOf(r)
 		switch r.URL.Path {
 		case "/", "/index.html":
+			if me.Role == RoleEmployee { // الموظف يشوف تقريره بس
+				http.Redirect(w, r, "/me", http.StatusFound)
+				return
+			}
 			file, ctype = "index.html", "text/html; charset=utf-8"
+		case "/me":
+			if me.Role != RoleEmployee {
+				http.Redirect(w, r, "/", http.StatusFound)
+				return
+			}
+			file, ctype = "me.html", "text/html; charset=utf-8"
 		case "/login":
 			if as == nil {
 				http.Redirect(w, r, "/", http.StatusFound)

@@ -1,6 +1,7 @@
 package server
 
-// تسجيل الدخول: صفحة عربية وجلسة محفوظة (كوكي) لكل مستخدم، والتحقق من الصلاحية بكل طلب.
+// تسجيل الدخول: صفحة عربية وجلسة (كوكي) لكل مستخدم، والتحقق من الصلاحية بكل طلب.
+// ما أكو دخول بدون اسم وكلمة سر. الجلسات بالذاكرة بس: كل ما ينفتح البرنامج من جديد يطلب الدخول.
 
 import (
 	"context"
@@ -8,7 +9,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"net"
 	"net/http"
@@ -22,7 +22,8 @@ import (
 
 const (
 	sessionCookie = "zk_session"
-	sessionTTL    = 30 * 24 * time.Hour
+	sessionTTL    = 12 * time.Hour
+	maxSessions   = 5000
 )
 
 func sessionsFile() string {
@@ -33,11 +34,11 @@ func sessionsFile() string {
 	return filepath.Join(dataDir, "data", name)
 }
 
-// الجلسات تنحفظ بالملف كبصمة (hash) مو كالرمز نفسه
+// الجلسة تنخزن ببصمة (hash) الرمز مو بالرمز نفسه
 type sessEntry struct {
-	User  string `json:"u"`
-	Exp   int64  `json:"exp"`
-	Stamp string `json:"p"` // بصمة كلمة السر وقت الدخول
+	User  string
+	Exp   int64
+	Stamp string // بصمة كلمة السر وقت الدخول
 }
 
 type sessionStore struct {
@@ -46,19 +47,8 @@ type sessionStore struct {
 }
 
 func newSessionStore() *sessionStore {
-	s := &sessionStore{m: map[string]sessEntry{}}
-	if b, err := os.ReadFile(sessionsFile()); err == nil {
-		if json.Unmarshal(b, &s.m) != nil || s.m == nil { // صيغة النسخة السابقة: نبدي من جديد
-			s.m = map[string]sessEntry{}
-		}
-	}
-	now := time.Now().Unix()
-	for k, e := range s.m {
-		if e.Exp < now || e.User == "" {
-			delete(s.m, k)
-		}
-	}
-	return s
+	os.Remove(sessionsFile()) // جلسات النسخ السابقة (كانت تبقى 30 يوم)
+	return &sessionStore{m: map[string]sessEntry{}}
 }
 
 func tokenKey(tok string) string {
@@ -66,21 +56,42 @@ func tokenKey(tok string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (s *sessionStore) saveLocked() {
-	os.MkdirAll(filepath.Dir(sessionsFile()), 0o755)
-	b, _ := json.Marshal(s.m)
-	os.WriteFile(sessionsFile(), b, 0o600)
-}
-
-func (s *sessionStore) create(u appUser) string {
+func (s *sessionStore) add(e sessEntry) string {
 	b := make([]byte, 32)
 	rand.Read(b)
 	tok := hex.EncodeToString(b)
+	e.Exp = time.Now().Add(sessionTTL).Unix()
 	s.mu.Lock()
-	s.m[tokenKey(tok)] = sessEntry{User: u.Username, Exp: time.Now().Add(sessionTTL).Unix(), Stamp: u.passStamp()}
-	s.saveLocked()
+	s.pruneLocked()
+	s.m[tokenKey(tok)] = e
 	s.mu.Unlock()
 	return tok
+}
+
+func (s *sessionStore) create(u appUser) string {
+	return s.add(sessEntry{User: u.Username, Stamp: u.passStamp()})
+}
+
+// يشيل المنتهية، وإذا بعدها هواية يشيل الأقدم
+func (s *sessionStore) pruneLocked() {
+	if len(s.m) < maxSessions {
+		return
+	}
+	now := time.Now().Unix()
+	for k, e := range s.m {
+		if e.Exp < now {
+			delete(s.m, k)
+		}
+	}
+	for len(s.m) >= maxSessions {
+		oldK, oldExp := "", int64(1<<62)
+		for k, e := range s.m {
+			if e.Exp < oldExp {
+				oldK, oldExp = k, e.Exp
+			}
+		}
+		delete(s.m, oldK)
+	}
 }
 
 func (s *sessionStore) lookup(tok string) (sessEntry, bool) {
@@ -93,7 +104,6 @@ func (s *sessionStore) lookup(tok string) (sessEntry, bool) {
 	}
 	if time.Now().Unix() > e.Exp {
 		delete(s.m, k)
-		s.saveLocked()
 		return sessEntry{}, false
 	}
 	return e, true
@@ -105,7 +115,6 @@ func (s *sessionStore) rebind(tok string, u appUser) {
 	if e, ok := s.m[tokenKey(tok)]; ok {
 		e.Stamp = u.passStamp()
 		s.m[tokenKey(tok)] = e
-		s.saveLocked()
 	}
 	s.mu.Unlock()
 }
@@ -113,7 +122,6 @@ func (s *sessionStore) rebind(tok string, u appUser) {
 func (s *sessionStore) remove(tok string) {
 	s.mu.Lock()
 	delete(s.m, tokenKey(tok))
-	s.saveLocked()
 	s.mu.Unlock()
 }
 
@@ -129,7 +137,6 @@ func (s *sessionStore) removeUser(user, keep string) {
 			delete(s.m, k)
 		}
 	}
-	s.saveLocked()
 	s.mu.Unlock()
 }
 
@@ -188,6 +195,7 @@ type ctxKey struct{}
 
 type reqUser struct {
 	Name, Role string
+	EmpID      string // حساب موظف: رقم بصمته
 	token      string
 }
 
@@ -208,7 +216,7 @@ func allowed(r *http.Request, need string) bool {
 
 func deny(w http.ResponseWriter, r *http.Request, what string) {
 	audit(r, "denied", map[string]any{"what": what}, errors.New("ما عنده صلاحية"))
-	writeJSON(w, 403, map[string]any{"error": "ما عندك صلاحية لهذا الأمر. اطلبه من المدير", "forbidden": true})
+	writeJSON(w, 403, map[string]any{"error": "ما عندك صلاحية لهذا الأمر. اطلبه من صاحب صلاحية أعلى", "forbidden": true})
 }
 
 // need يلف المسار بشرط صلاحية
@@ -258,7 +266,7 @@ func (a *authServer) authUser(r *http.Request) (reqUser, bool) {
 	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
 		if e, ok := a.sess.lookup(c.Value); ok {
 			if u, ok := a.store.get(e.User); ok && e.Stamp == u.passStamp() {
-				return reqUser{Name: u.Username, Role: u.Role, token: c.Value}, true
+				return reqUser{Name: u.Username, Role: u.Role, EmpID: u.EmpID, token: c.Value}, true
 			}
 			a.sess.remove(c.Value) // المستخدم انحذف أو تغيرت كلمة سره
 		}
@@ -270,7 +278,7 @@ func (a *authServer) authUser(r *http.Request) (reqUser, bool) {
 		if v, ok := a.basic.Load(key); ok {
 			hit := v.(basicHit)
 			if u, ok := a.store.get(hit.user); ok && u.Hash == hit.hash {
-				return reqUser{Name: u.Username, Role: u.Role}, true
+				return reqUser{Name: u.Username, Role: u.Role, EmpID: u.EmpID}, true
 			}
 			a.basic.Delete(key)
 		}
@@ -281,7 +289,7 @@ func (a *authServer) authUser(r *http.Request) (reqUser, bool) {
 			name, pass, _ := strings.Cut(string(raw), ":")
 			if u, ok := a.store.authenticate(name, pass); ok {
 				a.basic.Store(key, basicHit{u.Username, u.Hash})
-				return reqUser{Name: u.Username, Role: u.Role}, true
+				return reqUser{Name: u.Username, Role: u.Role, EmpID: u.EmpID}, true
 			}
 			a.limiter.fail(clientIP(r))
 		}
@@ -318,13 +326,20 @@ func localOnly(next http.Handler) http.Handler {
 			writeJSON(w, 403, map[string]any{"error": "طلب مرفوض: لازم يجي من صفحة البرنامج نفسه"})
 			return
 		}
-		next.ServeHTTP(w, withUser(r, reqUser{Role: RoleAdmin}))
+		next.ServeHTTP(w, withUser(r, reqUser{Role: RoleSuper}))
 	})
 }
 
+// كوكي الجلسة ينتهي ويا سدّ المتصفح، والجلسة نفسها تنتهي ويا إعادة تشغيل البرنامج أو بعد 12 ساعة
 func (a *authServer) setCookie(w http.ResponseWriter, tok string) {
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: tok, Path: "/", HttpOnly: true,
-		SameSite: http.SameSiteLaxMode, MaxAge: int(sessionTTL.Seconds())})
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: tok, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
+}
+
+// يشيل جلسة المتصفح الحالية قبل جلسة جديدة
+func (a *authServer) dropCurrent(r *http.Request) {
+	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
+		a.sess.remove(c.Value)
+	}
 }
 
 func (a *authServer) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -355,20 +370,21 @@ func (a *authServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.limiter.reset(ip)
+	a.dropCurrent(r)
 	a.setCookie(w, a.sess.create(u))
 	a.store.touchLogin(u.Username)
 	auditAs(r, u.Username, u.Role, "login", nil, nil)
 	writeJSON(w, 200, map[string]any{"ok": true, "user": userInfoJSON(u)})
 }
 
-// أول تشغيل على نفس الحاسبة: إنشاء حساب المدير من المتصفح
+// أول تشغيل على نفس الحاسبة: إنشاء حساب الصلاحية المطلقة من المتصفح
 func (a *authServer) handleSetup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeErr(w, apiErr{405, "طريقة غير مسموحة"}, "")
 		return
 	}
 	if !isLoopback(clientIP(r)) {
-		writeErr(w, apiErr{403, "افتح البرنامج من نفس الحاسبة حتى تنشئ حساب المدير"}, "")
+		writeErr(w, apiErr{403, "افتح البرنامج من نفس الحاسبة حتى تنشئ حساب الصلاحية المطلقة"}, "")
 		return
 	}
 	var req struct {
@@ -438,7 +454,7 @@ func (a *authServer) handleMyPassword(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, badReq("كلمة السر الجديدة نفس القديمة"), "")
 		return
 	}
-	u, err := a.store.update(me.Name, "", req.New)
+	u, err := a.store.update(me.Name, "", req.New, "")
 	if err != nil {
 		writeErr(w, err, "")
 		return
@@ -449,18 +465,33 @@ func (a *authServer) handleMyPassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": true, "message": "تغيرت كلمة السر، وانطلعت من باقي الأجهزة"})
 }
 
-// ---------- إدارة المستخدمين (للصلاحية المطلقة) ----------
+// ---------- إدارة المستخدمين ----------
+// الصلاحية المطلقة تدير كل الحسابات. المدير يدير حسابات الموظفين بس (ينشئها، يغير كلمة سرها، يحذفها).
+
+// manages هل المستخدم الحالي يگدر يدير حساب بهذي الصلاحية
+func manages(me reqUser, role string) bool {
+	if me.Role == RoleSuper {
+		return true
+	}
+	return me.Role == RoleAdmin && role == RoleEmployee
+}
 
 func (a *authServer) handleUsers(w http.ResponseWriter, r *http.Request) {
 	me, _ := userOf(r)
-	list := a.store.list()
-	out := make([]map[string]any, len(list))
-	for i, u := range list {
+	out := []map[string]any{}
+	for _, u := range a.store.list() {
+		if !manages(me, u.Role) && !strings.EqualFold(u.Username, me.Name) {
+			continue
+		}
 		m := userInfoJSON(u)
 		m["me"] = strings.EqualFold(u.Username, me.Name)
-		out[i] = m
+		out = append(out, m)
 	}
-	writeJSON(w, 200, map[string]any{"users": out, "roles": roleLabels})
+	roles := map[string]string{RoleEmployee: roleLabels[RoleEmployee]}
+	if me.Role == RoleSuper {
+		roles = roleLabels
+	}
+	writeJSON(w, 200, map[string]any{"users": out, "roles": roles})
 }
 
 func (a *authServer) handleUserSave(w http.ResponseWriter, r *http.Request) {
@@ -473,6 +504,7 @@ func (a *authServer) handleUserSave(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		Role     string `json:"role"`
+		EmpID    string `json:"empId"`
 		Create   bool   `json:"create"`
 	}
 	if err := readJSONBody(r, 4096, &req); err != nil {
@@ -483,19 +515,33 @@ func (a *authServer) handleUserSave(w http.ResponseWriter, r *http.Request) {
 		u   appUser
 		err error
 	)
-	detail := map[string]any{"target": strings.TrimSpace(req.Username), "newRole": req.Role}
+	target := strings.TrimSpace(req.Username)
+	detail := map[string]any{"target": target, "newRole": req.Role, "empId": strings.TrimSpace(req.EmpID)}
 	if req.Create {
-		u, err = a.store.create(req.Username, req.Password, req.Role)
-		audit(r, "userCreate", detail, err)
-	} else {
-		if strings.EqualFold(strings.TrimSpace(req.Username), me.Name) {
-			writeErr(w, badReq("حسابك أنت غيّر كلمة سره من «تغيير كلمة السر»، وصلاحيته يغيرها مدير ثاني"), "")
+		if !manages(me, req.Role) {
+			deny(w, r, "userCreate:"+req.Role)
 			return
 		}
-		u, err = a.store.update(req.Username, req.Role, req.Password)
+		u, err = a.store.create(req.Username, req.Password, req.Role, req.EmpID)
+		audit(r, "userCreate", detail, err)
+	} else {
+		if strings.EqualFold(target, me.Name) {
+			writeErr(w, badReq("حسابك أنت غيّر كلمة سره من «تغيير كلمة السر»، وصلاحيته يغيرها حساب ثاني بصلاحية مطلقة"), "")
+			return
+		}
+		cur, ok := a.store.get(target)
+		if !ok {
+			writeErr(w, badReq("المستخدم غير موجود"), "")
+			return
+		}
+		if !manages(me, cur.Role) || (req.Role != "" && !manages(me, req.Role)) {
+			deny(w, r, "userUpdate:"+cur.Role)
+			return
+		}
+		u, err = a.store.update(target, req.Role, req.Password, req.EmpID)
 		detail["passwordChanged"] = req.Password != ""
 		audit(r, "userUpdate", detail, err)
-		if err == nil && req.Password != "" {
+		if err == nil && req.Password != "" { // الصلاحية ورقم البصمة ينقرون من جديد بكل طلب، فتتطبق فوراً بدون ما يطلع
 			a.sess.removeUser(u.Username, "")
 		}
 	}
@@ -516,16 +562,21 @@ func (a *authServer) handleUserDelete(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 	}
 	readJSONBody(r, 4096, &req)
-	if strings.EqualFold(strings.TrimSpace(req.Username), me.Name) {
+	target := strings.TrimSpace(req.Username)
+	if strings.EqualFold(target, me.Name) {
 		writeErr(w, badReq("ما تگدر تحذف حسابك أنت"), "")
 		return
 	}
-	err := a.store.remove(req.Username)
-	audit(r, "userDelete", map[string]any{"target": strings.TrimSpace(req.Username)}, err)
+	if cur, ok := a.store.get(target); ok && !manages(me, cur.Role) {
+		deny(w, r, "userDelete:"+cur.Role)
+		return
+	}
+	err := a.store.remove(target)
+	audit(r, "userDelete", map[string]any{"target": target}, err)
 	if err != nil {
 		writeErr(w, err, "")
 		return
 	}
-	a.sess.removeUser(req.Username, "")
+	a.sess.removeUser(target, "")
 	writeJSON(w, 200, map[string]any{"ok": true})
 }

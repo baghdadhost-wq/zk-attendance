@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تقريري - الحضور</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#16212e">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="الحضور">
+<style>
+  :root { --bg:#f4f6f8; --card:#fff; --line:#e3e7eb; --text:#1d2733; --muted:#6b7682; --accent:#1f6feb; --ok:#1a7f37; --warn:#b35900; --bad:#c62828; }
+  * { box-sizing: border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; font-family: Tahoma, "Segoe UI", Arial, sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  header { background:#16212e; color:#fff; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:18px; }
+  header .who { display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:13px; }
+  header a { color:#9fb0c2; }
+  main { max-width:1000px; margin:0 auto; padding:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
+  .row { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+  select, input { padding:8px 10px; border:1px solid var(--line); border-radius:6px; font:inherit; color:var(--text); min-width:200px; }
+  button { padding:8px 14px; border:1px solid var(--line); background:#fff; border-radius:6px; font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .sched { color:var(--muted); font-size:13px; margin-top:10px; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:14px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; font-size:13px; }
+  .stat b { display:block; font-size:21px; margin-top:4px; }
+  .stat.bad b { color:var(--bad); } .stat.ok b { color:var(--ok); }
+  .tablewrap { overflow:auto; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { padding:7px 9px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  th { background:#f8fafb; font-size:12px; color:var(--muted); position:sticky; top:0; }
+  .tag { padding:2px 7px; border-radius:10px; font-size:11px; white-space:nowrap; }
+  .t-ok { background:#e6f4ea; color:var(--ok); } .t-late { background:#fff1e0; color:var(--warn); } .t-miss { background:#fde8e8; color:var(--bad); }
+  .t-off { background:#eceff1; color:#546e7a; } .t-man { background:#ede7f6; color:#5e35b1; } .t-hour { background:#e0f2f1; color:#00695c; }
+  .empty { color:var(--muted); padding:30px; text-align:center; line-height:1.9; }
+  .err { color:var(--bad); } .okc { color:var(--ok); }
+  .overlay { position:fixed; inset:0; background:rgba(16,24,34,.45); display:none; align-items:center; justify-content:center; z-index:10; padding:16px; }
+  .overlay.open { display:flex; }
+  .modal { background:#fff; border-radius:10px; padding:18px 20px; width:min(420px, 100%); }
+  .modal h3 { margin:0 0 12px; font-size:16px; }
+  .modal label { margin-bottom:10px; } .modal input { width:100%; min-width:0; }
+  .print-title { display:none; }
+  @media (max-width:640px) { main { padding:10px; } select { min-width:0; width:100%; } .row > * { flex:1 1 100%; } }
+  @media print {
+    header, .no-print { display:none !important; }
+    body { background:#fff; } main { padding:0; max-width:none; }
+    .card, .stat { border:none; padding:4px 0; }
+    .print-title { display:block; font-size:16px; font-weight:bold; margin-bottom:8px; }
+    .tablewrap { overflow:visible; } th { position:static; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>تقريري</h1>
+  <div class="who">
+    <span id="who"></span>
+    <a href="#" id="passLink">تغيير كلمة السر</a>
+    <a href="/logout">خروج</a>
+  </div>
+</header>
+<main>
+  <section class="card no-print">
+    <div class="row">
+      <label>الفترة <select id="period"></select></label>
+      <button id="printBtn">طباعة / PDF</button>
+    </div>
+    <div class="sched" id="sched"></div>
+    <div id="status" style="margin-top:8px;font-size:13px"></div>
+  </section>
+  <div class="print-title" id="printTitle"></div>
+  <section class="stats" id="stats"></section>
+  <section class="card">
+    <div class="tablewrap" id="days"><div class="empty">جارِ التحميل...</div></div>
+  </section>
+</main>
+
+<div class="overlay" id="passOverlay">
+  <form class="modal" id="passForm">
+    <h3>تغيير كلمة السر</h3>
+    <label>كلمة السر الحالية <input type="password" id="curPass" autocomplete="current-password" required></label>
+    <label>كلمة السر الجديدة (6 أحرف أو أكثر) <input type="password" id="newPass" autocomplete="new-password" required></label>
+    <label>أعد كتابتها <input type="password" id="newPass2" autocomplete="new-password" required></label>
+    <div id="passStatus" style="font-size:13px;min-height:18px;margin-bottom:8px"></div>
+    <div class="row"><button class="primary" id="passSave">حفظ</button><button type="button" id="passCancel">إلغاء</button></div>
+  </form>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = (n) => String(n).padStart(2, '0');
+const dur = (m) => { m = Math.round(m || 0); return `${Math.floor(m / 60)}:${pad(m % 60)}`; };
+const _fetch = window.fetch.bind(window);
+window.fetch = async (...a) => { const r = await _fetch(...a); if (r.status === 401) location.href = '/login'; return r; };
+const STATUS_CLS = { 'منتظم': 't-ok', 'متأخر': 't-late', 'بدون دخول': 't-miss', 'بدون خروج': 't-miss', 'غائب': 't-miss' };
+const RESULT_CLS = { 'مبرّر بإجازة': 't-ok', 'مبرّر بزمنية': 't-hour', 'بانتظار الموافقة': 't-late', 'غير مبرّر': 't-miss' };
+const tag = (t, cls) => t ? `<span class="tag ${cls || 't-off'}">${esc(t)}</span>` : '';
+const ltr = (t) => '\u2066' + t + '\u2069'; // التاريخ والوقت يبقون بترتيبهم وسط النص العربي
+
+async function api(url, opts) {
+  const r = await fetch(url, opts); const j = await r.json();
+  if (!r.ok) throw new Error(j.error || 'خطأ');
+  return j;
+}
+function setStatus(m, cls = '') { $('status').className = cls; $('status').textContent = m; }
+
+async function init() {
+  try {
+    const s = await api('/api/session');
+    if (!s.user) return location.replace('/login');
+    if (s.user.role !== 'employee') return location.replace('/');
+    $('who').textContent = `${s.user.username} · رقم البصمة ${s.user.empId}`;
+    const j = await api('/api/my/reports');
+    if (!j.reports.length) {
+      $('period').innerHTML = '<option>—</option>'; $('period').disabled = true;
+      $('days').innerHTML = '<div class="empty">ما أكو تقرير محفوظ إلك بعد.<br>المدير يحفظ تقارير الموظفين بعد كل فترة، وبعدها تبين هنا.</div>';
+      return;
+    }
+    $('period').innerHTML = j.reports.map(r => `<option value="${esc(r.id)}">من ${ltr(esc(r.from))} إلى ${ltr(esc(r.to))}</option>`).join('');
+    await show($('period').value);
+  } catch (e) { setStatus(e.message, 'err'); $('days').innerHTML = ''; }
+}
+
+async function show(id) {
+  setStatus('');
+  try {
+    const j = await api('/api/my/report?id=' + encodeURIComponent(id));
+    const me = j.me, s = me.summary;
+    $('who').textContent = `${me.name} · رقم البصمة ${j.empId}`;
+    $('printTitle').textContent = `تقرير حضور ${me.name} (رقم ${j.empId}) من ${ltr(j.from)} إلى ${ltr(j.to)}`;
+    $('sched').textContent = (s.exempt ? 'غير مشمول بالبصمة. ' : '') + 'دوامك: ' +
+      (me.sched === 'النظام العام' ? 'النظام العام ' + (j.general || '') : me.sched) + ` · انحفظ التقرير ${ltr(String(j.savedAt || '').replace('T', ' ').slice(0, 16))}`;
+    const cards = [['أيام الحضور', s.present], ['أيام الغياب', s.exempt ? '—' : s.absent, s.absent ? 'bad' : ''], ['مرات التأخير', s.lateCount, s.lateCount ? 'bad' : ''],
+      ['مجموع التأخير', dur(s.lateMin)], ['الخروج المبكر', dur(s.earlyMin)], ['الإضافي', dur(s.overtime), 'ok'],
+      ['بدون دخول', s.missingIn], ['بدون خروج', s.missingOut], ['ساعات العمل', dur(s.worked)]];
+    if (j.leaves) cards.push(['مبرّر بإجازة', s.excLeave, 'ok'], ['مبرّر بزمنية', s.excHour, 'ok'], ['بانتظار الموافقة', s.pend],
+      ['غياب غير مبرّر', s.badAbsent, s.badAbsent ? 'bad' : ''], ['نقص بصمة غير مبرّر', s.badMissing, s.badMissing ? 'bad' : '']);
+    $('stats').innerHTML = cards.map(([k, v, c]) => `<div class="stat ${c || ''}">${k}<b>${esc(v)}</b></div>`).join('');
+    const time = (t, m) => t ? esc(t) + (m ? ` <span class="tag t-man" title="${esc(m)}">يدوية</span>` : '') : '';
+    $('days').innerHTML = me.days.length ? '<table><thead><tr><th>التاريخ</th><th>اليوم</th><th>الدخول</th><th>الخروج</th><th>ساعات العمل</th><th>التأخير</th>' +
+      '<th>خروج مبكر</th><th>إضافي</th><th>الحالة</th>' + (j.leaves ? '<th>التصفية</th>' : '') + '</tr></thead><tbody>' +
+      me.days.map(d => `<tr><td>${esc(d.day)}</td><td>${esc(d.dow)}</td><td>${time(d.in, d.inManual)}</td><td>${time(d.out, d.outManual)}</td>
+        <td>${d.worked ? dur(d.worked) : ''}</td><td>${d.late ? dur(d.late) : ''}</td><td>${d.early ? dur(d.early) : ''}</td><td>${d.overtime ? dur(d.overtime) : ''}</td>
+        <td>${tag(d.status, STATUS_CLS[d.status])}</td>` +
+        (j.leaves ? `<td style="white-space:normal;min-width:160px">${tag(d.result, RESULT_CLS[d.result])}${d.leave ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(d.leave)}</div>` : ''}${d.note ? `<div style="font-size:12px;color:var(--muted)">${esc(d.note)}</div>` : ''}</td>` : '') +
+        '</tr>').join('') + '</tbody></table>' : '<div class="empty">ما أكو أيام بهذي الفترة</div>';
+  } catch (e) { setStatus(e.message, 'err'); }
+}
+
+$('period').onchange = () => show($('period').value);
+$('printBtn').onclick = () => window.print();
+$('passLink').onclick = (e) => { e.preventDefault(); $('passForm').reset(); $('passStatus').textContent = ''; $('passOverlay').classList.add('open'); $('curPass').focus(); };
+$('passCancel').onclick = () => $('passOverlay').classList.remove('open');
+$('passForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const st = $('passStatus');
+  if ($('newPass').value.length < 6) { st.className = 'err'; st.textContent = 'كلمة السر لازم تكون 6 أحرف أو أكثر'; return; }
+  if ($('newPass').value !== $('newPass2').value) { st.className = 'err'; st.textContent = 'كلمتين السر غير متطابقة'; return; }
+  $('passSave').disabled = true;
+  try {
+    const j = await api('/api/me/password', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current: $('curPass').value, new: $('newPass').value }) });
+    st.className = 'okc'; st.textContent = j.message || 'تغيرت كلمة السر';
+    setTimeout(() => $('passOverlay').classList.remove('open'), 1200);
+  } catch (x) { st.className = 'err'; st.textContent = x.message; }
+  finally { $('passSave').disabled = false; }
+};
+if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
+init();
+</script>
+</body>
+</html>

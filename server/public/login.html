@@ -26,6 +26,7 @@
   #err { color:#c62828; font-size:14px; min-height:20px; margin-top:10px; }
   #demo { margin-top:14px; border-top:1px dashed #e3e7eb; padding-top:12px; font-size:13px; color:#6b7682; }
   #demo button { background:#fff; color:#1d2733; border:1px solid #e3e7eb; padding:8px; font-size:14px; margin-top:6px; }
+
 </style>
 </head>
 <body>
@@ -50,16 +51,16 @@ try { $('user').value = localStorage.getItem('zkLastUser') || ''; } catch (_) {}
     if (j.user) return location.replace('/');
     if (j.setup) {
       setup = true;
-      $('title').textContent = 'أول تشغيل: حساب المدير';
-      $('sub').textContent = 'أنشئ حساب المدير الأساسي (صلاحية مطلقة). بعدها تگدر تضيف مستخدمين ثانيين، كل واحد بصلاحيته.';
-      if (!$('user').value) $('user').value = 'admin';
+      $('title').textContent = 'أول تشغيل: حساب الصلاحية المطلقة';
+      $('sub').textContent = 'أنشئ أول حساب: صلاحية مطلقة بدون قيد، ويضيف كل أنواع المستخدمين (مدير، مشرف، أساسي، موظفين).';
+      $('user').value = '';
       $('pw').placeholder = 'كلمة السر (6 أحرف أو أكثر)';
       $('pw').autocomplete = 'new-password';
       $('pw2').hidden = false; $('pw2').required = true;
       $('btn').textContent = 'إنشاء الحساب والدخول';
     }
     if (j.demo && j.demoAccounts) {
-      const labels = { admin: 'مدير (صلاحية مطلقة)', supervisor: 'مشرف', viewer: 'مشاهد' };
+      const labels = { super: 'صلاحية مطلقة', admin: 'مدير', supervisor: 'مشرف', viewer: 'أساسي', employee: 'موظف' };
       $('demo').innerHTML = 'وضع التجربة: اختار حساب حتى تجرب صلاحيته' +
         j.demoAccounts.map(a => `<button type="button" data-u="${a.username}" data-p="${a.password}">${labels[a.role] || a.role}: ${a.username} / ${a.password}</button>`).join('');
       $('demo').hidden = false;
@@ -72,14 +73,16 @@ $('f').onsubmit = async (e) => {
   e.preventDefault();
   const btn = $('btn'), err = $('err');
   err.textContent = '';
-  if (setup && $('pw').value !== $('pw2').value) { err.textContent = 'كلمتين السر غير متطابقة'; return; }
+  const user = $('user').value.trim(), pw = $('pw').value;
+  if (!user || !pw) { err.textContent = 'اكتب اسم المستخدم وكلمة السر'; return; }
+  if (setup && pw !== $('pw2').value) { err.textContent = 'كلمتين السر غير متطابقة'; return; }
   btn.disabled = true;
   try {
     const r = await fetch(setup ? '/api/setup' : '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: $('user').value.trim(), password: $('pw').value }) });
+      body: JSON.stringify({ username: user, password: pw }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || 'خطأ');
-    try { localStorage.setItem('zkLastUser', $('user').value.trim()); } catch (_) {}
+    try { localStorage.setItem('zkLastUser', user); } catch (_) {}
     location.replace('/');
   } catch (x) {
     err.textContent = x.message === 'Failed to fetch' ? 'ما گدرت أتصل بالبرنامج' : x.message;

@@ -6,6 +6,7 @@ ok = True
 for path in sys.argv[1:]:
     r = json.load(open(path))
     checks = {
+        'login required (first open asks to create the account)': r.get('login') == 'setup',
         'pulled data from the device': r.get('fetch', '').startswith('تم السحب'),
         'device info shown': r.get('infoRows', 0) >= 10,
         'confirm dialog handled': 'متأكد' in r.get('confirm', ''),

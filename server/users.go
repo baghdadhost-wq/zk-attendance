@@ -28,22 +28,29 @@ import (
 )
 
 const (
-	RoleAdmin      = "admin"
-	RoleSupervisor = "supervisor"
-	RoleViewer     = "viewer"
+	RoleSuper      = "super"      // صلاحية مطلقة بدون قيد
+	RoleAdmin      = "admin"      // مدير: كل شي عدا تغيير الأوقات وخصائص الجهاز، ويدير حسابات الموظفين بس
+	RoleSupervisor = "supervisor" // مشرف
+	RoleViewer     = "viewer"     // أساسي
+	RoleEmployee   = "employee"   // موظف: يشوف تقريره المحفوظ بس
+
+	usersSchema = 2 // من 2.8: "admin" صار مدير محدود، والمطلقة اسمها "super"
 
 	pbkdf2Iter = 120000
 	minPassLen = 6
 )
 
-var roleRank = map[string]int{RoleViewer: 1, RoleSupervisor: 2, RoleAdmin: 3}
+// الموظف ترتيبه صفر: ما يوصل لأي شي بالبرنامج غير تقريره
+var roleRank = map[string]int{RoleEmployee: 0, RoleViewer: 1, RoleSupervisor: 2, RoleAdmin: 3, RoleSuper: 4}
 
-var roleLabels = map[string]string{RoleAdmin: "مدير (صلاحية مطلقة)", RoleSupervisor: "مشرف", RoleViewer: "مشاهد"}
+var roleLabels = map[string]string{RoleSuper: "صلاحية مطلقة", RoleAdmin: "مدير", RoleSupervisor: "مشرف", RoleViewer: "أساسي", RoleEmployee: "موظف"}
 
-func validRole(r string) bool { return roleRank[r] > 0 }
+func validRole(r string) bool { _, ok := roleRank[r]; return ok }
 
 // atLeast هل الصلاحية role تكفي لشي يحتاج need
-func atLeast(role, need string) bool { return validRole(role) && roleRank[role] >= roleRank[need] }
+func atLeast(role, need string) bool {
+	return validRole(role) && validRole(need) && roleRank[role] >= roleRank[need]
+}
 
 type appUser struct {
 	Username   string `json:"username"`
@@ -51,6 +58,7 @@ type appUser struct {
 	Salt       string `json:"salt"`
 	Hash       string `json:"hash"`
 	Iterations int    `json:"iterations"`
+	EmpID      string `json:"empId,omitempty"` // حساب موظف: رقم بصمته
 	Created    string `json:"created,omitempty"`
 	Updated    string `json:"updated,omitempty"`
 	LastLogin  string `json:"lastLogin,omitempty"`
@@ -66,20 +74,29 @@ type UserStore struct {
 	size       int64     // حتى إذا تغير من برّه (--reset-admin والبرنامج شغال) نقراه من جديد
 }
 
-func parseUsers(b []byte) ([]appUser, error) {
+// parseUsers يقرا الملف. ملف من قبل 2.8: كان "admin" هو الصلاحية المطلقة، فيصير "super" (old = لازم ينحفظ بالصيغة الجديدة)
+func parseUsers(b []byte) (users []appUser, old bool, err error) {
 	var f struct {
-		Users []appUser `json:"users"`
+		Schema int       `json:"schema"`
+		Users  []appUser `json:"users"`
 	}
 	if err := json.Unmarshal(b, &f); err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	var out []appUser
+	old = f.Schema < usersSchema
 	for _, u := range f.Users {
+		if old && u.Role == RoleAdmin {
+			u.Role = RoleSuper
+		}
+		if u.Role == RoleEmployee && strings.TrimSpace(u.EmpID) == "" {
+			continue
+		}
 		if strings.TrimSpace(u.Username) != "" && validRole(u.Role) && u.Hash != "" && u.Iterations > 0 {
-			out = append(out, u)
+			out := u
+			users = append(users, out)
 		}
 	}
-	return out, nil
+	return users, old, nil
 }
 
 func (s *UserStore) stampLocked() {
@@ -95,7 +112,7 @@ func (s *UserStore) refreshLocked() {
 		return
 	}
 	if b, err := os.ReadFile(usersFile()); err == nil {
-		if users, err := parseUsers(b); err == nil {
+		if users, _, err := parseUsers(b); err == nil {
 			s.users = users
 		}
 	}
@@ -114,9 +131,11 @@ func oldAuthFile() string { return filepath.Join(dataDir, "data", "auth.json") }
 
 // حسابات وضع التجربة (بيانات وهمية بس، وتنحفظ بملف منفصل)
 var demoAccounts = []map[string]string{
+	{"username": "owner", "password": "123456", "role": RoleSuper},
 	{"username": "admin", "password": "123456", "role": RoleAdmin},
 	{"username": "supervisor", "password": "123456", "role": RoleSupervisor},
 	{"username": "viewer", "password": "123456", "role": RoleViewer},
+	{"username": "employee", "password": "123456", "role": RoleEmployee, "empId": "1"},
 }
 
 // LoadUsers يقرأ المستخدمين. إذا ما أكو ملف مستخدمين وأكو كلمة سر من النسخة السابقة، تصير كلمة سر حساب admin.
@@ -125,18 +144,31 @@ func LoadUsers() (*UserStore, error) {
 	b, err := os.ReadFile(usersFile())
 	switch {
 	case err == nil:
-		users, err := parseUsers(b)
+		users, old, err := parseUsers(b)
 		if err != nil {
 			return nil, fmt.Errorf("ملف المستخدمين %s تالف (%v). رجّع نسخته users.json.bak إذا موجودة", usersFile(), err)
 		}
 		s.users = users
 		s.stampLocked()
+		if old && demoMode { // حسابات التجربة القديمة: نسويها من جديد بالصلاحيات الجديدة
+			s.users = nil
+			now := localISO(time.Now())
+			for _, a := range demoAccounts {
+				salt, hash := hashPassword(a["password"])
+				s.users = append(s.users, appUser{Username: a["username"], Role: a["role"], EmpID: a["empId"], Salt: salt, Hash: hash, Iterations: pbkdf2Iter, Created: now})
+			}
+		}
+		if old {
+			if err := s.saveLocked(); err != nil {
+				return nil, err
+			}
+		}
 	case errors.Is(err, os.ErrNotExist):
 		now := localISO(time.Now())
 		if demoMode {
 			for _, a := range demoAccounts {
 				salt, hash := hashPassword(a["password"])
-				s.users = append(s.users, appUser{Username: a["username"], Role: a["role"], Salt: salt, Hash: hash, Iterations: pbkdf2Iter, Created: now})
+				s.users = append(s.users, appUser{Username: a["username"], Role: a["role"], EmpID: a["empId"], Salt: salt, Hash: hash, Iterations: pbkdf2Iter, Created: now})
 			}
 			if err := s.saveLocked(); err != nil {
 				return nil, err
@@ -149,7 +181,7 @@ func LoadUsers() (*UserStore, error) {
 			Iterations int    `json:"iterations"`
 		}
 		if ob, err := os.ReadFile(oldAuthFile()); err == nil && json.Unmarshal(ob, &old) == nil && old.Hash != "" && old.Iterations > 0 {
-			s.users = []appUser{{Username: "admin", Role: RoleAdmin, Salt: old.Salt, Hash: old.Hash, Iterations: old.Iterations, Created: now}}
+			s.users = []appUser{{Username: "admin", Role: RoleSuper, Salt: old.Salt, Hash: old.Hash, Iterations: old.Iterations, Created: now}}
 			if err := s.saveLocked(); err != nil {
 				return nil, err
 			}
@@ -166,7 +198,7 @@ func LoadUsers() (*UserStore, error) {
 // Migrated صار هسه نقل كلمة السر القديمة لحساب admin
 func (s *UserStore) Migrated() bool { return s.migrated }
 
-// AllowWebSetup يسمح بإنشاء أول مدير من المتصفح (بس إذا ماكو مستخدمين، ومن نفس الحاسبة)
+// AllowWebSetup يسمح بإنشاء أول حساب (صلاحية مطلقة) من المتصفح (بس إذا ماكو مستخدمين، ومن نفس الحاسبة)
 func (s *UserStore) AllowWebSetup() { s.mu.Lock(); s.allowSetup = true; s.mu.Unlock() }
 
 func (s *UserStore) setupOpen() bool {
@@ -192,7 +224,7 @@ func (s *UserStore) saveLocked() error {
 	if old, err := os.ReadFile(f); err == nil {
 		os.WriteFile(f+".bak", old, 0o600)
 	}
-	b, err := json.MarshalIndent(map[string]any{"users": s.users}, "", " ")
+	b, err := json.MarshalIndent(map[string]any{"schema": usersSchema, "users": s.users}, "", " ")
 	if err != nil {
 		return err
 	}
@@ -289,14 +321,50 @@ func (s *UserStore) findLocked(name string) int {
 	return -1
 }
 
-func (s *UserStore) adminsLocked() int {
+// عدد حسابات الصلاحية المطلقة (لازم يبقى واحد على الأقل)
+func (s *UserStore) supersLocked() int {
 	n := 0
 	for _, u := range s.users {
-		if u.Role == RoleAdmin {
+		if u.Role == RoleSuper {
 			n++
 		}
 	}
 	return n
+}
+
+// cleanEmpID رقم بصمة الموظف لحسابه: حروف وأرقام بس
+func cleanEmpID(v string) (string, error) {
+	v = strings.TrimSpace(toASCIIDigits(v))
+	if v == "" {
+		return "", badReq("اكتب رقم بصمة الموظف")
+	}
+	if utf8.RuneCountInString(v) > 24 {
+		return "", badReq("رقم البصمة طويل")
+	}
+	for _, r := range v {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return "", badReq("رقم البصمة يقبل أرقام وحروف بس")
+		}
+	}
+	return v, nil
+}
+
+// nid رقم البصمة بدون أصفار بالبداية (حتى 012 و 12 يكونون نفس الموظف)
+func nid(v string) string {
+	v = strings.TrimLeft(strings.TrimSpace(v), "0")
+	if v == "" {
+		return "0"
+	}
+	return v
+}
+
+func (s *UserStore) empTakenLocked(empID, except string) string {
+	for _, u := range s.users {
+		if u.Role == RoleEmployee && nid(u.EmpID) == nid(empID) && !strings.EqualFold(u.Username, except) {
+			return u.Username
+		}
+	}
+	return ""
 }
 
 func (s *UserStore) get(name string) (appUser, bool) {
@@ -335,13 +403,20 @@ func (s *UserStore) list() []appUser {
 	return out
 }
 
-func (s *UserStore) create(name, pass, role string) (appUser, error) {
+func (s *UserStore) create(name, pass, role, empID string) (appUser, error) {
 	name, err := cleanUsername(name)
 	if err != nil {
 		return appUser{}, err
 	}
 	if !validRole(role) {
 		return appUser{}, badReq("اختار الصلاحية")
+	}
+	if role == RoleEmployee {
+		if empID, err = cleanEmpID(empID); err != nil {
+			return appUser{}, err
+		}
+	} else {
+		empID = ""
 	}
 	if err := checkNewPassword(pass); err != nil {
 		return appUser{}, err
@@ -352,8 +427,13 @@ func (s *UserStore) create(name, pass, role string) (appUser, error) {
 	if s.findLocked(name) >= 0 {
 		return appUser{}, badReq("اسم المستخدم «" + name + "» موجود من قبل")
 	}
+	if role == RoleEmployee {
+		if other := s.empTakenLocked(empID, ""); other != "" {
+			return appUser{}, badReq("الموظف رقم " + empID + " عنده حساب من قبل: " + other)
+		}
+	}
 	salt, hash := hashPassword(pass)
-	u := appUser{Username: name, Role: role, Salt: salt, Hash: hash, Iterations: pbkdf2Iter, Created: localISO(time.Now())}
+	u := appUser{Username: name, Role: role, EmpID: empID, Salt: salt, Hash: hash, Iterations: pbkdf2Iter, Created: localISO(time.Now())}
 	s.users = append(s.users, u)
 	if err := s.saveLocked(); err != nil {
 		s.users = s.users[:len(s.users)-1]
@@ -362,16 +442,16 @@ func (s *UserStore) create(name, pass, role string) (appUser, error) {
 	return u, nil
 }
 
-// أول مدير من صفحة الإعداد: ينجح بس إذا ماكو ولا مستخدم
+// أول حساب (صلاحية مطلقة) من صفحة الإعداد: ينجح بس إذا ماكو ولا مستخدم
 func (s *UserStore) createFirstAdmin(name, pass string) (appUser, error) {
 	s.mu.Lock()
 	s.refreshLocked()
 	open := s.allowSetup && len(s.users) == 0
 	s.mu.Unlock()
 	if !open {
-		return appUser{}, apiErr{403, "حساب المدير موجود من قبل، سجّل الدخول"}
+		return appUser{}, apiErr{403, "حساب الصلاحية المطلقة موجود من قبل، سجّل الدخول"}
 	}
-	u, err := s.create(name, pass, RoleAdmin)
+	u, err := s.create(name, pass, RoleSuper, "")
 	if err == nil {
 		s.mu.Lock()
 		if len(s.users) > 1 { // طلبين بنفس اللحظة: نخلي الأول بس
@@ -383,10 +463,16 @@ func (s *UserStore) createFirstAdmin(name, pass string) (appUser, error) {
 	return u, err
 }
 
-// update يغير الصلاحية أو كلمة السر (الفارغ يبقى مثل ما هو)
-func (s *UserStore) update(name, role, pass string) (appUser, error) {
+// update يغير الصلاحية أو كلمة السر أو رقم بصمة حساب الموظف (الفارغ يبقى مثل ما هو)
+func (s *UserStore) update(name, role, pass, empID string) (appUser, error) {
 	if role != "" && !validRole(role) {
 		return appUser{}, badReq("صلاحية غير معروفة")
+	}
+	if empID != "" {
+		var err error
+		if empID, err = cleanEmpID(empID); err != nil {
+			return appUser{}, err
+		}
 	}
 	if pass != "" {
 		if err := checkNewPassword(pass); err != nil {
@@ -403,10 +489,23 @@ func (s *UserStore) update(name, role, pass string) (appUser, error) {
 	old := s.users[i]
 	u := old
 	if role != "" && role != u.Role {
-		if u.Role == RoleAdmin && s.adminsLocked() == 1 {
-			return appUser{}, badReq("هذا آخر مدير بالبرنامج. أضف مدير ثاني قبل ما تغير صلاحيته")
+		if u.Role == RoleSuper && s.supersLocked() == 1 {
+			return appUser{}, badReq("هذا آخر حساب بصلاحية مطلقة. أضف حساب ثاني بصلاحية مطلقة قبل ما تغير صلاحيته")
 		}
 		u.Role = role
+	}
+	if u.Role == RoleEmployee {
+		if empID != "" {
+			u.EmpID = empID
+		}
+		if u.EmpID == "" {
+			return appUser{}, badReq("حساب الموظف يحتاج رقم بصمته")
+		}
+		if other := s.empTakenLocked(u.EmpID, u.Username); other != "" {
+			return appUser{}, badReq("الموظف رقم " + u.EmpID + " عنده حساب من قبل: " + other)
+		}
+	} else {
+		u.EmpID = ""
 	}
 	if pass != "" {
 		u.Salt, u.Hash = hashPassword(pass)
@@ -429,8 +528,8 @@ func (s *UserStore) remove(name string) error {
 	if i < 0 {
 		return badReq("المستخدم غير موجود")
 	}
-	if s.users[i].Role == RoleAdmin && s.adminsLocked() == 1 {
-		return badReq("ما يصير تحذف آخر مدير بالبرنامج")
+	if s.users[i].Role == RoleSuper && s.supersLocked() == 1 {
+		return badReq("ما يصير تحذف آخر حساب بصلاحية مطلقة")
 	}
 	old := append([]appUser(nil), s.users...)
 	s.users = append(s.users[:i:i], s.users[i+1:]...)
@@ -451,7 +550,7 @@ func (s *UserStore) touchLogin(name string) {
 	}
 }
 
-// EnsureAdmin ينشئ حساب مدير بهذا الاسم وكلمة السر، أو يرجّع صلاحيته مطلقة ويغير كلمة سره.
+// EnsureAdmin ينشئ حساب بصلاحية مطلقة بهذا الاسم وكلمة السر، أو يرجّع صلاحيته مطلقة ويغير كلمة سره.
 // إذا الحساب موجود بنفس كلمة السر والصلاحية ما يغير شي (حتى ما تطلع الجلسات مع كل تشغيل).
 // changed = هل تغيرت كلمة السر (فلازم نطلّع جلساته)
 func (s *UserStore) EnsureAdmin(name, pass string) (created, changed bool, err error) {
@@ -464,11 +563,11 @@ func (s *UserStore) EnsureAdmin(name, pass string) (created, changed bool, err e
 	}
 	u, ok := s.get(name)
 	if !ok {
-		_, err := s.create(name, pass, RoleAdmin)
+		_, err := s.create(name, pass, RoleSuper, "")
 		return err == nil, false, err
 	}
 	samePass := u.check(pass)
-	if samePass && u.Role == RoleAdmin {
+	if samePass && u.Role == RoleSuper {
 		return false, false, nil
 	}
 	p := pass
@@ -478,10 +577,11 @@ func (s *UserStore) EnsureAdmin(name, pass string) (created, changed bool, err e
 	s.mu.Lock()
 	s.refreshLocked()
 	if i := s.findLocked(name); i >= 0 {
-		s.users[i].Role = RoleAdmin // ترقية لمدير مسموحة دائماً (ما تقلل عدد المدراء)
+		s.users[i].Role = RoleSuper // الترقية للمطلقة مسموحة دائماً (ما تقلل عددهم)
+		s.users[i].EmpID = ""
 	}
 	s.mu.Unlock()
-	_, err = s.update(name, "", p) // جلساته القديمة تبطل وحدها لأن كل جلسة مربوطة بكلمة السر
+	_, err = s.update(name, "", p, "") // جلساته القديمة تبطل وحدها لأن كل جلسة مربوطة بكلمة السر
 	return false, !samePass, err
 }
 
@@ -493,7 +593,33 @@ func (u appUser) passStamp() string {
 	return u.Hash[:16]
 }
 
+// ResetAll يحذف كل حسابات البرنامج (بعد ما يحفظ نسخة من ملفهم بمجلد backups).
+// بعدها أول دخول يطلب إنشاء حساب الصلاحية المطلقة.
+func (s *UserStore) ResetAll() (backup string, n int, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.refreshLocked()
+	n = len(s.users)
+	if b, rerr := os.ReadFile(usersFile()); rerr == nil {
+		dir := filepath.Join(dataDir, "backups")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "", 0, err
+		}
+		backup = filepath.Join(dir, "program-users_"+time.Now().Format("2006-01-02_15-04-05")+".json")
+		if err := os.WriteFile(backup, b, 0o600); err != nil {
+			return "", 0, fmt.Errorf("ما گدرت أحفظ نسخة من المستخدمين، فما حذفت شي: %v", err)
+		}
+	}
+	old := s.users
+	s.users = nil
+	if err := s.saveLocked(); err != nil {
+		s.users = old
+		return "", 0, err
+	}
+	return backup, n, nil
+}
+
 func userInfoJSON(u appUser) map[string]any {
-	return map[string]any{"username": u.Username, "role": u.Role, "roleLabel": roleLabels[u.Role],
+	return map[string]any{"username": u.Username, "role": u.Role, "roleLabel": roleLabels[u.Role], "empId": u.EmpID,
 		"created": u.Created, "updated": u.Updated, "lastLogin": u.LastLogin}
 }

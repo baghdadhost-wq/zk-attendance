@@ -5,10 +5,17 @@
 #
 # التعليمات: README كل منصة = tools/pkg/head-<منصة>.txt + common.txt + tail-<منصة>.txt
 # (القسم المشترك بملف واحد حتى ما تختلف التعليمات بين المنصات)
+#
+# بدون شي: كل المنصات. أو اختار: ./tools/package.sh windows mac
 set -e
 cd "$(dirname "$0")/.."
 V=$(sed -n 's/^const Version = "\(.*\)"/\1/p' server/server.go)
 [ -n "$V" ] || { echo "ما لكيت رقم الإصدار بـ server/server.go" >&2; exit 1; }
+PLATFORMS=${*:-windows linux mac android}
+for p in $PLATFORMS; do
+	case $p in windows | linux | mac | android) ;; *) echo "منصة غير معروفة: $p (windows linux mac android)" >&2; exit 1 ;; esac
+done
+want() { case " $PLATFORMS " in *" $1 "*) return 0 ;; esac; return 1; }
 rm -rf dist/pkg && mkdir -p dist/pkg
 
 build() { # GOOS GOARCH OUT [خيارات go build إضافية]
@@ -32,41 +39,52 @@ readme() { # PLATFORM SEP RESET  -> يطبع README المنصة
 
 # ويندوز: نهايات أسطر CRLF و BOM حتى Notepad القديم يعرض العربي صح
 W=dist/pkg/zk-attendance-windows
+if want windows; then
 mkdir -p $W
 build windows amd64 $W/zk-attendance.exe
 printf '@echo off\r\ncd /d "%%~dp0"\r\nzk-attendance.exe --network\r\npause\r\n' >$W/start-network.bat
 printf '@echo off\r\ncd /d "%%~dp0"\r\nzk-attendance.exe --demo\r\npause\r\n' >$W/start-demo.bat
 printf '@echo off\r\ncd /d "%%~dp0"\r\nzk-attendance.exe --reset-admin\r\npause\r\n' >$W/reset-admin.bat
+printf '@echo off\r\ncd /d "%%~dp0"\r\nzk-attendance.exe --reset-users\r\npause\r\n' >$W/reset-users.bat
 readme windows '\' 'شغّل reset-admin.bat' | sed 's/$/\r/' | { printf '\357\273\277'; cat; } >$W/README.txt
+fi
 
 L=dist/pkg/zk-attendance-linux
+if want linux; then
 mkdir -p $L/linux-x64 $L/linux-arm64 $L/linux-arm32
 build linux amd64 $L/linux-x64/zk-attendance
 build linux arm64 $L/linux-arm64/zk-attendance
 build linux arm $L/linux-arm32/zk-attendance
 cp tools/pkg/zk-attendance.service $L/
 readme linux / 'شغّل: cd /opt/zk-attendance && sudo ./zk-attendance --reset-admin' >$L/README.txt
+chmod 755 $L/*/zk-attendance
+fi
 
 M=dist/pkg/zk-attendance-mac
+if want mac; then
 mkdir -p $M/mac-intel $M/mac-apple-silicon
 build darwin amd64 $M/mac-intel/zk-attendance
 build darwin arm64 $M/mac-apple-silicon/zk-attendance
 readme mac / 'بـ Terminal: cd ~/zk-attendance && ./zk-attendance --reset-admin' >$M/README.txt
+chmod 755 $M/*/zk-attendance
+fi
 
 # أندرويد يحتاج ملف PIE
 A=dist/pkg/zk-attendance-android
+if want android; then
 mkdir -p $A
 build android arm64 $A/zk-attendance -buildmode=pie
 readme android / 'بـ Termux: ./zk-attendance --reset-admin' >$A/README.txt
+chmod 755 $A/zk-attendance
+fi
 
-chmod 755 $L/*/zk-attendance $M/*/zk-attendance $A/zk-attendance
-if grep -l '@[A-Z][A-Z]*@' $W/README.txt $L/README.txt $M/README.txt $A/README.txt; then
+if grep -l '@[A-Z][A-Z]*@' dist/pkg/*/README.txt; then
 	echo "بقى متغير ما انستبدل بالتعليمات" >&2
 	exit 1
 fi
 
 cd dist/pkg
-for p in windows linux mac android; do
+for p in $PLATFORMS; do
 	rm -f ../zk-attendance-$p.zip
 	zip -qr -X ../zk-attendance-$p.zip zk-attendance-$p
 done

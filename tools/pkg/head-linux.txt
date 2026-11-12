@@ -12,9 +12,9 @@
   sudo chmod +x /opt/zk-attendance/zk-attendance
   cd /opt/zk-attendance
   sudo ./zk-attendance --network
-  أول مرة يطلب تنشئ حساب المدير (اسم وكلمة سر)، وبعدها يطلعلك العنوان اللي تفتحه من باقي الأجهزة.
+  أول مرة يطلب تنشئ حساب الصلاحية المطلقة (اسم وكلمة سر)، وبعدها يطلعلك العنوان اللي تفتحه من باقي الأجهزة.
 
-حتى يشتغل وحده مع تشغيل السيرفر (بعد ما تنشئ حساب المدير أول مرة):
+حتى يشتغل وحده مع تشغيل السيرفر (بعد ما تنشئ حساب الصلاحية المطلقة أول مرة):
   sudo cp zk-attendance.service /etc/systemd/system/
   sudo systemctl enable --now zk-attendance
   الحالة: systemctl status zk-attendance     السجل: journalctl -u zk-attendance -f

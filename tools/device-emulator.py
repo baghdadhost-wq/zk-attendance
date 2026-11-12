@@ -1,5 +1,5 @@
 """ZKTeco TCP device emulator for testing (port 4370), closer to real devices.
-Env: EMU_NAMES=utf8|cp1256|ascii  EMU_LOGS=N  EMU_REC=40|16|8  EMU_COMMKEY=n  EMU_MISMATCH=1  EMU_IGNORE_WRITE=1
+Env: EMU_NAMES=utf8|cp1256|ascii  EMU_LOGS=N  EMU_LOGS_FILE=logs.json  EMU_REC=40|16|8  EMU_COMMKEY=n  EMU_MISMATCH=1  EMU_IGNORE_WRITE=1
      EMU_NO134=1 (old firmware: delete-finger by user id unknown)  EMU_OPLOG_CLEARS_LOGS=1
 Logs: CMD <code> <hex> | BADCHK | USERWRQ <hex> | SETTIME <iso> | DELUSER | DELFP | CLEARDATA | CLEARADMIN | OPTW
 """
@@ -31,6 +31,10 @@ RAW = {u[0]: user_rec(*u) for u in users}
 FINGERS = {1: {0, 1, 2}, 2: {0, 1}, 3: {6}, 4: {5}}  # enrolled finger indexes per uid
 base = datetime.datetime(2026, 10, 1, 8, 0, 0)
 logs = [(str((i % 4) + 1), base + datetime.timedelta(minutes=i * 37)) for i in range(NLOGS)]
+if os.environ.get('EMU_LOGS_FILE'):  # بصمات محددة للاختبار: [["رقم الموظف", "2026-10-04 07:58:00"], ...]
+    import json
+    with open(os.environ['EMU_LOGS_FILE'], encoding='utf-8') as f:
+        logs = [(str(u), datetime.datetime.strptime(t, '%Y-%m-%d %H:%M:%S')) for u, t in json.load(f)]
 state = {'time_offset': -125}
 OPTIONS = {'~SerialNumber': 'EMU0001', '~Platform': 'ZMM220_TFT', '~DeviceName': 'iFace1000', 'MAC': '00:17:61:aa:bb:cc',
            'ZKFaceVersion': '7', '~ZKFPVersion': '10', 'IPAddress': '127.0.0.1', 'NetMask': '255.255.255.0', 'GATEIPAddress': '192.168.1.1'}

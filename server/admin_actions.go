@@ -175,6 +175,9 @@ func actAddUser(c *zkClient, p map[string]any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if priv != privUser && !callerIsSuper(p) {
+		return nil, apiErr{403, "إضافة مدير للجهاز تحتاج الصلاحية المطلقة"}
+	}
 	pin, err := paramPin(p)
 	if err != nil {
 		return nil, err
@@ -644,11 +647,15 @@ func actRestoreUsers(c *zkClient, p map[string]any) (map[string]any, error) {
 	}
 	var toWrite [][]byte
 	var ids []string
-	skipped := 0
+	skipped, skippedAdmins := 0, 0
 	for _, raw := range recs {
 		id := string(cstrBytes(raw[48:72]))
 		if id == "" || have[id] {
 			skipped++
+			continue
+		}
+		if raw[2] != privUser && !callerIsSuper(p) { // مدراء الجهاز يرجعهم صاحب الصلاحية المطلقة بس
+			skippedAdmins++
 			continue
 		}
 		uid := le.Uint16(raw[0:])
@@ -662,6 +669,9 @@ func actRestoreUsers(c *zkClient, p map[string]any) (map[string]any, error) {
 		toWrite, ids = append(toWrite, raw), append(ids, id)
 	}
 	if len(toWrite) == 0 {
+		if skippedAdmins > 0 {
+			return nil, apiErr{403, fmt.Sprintf("اللي ناقص بالجهاز من هذي النسخة %d مدير جهاز، وإرجاعهم يحتاج الصلاحية المطلقة", skippedAdmins)}
+		}
 		return msg(fmt.Sprintf("كل الموظفين اللي بالنسخة (%d) موجودين بالجهاز، ما أكو شي يرجع", skipped)), nil
 	}
 	if maxUID > 65534 {
@@ -704,6 +714,9 @@ func actRestoreUsers(c *zkClient, p map[string]any) (map[string]any, error) {
 	text := fmt.Sprintf("رجع %d موظف من النسخة (أسماءهم وبطاقاتهم وصلاحياتهم وأرقامهم السرية)، بدون بصمات الأصابع والوجوه: لازم يسجلونها من جديد من قائمة الجهاز", restored)
 	if skipped > 0 {
 		text += fmt.Sprintf(". %d كانوا موجودين بالجهاز فما تغيروا", skipped)
+	}
+	if skippedAdmins > 0 {
+		text += fmt.Sprintf(". %d مدير جهاز ما رجعتهم، يحتاجون الصلاحية المطلقة", skippedAdmins)
 	}
 	if restored < len(toWrite) {
 		text += fmt.Sprintf(". %d ما انحفظوا، حاول مرة ثانية", len(toWrite)-restored)
