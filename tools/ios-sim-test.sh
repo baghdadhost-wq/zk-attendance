@@ -43,6 +43,20 @@ run_on() {
     [ $((i % 3)) -eq 1 ] && shot "$udid" "$kind-$(printf %02d "$i")"
     if grep -q '"done"' "$data/Documents/selftest.json" 2> /dev/null; then result=done; break; fi
   done
+  # جهاز ثاني بالشبكة يفتح رابط الموبايل (المحاكي يستخدم شبكة الماك نفسها)
+  python3 - "$data/Documents/selftest.json" "$OUT/$kind-net.json" << 'PY'
+import json, sys, urllib.request
+r = json.load(open(sys.argv[1])); out = {}
+for u in r.get('shareUrls') or []:
+    try:
+        with urllib.request.urlopen(u + '/api/session', timeout=5) as resp:
+            j = json.loads(resp.read())
+            out[u] = {'status': resp.status, 'setupOffered': j.get('setup')}
+    except Exception as e:
+        out[u] = {'error': str(e)}
+json.dump(out, open(sys.argv[2], 'w'), ensure_ascii=False)
+print('from another device:', out)
+PY
   shot "$udid" "$kind-report"
   sleep 5
   shot "$udid" "$kind-share"

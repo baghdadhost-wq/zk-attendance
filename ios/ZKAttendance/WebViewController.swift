@@ -54,6 +54,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
         NotificationCenter.default.addObserver(self, selector: #selector(appBecameActive),
                                                name: UIApplication.didBecomeActiveNotification, object: nil)
+        // التطبيق سيرفر للأجهزة الثانية طول ما هو مفتوح، فالشاشة ما تطفي وحدها
+        UIApplication.shared.isIdleTimerDisabled = true
         startServer()
     }
 
@@ -71,6 +73,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     /// إذا التطبيق بقى بالخلفية فترة طويلة ممكن iOS يوقف البرنامج، فنتأكد منه كل ما يرجع
     @objc private func appBecameActive() {
+        UIApplication.shared.isIdleTimerDisabled = true
         guard let base = serverURL, let ping = URL(string: "api/session", relativeTo: base) else { return }
         var request = URLRequest(url: ping)
         request.timeoutInterval = 2
@@ -259,6 +262,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
           var idle = function () { return !document.querySelector('[data-cmd=info]').disabled; };
           try {
             post({ loaded: document.title });
+            var sh = await (await fetch('/api/share')).json();
+            post({ shareMode: sh.mode, shareUrls: sh.urls });
             el('ip').value = '\(ip)';
             var t0 = Date.now();
             el('fetchBtn').click();

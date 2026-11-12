@@ -410,7 +410,7 @@ func (a *authServer) handleSession(w http.ResponseWriter, r *http.Request) {
 		out["user"] = userInfoJSON(au)
 	} else {
 		out["user"] = nil
-		out["setup"] = a.store.setupOpen()
+		out["setup"] = a.store.setupOpen() && isLoopback(clientIP(r)) // الأجهزة الثانية تشوف صفحة الدخول العادية
 		if demoMode {
 			out["demoAccounts"] = demoAccounts
 		}

@@ -108,13 +108,17 @@ func TestSettingsSaveAndReload(t *testing.T) {
 }
 
 type tclient struct {
-	t *testing.T
-	h http.Handler
-	c *http.Cookie
+	t      *testing.T
+	h      http.Handler
+	c      *http.Cookie
+	remote string // عنوان الجهاز اللي يطلب (الافتراضي جهاز ثاني مو 127.0.0.1)
 }
 
 func (c *tclient) do(method, path, body string) (int, map[string]any, *httptest.ResponseRecorder) {
 	r := httptest.NewRequest(method, path, strings.NewReader(body))
+	if c.remote != "" {
+		r.RemoteAddr = c.remote
+	}
 	if body != "" {
 		r.Header.Set("Content-Type", "application/json")
 	}
@@ -151,7 +155,7 @@ func TestAccountsAndReports(t *testing.T) {
 	store := newStore(t)
 	store.AllowWebSetup()
 	h := NewHandler(store)
-	anon := &tclient{t: t, h: h}
+	anon := &tclient{t: t, h: h, remote: "127.0.0.1:5000"}
 	if code, j, _ := anon.do("GET", "/api/session", ""); j["setup"] != true || code != 200 {
 		t.Fatalf("first run must ask for the first account: %v", j)
 	}
@@ -308,19 +312,58 @@ func TestShareLinks(t *testing.T) {
 	store := newStore(t)
 	store.create("owner1", "Owner#2026x", RoleSuper, "")
 	store.create("emp", "emp12345", RoleEmployee, "4")
+	store.AllowWebSetup()
 	h := NewHandler(store)
-	SetShareInfo("", nil)
+	SetShareInfo("", "", 0)
 	sup := login(t, h, "owner1", "Owner#2026x")
-	if _, j, _ := sup.do("GET", "/api/share", ""); j["mode"] != ShareLocal {
-		t.Fatalf("default must be local: %v", j)
+	if _, j, _ := sup.do("GET", "/api/share", ""); j["mode"] != ShareLocal || len(j["urls"].([]any)) != 0 {
+		t.Fatalf("default must be local without links: %v", j)
 	}
-	SetShareInfo(ShareNetwork, []string{"http://192.168.1.10:3000", "http://172.20.0.1:3000"})
+	SetShareInfo(SharePhone, "http", 3000)
 	_, j, _ := sup.do("GET", "/api/share", "")
-	if urls, _ := j["urls"].([]any); j["mode"] != ShareNetwork || len(urls) != 2 || urls[0] != "http://192.168.1.10:3000" {
-		t.Fatalf("network links: %v", j)
+	urls, _ := j["urls"].([]any)
+	if j["mode"] != SharePhone {
+		t.Fatalf("phone mode: %v", j)
+	}
+	for _, u := range urls {
+		if s, _ := u.(string); !strings.HasPrefix(s, "http://") || !strings.HasSuffix(s, ":3000") || strings.Contains(s, "127.0.0.1") {
+			t.Fatalf("bad link %q", s)
+		}
+	}
+	if len(LanIPs()) != len(urls) {
+		t.Fatalf("links %v do not match addresses %v", urls, LanIPs())
 	}
 	if code, _, _ := login(t, h, "emp", "emp12345").do("GET", "/api/share", ""); code != 403 {
 		t.Fatal("employees do not need the members link")
 	}
-	SetShareInfo("", nil)
+	SetShareInfo("", "", 0)
+}
+
+// أول حساب ينعمل من نفس الجهاز بس: الأجهزة الثانية تشوف صفحة دخول عادية
+func TestSetupOnlyOnTheDeviceItself(t *testing.T) {
+	store := newStore(t)
+	store.AllowWebSetup()
+	h := NewHandler(store)
+	ask := func(remote string) map[string]any {
+		r := httptest.NewRequest("GET", "/api/session", nil)
+		r.RemoteAddr = remote
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		var j map[string]any
+		json.Unmarshal(w.Body.Bytes(), &j)
+		return j
+	}
+	if ask("127.0.0.1:5000")["setup"] != true {
+		t.Fatal("the device itself must be offered the first-run setup")
+	}
+	if ask("192.168.1.30:5000")["setup"] != false {
+		t.Fatal("another device must not be offered the first-run setup")
+	}
+	r := httptest.NewRequest("POST", "/api/setup", strings.NewReader(`{"username":"x1","password":"xxxxxx11"}`))
+	r.RemoteAddr = "192.168.1.30:5000"
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 403 {
+		t.Fatalf("remote setup: %d", w.Code)
+	}
 }

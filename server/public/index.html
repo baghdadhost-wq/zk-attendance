@@ -618,9 +618,9 @@ async function loadShare() {
   try {
     const r = await fetch('/api/share'); if (!r.ok) return;
     const j = await r.json();
-    if (j.mode === 'app') return; // تطبيق الموبايل: يشتغل داخل الموبايل بس
     $('shareBar').hidden = false;
-    if (j.mode !== 'network') {
+    const phone = j.mode === 'phone'; // تطبيق الموبايل: سيرفر على الواي فاي طول ما هو مفتوح
+    if (j.mode !== 'network' && !phone) {
       $('shareBtn').hidden = true;
       $('shareNote').textContent = `البرنامج مفتوح لهذي الحاسبة بس. حتى يدخل الأعضاء من أجهزتهم، ${j.hint || 'شغّله للشبكة'}، والرابط يطلع هنا.`;
       return;
@@ -630,13 +630,17 @@ async function loadShare() {
     if (!local) urls = [location.origin, ...urls.filter(u => u !== location.origin)];
     if (!urls.length) {
       $('shareBtn').hidden = true;
-      $('shareNote').textContent = 'ما لگيت عنوان الحاسبة بالشبكة. تأكد إنها متصلة بالواي فاي أو كيبل الشبكة، وأعد تشغيل البرنامج.';
+      $('shareNote').textContent = phone ? 'وصّل الموبايل بالواي فاي حتى يطلع الرابط اللي تفتحه الأجهزة الثانية.'
+        : 'ما لگيت عنوان الحاسبة بالشبكة. تأكد إنها متصلة بالواي فاي أو كيبل الشبكة، وأعد تشغيل البرنامج.';
       return;
     }
+    $('shareBtn').hidden = false;
     setShareUrl(urls[0]);
-    $('shareNote').textContent = 'الأعضاء لازم يكونون على نفس الشبكة، والحاسبة والبرنامج شغالين.';
+    $('shareNote').textContent = phone
+      ? 'الأعضاء لازم يكونون على نفس الواي فاي، وخلي التطبيق مفتوح بالشاشة: إذا سكرته أو قفلت الموبايل ما يگدرون يدخلون. إذا الرابط بطّل يشتغل انسخه من جديد (الراوتر ممكن يبدّل IP الموبايل)، وشبكة الضيوف ما تنفع لأنها تعزل الأجهزة عن بعض.'
+      : 'الأعضاء لازم يكونون على نفس الشبكة، والحاسبة والبرنامج شغالين.';
+    $('shareMore').hidden = urls.length < 2;
     if (urls.length > 1) {
-      $('shareMore').hidden = false;
       $('shareList').innerHTML = urls.slice(1).map(u => `<button type="button" class="small" data-share="${esc(u)}"><bdi dir="ltr">${esc(u)}</bdi></button>`).join('');
     }
   } catch (_) {}
