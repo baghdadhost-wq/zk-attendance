@@ -245,7 +245,8 @@ func sameOrigin(r *http.Request) bool {
 
 // ملفات مسموحة بدون دخول (صفحة الدخول والأيقونات)
 var publicPaths = map[string]bool{
-	"/login": true, "/api/login": true, "/api/setup": true, "/api/session": true, "/manifest.webmanifest": true, "/sw.js": true,
+	"/login": true, "/api/login": true, "/api/setup": true, "/api/session": true, "/api/transfer/push": true, // النقل محمي بالرمز والتشفير
+	"/manifest.webmanifest": true, "/sw.js": true,
 	"/icon-192.png": true, "/icon-512.png": true, "/apple-touch-icon.png": true, "/favicon.ico": true,
 }
 

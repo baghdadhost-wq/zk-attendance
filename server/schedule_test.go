@@ -1,11 +1,15 @@
 package server
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -398,5 +402,70 @@ func TestPerDaySchedule(t *testing.T) {
 	}
 	if err := normSchedFields(profile{"schedMode": "خاص", "workStart": "08:00", "workEnd": "14:00", "dayTimes": "الخميس ثمانية"}); err == nil {
 		t.Error("bad dayTimes accepted")
+	}
+}
+
+func TestTransferCrypto(t *testing.T) {
+	code := newXferCode()
+	if len(code) != xferCodeLen || normXferCode(strings.ToLower(fmtXferCode(code))) != code {
+		t.Fatalf("code %q", code)
+	}
+	box, err := sealXfer(code, []byte("hello users.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(box, []byte("users.json")) {
+		t.Fatal("plaintext visible")
+	}
+	if p, err := openXfer(code, box); err != nil || string(p) != "hello users.json" {
+		t.Fatalf("open: %q %v", p, err)
+	}
+	other := newXferCode()
+	if _, err := openXfer(other, box); !errors.Is(err, errXferCode) {
+		t.Fatal("wrong code opened the box")
+	}
+	box[len(box)-1] ^= 1
+	if _, err := openXfer(code, box); err == nil {
+		t.Fatal("tampered box opened")
+	}
+	for in, want := range map[string]string{"192.168.1.20": "http://192.168.1.20:3000/api/transfer/push",
+		"http://10.0.0.5:8080/": "http://10.0.0.5:8080/api/transfer/push", "١٩٢.١٦٨.١.٢٠:٣٠٠١": "http://192.168.1.20:3001/api/transfer/push"} {
+		if got, err := xferTarget(in); err != nil || got != want {
+			t.Errorf("%s → %s %v", in, got, err)
+		}
+	}
+	for _, bad := range []string{"8.8.8.8", "example.com", "", "192.168.1.20:99999"} {
+		if _, err := xferTarget(bad); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}
+
+func TestTransferUnpackRejects(t *testing.T) {
+	mk := func(files map[string]string) []byte {
+		var b bytes.Buffer
+		zw := zip.NewWriter(&b)
+		for n, c := range files {
+			f, _ := zw.Create(n)
+			f.Write([]byte(c))
+		}
+		zw.Close()
+		return b.Bytes()
+	}
+	users := `{"schema":2,"users":[{"username":"o","role":"super","salt":"aa","hash":"bb","iterations":1}]}`
+	files, err := unpackData(mk(map[string]string{"users.json": users, "../evil": "x", "/abs": "x", "a/../../b": "x", "reports/2026-01-01_2026-01-31.json": "{}", "audit.log": "x"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, f := range files {
+		names = append(names, f.rel)
+	}
+	sort.Strings(names)
+	if strings.Join(names, ",") != "reports/2026-01-01_2026-01-31.json,users.json" {
+		t.Errorf("kept %v", names)
+	}
+	if _, err := unpackData(mk(map[string]string{"settings.json": "{}"})); err == nil {
+		t.Error("no accounts accepted")
 	}
 }

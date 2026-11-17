@@ -9,7 +9,7 @@ import (
 )
 
 // Version رقم نسخة البرنامج
-const Version = "2.9.0"
+const Version = "2.10.0"
 
 //go:embed public
 var publicFS embed.FS
@@ -62,9 +62,17 @@ func NewHandler(users *UserStore) http.Handler {
 	mux.HandleFunc("/api/reports/delete", need(RoleAdmin, handleReportDelete))
 	mux.HandleFunc("/api/my/reports", onlyEmployee(handleMyReports))
 	mux.HandleFunc("/api/my/report", onlyEmployee(handleMyReport))
+	// نقل كل البيانات لجهاز ثاني: الإرسال والاستلام للصلاحية المطلقة، والدفع محمي بالرمز والتشفير
+	mux.HandleFunc("/api/transfer/receive", need(RoleSuper, handleTransferReceive))
+	mux.HandleFunc("/api/transfer/status", need(RoleSuper, handleTransferStatus))
+	mux.HandleFunc("/api/transfer/send", need(RoleSuper, handleTransferSend))
+	mux.HandleFunc("/api/transfer/push", handleTransferPush)
 	var as *authServer
 	if users != nil {
 		as = newAuthServer(users)
+		activeMu.Lock()
+		activeAuth = as
+		activeMu.Unlock()
 		mux.HandleFunc("/api/login", as.handleLogin)
 		mux.HandleFunc("/api/setup", as.handleSetup)
 		mux.HandleFunc("/api/session", as.handleSession)

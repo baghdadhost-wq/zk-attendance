@@ -404,6 +404,33 @@
     <div id="reportsStatus" style="margin-top:8px;font-size:13px"></div>
   </details>
 
+  <details class="card no-print" id="xferCard" data-min="super" hidden>
+    <summary>نقل البيانات لجهاز ثاني <small>الحسابات، الموظفين ودوامهم، الإعدادات، التقارير المحفوظة</small></summary>
+    <div class="hint" style="margin:-4px 0 10px">الجهازين على نفس الواي فاي. بالجهاز الجديد اضغط «استلام» ويطلع رابطه ورمز، وبهذا الجهاز اكتبهن واضغط «إرسال». البيانات تنتقل مشفّرة بالرمز، فإذا أحد سحبها بالطريق ما يگدر يقراها. بيانات الجهاز المستلم تنحفظ نسخة منها بـ backups وبعدين تنستبدل، وسجل العمليات ما ينتقل.</div>
+    <div class="row" style="align-items:flex-start;gap:24px;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px">
+        <b>استلام (هذا الجهاز ياخذ البيانات)</b>
+        <div style="margin:8px 0"><button id="xferRecvBtn">استلام</button> <button id="xferStopBtn" class="small" hidden>إيقاف الاستلام</button></div>
+        <div id="xferRecvBox" hidden style="font-size:14px">
+          <div>الرابط: <code id="xferUrl" dir="ltr" style="font-size:16px"></code></div>
+          <div id="xferMoreUrls" class="hint" style="font-size:12px"></div>
+          <div style="margin-top:6px">الرمز: <code id="xferCode" dir="ltr" style="font-size:20px;letter-spacing:2px"></code></div>
+          <div class="hint" style="font-size:12px">ينتهي بعد <span id="xferLeft"></span>. خلي هذي الصفحة مفتوحة لحد ما يوصل.</div>
+        </div>
+        <div id="xferRecvStatus" style="margin-top:6px;font-size:13px"></div>
+      </div>
+      <div style="flex:1;min-width:260px">
+        <b>إرسال (من هذا الجهاز لجهاز ثاني)</b>
+        <div class="pgrid" style="margin-top:8px">
+          <label>رابط الجهاز المستلم <input id="xferTarget" dir="ltr" placeholder="192.168.1.20:3000" autocomplete="off"></label>
+          <label>الرمز <input id="xferCodeIn" dir="ltr" placeholder="XXXX-XXXX-XX" autocomplete="off" autocapitalize="characters"></label>
+        </div>
+        <button id="xferSendBtn" style="margin-top:8px">إرسال كل البيانات</button>
+        <div id="xferSendStatus" style="margin-top:6px;font-size:13px"></div>
+      </div>
+    </div>
+  </details>
+
   <details class="card no-print" id="auditCard" data-min="admin" hidden>
     <summary>سجل العمليات <small>منو سوّى شنو ومتى</small></summary>
     <div class="row" style="margin-bottom:10px">
@@ -430,6 +457,10 @@
       <label>نهاية الدوام <input type="time" id="end" value="14:00" data-gen></label>
       <label>سماحية التأخير (دقيقة) <input type="number" id="grace" value="10" min="0" max="240" style="min-width:80px" data-gen></label>
       <label>تجاهل البصمة المكررة خلال (دقيقة) <input type="number" id="dedup" value="3" min="0" max="120" style="min-width:80px" data-gen></label>
+    </div>
+    <div style="margin-top:10px">
+      <label class="chk"><input type="checkbox" id="strict" data-gen> البصمة خارج الوقت والسماحية تنحسب عدم التزام</label>
+      <div class="hint" style="font-size:12px">الدخول بعد السماحية = «بدون دخول (تأخر)»، والخروج قبل نهاية الدوام بأكثر من السماحية = «بدون خروج (مبكر)»، والثنتين باليوم = «غياب (عدم التزام)». الزمنية والإجازة تبرّرهن مثل نقص البصمة.</div>
     </div>
     <div class="days" id="genOff"><span>العطلة الأسبوعية:</span></div>
     <details id="genDaysBox" style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">أوقات تختلف لبعض الأيام <span id="genDaysSum" class="hint"></span></summary>
@@ -737,7 +768,9 @@ function parseDayTimes(v) {
 }
 const dayTimesStr = (dt) => Object.keys(dt).map(Number).sort((a, b) => a - b).map(d => `${d}=${dt[d].start}-${dt[d].end}`).join(',');
 const dayTimesText = (dt) => WEEK.filter(d => dt[d]).map(d => `${DAYS[d]} ${dt[d].start}-${dt[d].end}`).join(' و');
-const genText = (g) => `${g.start} - ${g.end}، العطلة: ${offText(g.off)}` + (Object.keys(parseDayTimes(g.days)).length ? '، ' + dayTimesText(parseDayTimes(g.days)) : '');
+const genText = (g) => `${g.start} - ${g.end}، العطلة: ${offText(g.off)}` + (Object.keys(parseDayTimes(g.days)).length ? '، ' + dayTimesText(parseDayTimes(g.days)) : '') + (g.strict ? '، البصمة خارج الوقت = عدم التزام' : '');
+// اسم حالة اليوم إذا ناقصه بصمة (أو بصمته خارج الوقت بالالتزام الصارم)
+const missLabel = (r) => r.noncomp ? 'غياب (عدم التزام)' : r.missingIn ? (r.lateMiss ? 'بدون دخول (تأخر)' : 'بدون دخول') : r.missingOut ? (r.earlyMiss ? 'بدون خروج (مبكر)' : 'بدون خروج') : '';
 // جدول أيام الأسبوع: بداية ونهاية لكل يوم، ويا الاستثناء من البصمة إذا ex
 function dayTimesTable(box, attr, ex) {
   $(box).innerHTML = `<span class="h">اليوم</span><span class="h">البداية</span><span class="h">النهاية</span>` + (ex ? '<span class="h" title="ما يحتاج بصمة دخول">بلا صباحية</span><span class="h" title="ما يحتاج بصمة خروج">بلا مسائية</span>' : '<span></span><span></span>') +
@@ -762,12 +795,12 @@ function dayBoxes(box, attr) {
 const offOf = (attr) => [...document.querySelectorAll(`[data-${attr}]`)].filter(x => x.checked).map(x => +x.dataset[attr]).sort((a, b) => a - b);
 function setOff(attr, days) { document.querySelectorAll(`[data-${attr}]`).forEach(x => { x.checked = days.includes(+x.dataset[attr]); }); }
 function genForm() { const start = $('start').value, end = $('end').value;
-  return { start, end, off: offOf('goff'), grace: +$('grace').value || 0, dedup: +$('dedup').value || 0, days: readDayTimes('gday', start, end) }; }
-function fillGen(g) { $('start').value = g.start; $('end').value = g.end; $('grace').value = g.grace; $('dedup').value = g.dedup; setOff('goff', g.off);
+  return { start, end, off: offOf('goff'), grace: +$('grace').value || 0, dedup: +$('dedup').value || 0, days: readDayTimes('gday', start, end), strict: $('strict').checked }; }
+function fillGen(g) { $('start').value = g.start; $('end').value = g.end; $('grace').value = g.grace; $('dedup').value = g.dedup; $('strict').checked = !!g.strict; setOff('goff', g.off);
   fillDayTimes('gday', parseDayTimes(g.days), g.off); genDaysSum(); }
 function genDaysSum() { const t = dayTimesText(parseDayTimes(genForm().days)); $('genDaysSum').textContent = t ? '— ' + t : '';
   const off = offOf('goff'); for (const d of WEEK) dtEl('gday', 'name', d).className = off.includes(d) ? 'off' : ''; }
-const sameGen = (a, b) => a.start === b.start && a.end === b.end && +a.grace === +b.grace && +a.dedup === +b.dedup && a.off.join() === b.off.join() &&
+const sameGen = (a, b) => a.start === b.start && a.end === b.end && +a.grace === +b.grace && +a.dedup === +b.dedup && a.off.join() === b.off.join() && !!a.strict === !!b.strict &&
   dayTimesStr(parseDayTimes(a.days)) === dayTimesStr(parseDayTimes(b.days));
 // دوام الموظف: نظامه الخاص إذا عنده، وإلا النظام العام (مثل ما مكتوب هسه بالشاشة، حتى التجربة قبل الحفظ تبين)
 function schedOf(id) {
@@ -942,7 +975,7 @@ function filteredLogs() {
 
 function dailyRows() {
   const g = CUR_GEN || genForm();
-  const dedupMs = g.dedup * 60000, grace = g.grace;
+  const dedupMs = g.dedup * 60000, grace = g.grace, strict = !!g.strict;
   const groups = new Map();
   for (const l of filteredLogs()) {
     const k = l.userId + '|' + dateKey(l.d);
@@ -974,9 +1007,14 @@ function dailyRows() {
     const early = tracked && !dt.exOut && outM != null && outM < endM ? endM - outM : 0;
     // بيوم عطلته كل الشغل إضافي
     const overtime = sc.exempt ? 0 : offDay ? Math.round(worked || 0) : outM != null && outM > endM ? outM - endM : 0;
+    // الالتزام الصارم: بصمة الدخول بعد السماحية ما تنقبل (بدون دخول - تأخر)، والخروج قبل النهاية بأكثر من السماحية (بدون خروج - مبكر)
+    const lateMiss = strict && tracked && !dt.exIn && inM != null && inM > startM + grace;
+    const earlyMiss = strict && tracked && !dt.exOut && outM != null && outM < endM - grace;
+    const missingIn = (!first && !dt.exIn) || lateMiss, missingOut = (!last && !dt.exOut) || earlyMiss;
+    const noncomp = strict && tracked && missingIn && missingOut; // الثنتين: غياب عدم التزام
     rows.push({ userId, name: userName(userId), day, dow: DAYS[(first || last).getDay()], first, last,
       worked, late, early, overtime, count: punches.length, offDay, exempt: sc.exempt, tracked, exDay,
-      missingIn: !first && !dt.exIn, missingOut: !last && !dt.exOut, startM, endM,
+      missingIn, missingOut, lateMiss, earlyMiss, noncomp, startM, endM,
       manualIn: firstP && firstP.manual || null, manualOut: lastP && lastP.manual || null, manualCount: punches.filter(p => p.manual).length });
   }
   rows.sort((a,b) => a.day.localeCompare(b.day) || Number(a.userId) - Number(b.userId));
@@ -1004,12 +1042,12 @@ function summaryRows(daily, recon) {
     const sc = schedOf(id);
     const rs = daily.filter(r => r.userId === id), tr = rs.filter(r => r.tracked);
     const rc = recon ? recon.filter(x => x.userId === id) : [];
-    const present = new Set(rs.map(r => r.day));
+    const present = new Set(rs.filter(r => !r.noncomp).map(r => r.day)), tm = tr.filter(r => !r.noncomp);
     return { userId: id, name: userName(id), sched: schedText(id), exempt: sc.exempt, present: present.size,
       absent: sc.exempt ? null : workingDaysFor(id).filter(d => !present.has(d)).length,
       lateCount: tr.filter(r => r.late).length, lateMin: rs.reduce((s,r)=>s+r.late,0),
       earlyMin: rs.reduce((s,r)=>s+r.early,0), overtime: rs.reduce((s,r)=>s+r.overtime,0),
-      missingOut: tr.filter(r => r.missingOut).length, missingIn: tr.filter(r => r.missingIn).length,
+      missingOut: tm.filter(r => r.missingOut).length, missingIn: tm.filter(r => r.missingIn).length,
       worked: rs.reduce((s,r)=>s+(r.worked||0),0), manual: rs.reduce((s,r)=>s+r.manualCount,0),
       excLeave: rc.filter(x => x.code === 'leave').length, excHour: rc.filter(x => x.code === 'hour').length,
       pend: rc.filter(x => x.code === 'pending').length,
@@ -1075,13 +1113,13 @@ function reconcile(daily) {
     const dayPend = !dayOk && lv.day.length > 0, hourPend = !hourOk && lv.hour.length > 0;
     const hourMin = lv.hour.filter(l => l.status === 'approved').reduce((s, l) => s + (l.minutes || 0), 0);
     let state, code, note = '', absent = false;
-    if (!r) {
-      state = 'غائب'; absent = true;
+    if (!r || r.noncomp) {
+      state = r ? 'غياب (عدم التزام)' : 'غائب'; absent = true;
       if (dayOk) code = 'leave';
       else if (dayPend) code = 'pending';
       else { code = 'bad'; note = hourOk ? 'عنده زمنية بس غاب اليوم كامل' : hourPend ? 'عنده زمنية بانتظار الموافقة' : ''; }
     } else if (r.missingIn || r.missingOut) {
-      state = r.missingIn ? 'بدون دخول' : 'بدون خروج';
+      state = missLabel(r);
       const fit = lv.hour.filter(l => hourFits(l, r));
       const fitOk = fit.some(l => l.status === 'approved');
       if (fitOk) code = 'hour';
@@ -1167,7 +1205,7 @@ const shortDay = (d) => d.slice(8) + '/' + d.slice(5, 7);
 function digestOf(list) {
   const g = Object.fromEntries(DIGEST.map(([k]) => [k, []]));
   for (const x of list) {
-    const k = x.code === 'bad' ? (x.absent ? 'absent' : x.state === 'بدون دخول' ? 'badIn' : 'badOut')
+    const k = x.code === 'bad' ? (x.absent ? 'absent' : x.state.startsWith('بدون دخول') ? 'badIn' : 'badOut')
       : x.code === 'leave' ? 'leave' : x.code === 'hour' ? 'hour' : x.code === 'pending' ? 'pending' : x.code === 'partial' ? 'partial' : null;
     if (k) g[k].push(x.day);
   }
@@ -1207,8 +1245,7 @@ function personReport(id, daily, recon, summ) {
     else if (off) state = r ? 'يوم عطلة (بصم)' : 'يوم عطلة';
     else if (dt.exAll) state = 'مستثنى من البصمة';
     else if (!r) { state = 'غائب'; c = 't-miss'; }
-    else if (r.missingIn) { state = 'بدون دخول'; c = 't-miss'; }
-    else if (r.missingOut) { state = 'بدون خروج'; c = 't-miss'; }
+    else if (r.missingIn || r.missingOut) { state = missLabel(r); c = 't-miss'; }
     else if (r.late) { state = 'متأخر'; c = 't-late'; }
     else { state = 'منتظم'; c = 't-ok'; }
     const ex = [dt.exIn && !dt.exAll ? 'بدون بصمة صباحية' : '', dt.exOut && !dt.exAll ? 'بدون بصمة مسائية' : ''].filter(Boolean).join('، ');
@@ -1247,7 +1284,7 @@ function render() {
     const H = ['التاريخ','اليوم','الرقم','الاسم','الدخول','الخروج','ساعات العمل','التأخير','خروج مبكر','إضافي','الحالة'];
     const mark = (t, p) => p ? `${t} (يدوية)` : t;
     const baseSt = (r) => r.exempt ? 'غير مشمول' : r.offDay ? 'يوم عطلة' + (r.count === 1 ? ' (بصمة وحدة)' : '') : r.exDay ? 'مستثنى من البصمة'
-      : r.missingIn ? 'بدون دخول' : r.missingOut ? 'بدون خروج' : r.late ? 'متأخر' : 'منتظم';
+      : r.missingIn || r.missingOut ? missLabel(r) : r.late ? 'متأخر' : 'منتظم';
     const recOf = (r) => recIdx.get(r.userId + '|' + r.day);
     const rows = daily.map(r => { const x = recOf(r);
       return [r.day, r.dow, r.userId, r.name, mark(hhmm(r.first), r.manualIn), mark(hhmm(r.last), r.manualOut), fmtDur(r.worked), fmtDur(r.late||null), fmtDur(r.early||null), fmtDur(r.overtime||null),
@@ -1259,8 +1296,9 @@ function render() {
       const recTag = x ? ` <span class="tag ${RECON[x.code].cls}" title="${esc(x.leaveText || x.note)}">${RECON[x.code].label}</span>` : '';
       const fixable = !x || x.code === 'bad' || x.code === 'pending';
       const st = !r.tracked ? `<span class="tag t-off">${esc(baseSt(r))}</span>`
-        : r.missingIn ? '<span class="tag t-miss">بدون دخول</span>' + recTag + (quick && fixable ? ` <button class="small no-print" data-addin="${esc(r.userId)}|${r.day}">إضافة دخول</button>` : '')
-        : r.missingOut ? '<span class="tag t-miss">بدون خروج</span>' + recTag + (quick && fixable ? ` <button class="small no-print" data-addout="${esc(r.userId)}|${r.day}">إضافة خروج</button>` : '')
+        : r.noncomp ? '<span class="tag t-miss">غياب (عدم التزام)</span>' + recTag
+        : r.missingIn ? `<span class="tag t-miss">${missLabel(r)}</span>` + recTag + (quick && fixable ? ` <button class="small no-print" data-addin="${esc(r.userId)}|${r.day}">إضافة دخول</button>` : '')
+        : r.missingOut ? `<span class="tag t-miss">${missLabel(r)}</span>` + recTag + (quick && fixable ? ` <button class="small no-print" data-addout="${esc(r.userId)}|${r.day}">إضافة خروج</button>` : '')
         : (r.late ? '<span class="tag t-late">متأخر</span>' : '<span class="tag t-ok">منتظم</span>') + recTag;
       const c = rows[i];
       return `<tr>${c.slice(0,4).map(x=>`<td>${esc(x)}</td>`).join('')}${timeCell(hhmm(r.first), r.manualIn)}${timeCell(hhmm(r.last), r.manualOut)}` +
@@ -2086,7 +2124,7 @@ function buildPublished() {
     for (const r of daily) { if (!byEmp.has(r.userId)) byEmp.set(r.userId, new Map()); byEmp.get(r.userId).set(r.day, { r }); }
     for (const x of recon) { if (!byEmp.has(x.userId)) byEmp.set(x.userId, new Map()); const m = byEmp.get(x.userId); m.set(x.day, { ...(m.get(x.day) || {}), x }); }
     const st = (r) => r.exempt ? 'غير مشمول' : r.offDay ? 'يوم عطلة' + (r.count === 1 ? ' (بصمة وحدة)' : '') : r.exDay ? 'مستثنى من البصمة'
-      : r.missingIn ? 'بدون دخول' : r.missingOut ? 'بدون خروج' : r.late ? 'متأخر' : 'منتظم';
+      : r.missingIn || r.missingOut ? missLabel(r) : r.late ? 'متأخر' : 'منتظم';
     for (const sm of summ) {
       const days = [...(byEmp.get(sm.userId) || new Map()).entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([day, { r, x }]) => ({
         day, dow: DAYS[dowOf(day)],
@@ -2130,6 +2168,44 @@ async function loadReports() {
   } catch (e) { $('reportsTable').innerHTML = ''; $('reportsStatus').className = 'err'; $('reportsStatus').textContent = e.message; }
 }
 $('reportsCard').addEventListener('toggle', () => { if ($('reportsCard').open) loadReports(); });
+
+// ---------- نقل البيانات لجهاز ثاني ----------
+let xferTimer = null;
+const xferMsg = (id, t, cls) => { $(id).className = cls || ''; $(id).textContent = t; };
+function xferShow(on) { $('xferRecvBox').hidden = !on; $('xferStopBtn').hidden = !on; $('xferRecvBtn').disabled = on; if (!on && xferTimer) { clearInterval(xferTimer); xferTimer = null; } }
+$('xferRecvBtn').onclick = async () => {
+  xferMsg('xferRecvStatus', '');
+  try {
+    const j = await postJSON('/api/transfer/receive', { on: true });
+    $('xferUrl').textContent = j.urls[0].replace(/^https?:\/\//, '');
+    $('xferMoreUrls').textContent = j.urls.length > 1 ? 'إذا ما وصل جرب: ' + j.urls.slice(1).map(u => u.replace(/^https?:\/\//, '')).join('  ،  ') : '';
+    $('xferCode').textContent = j.code; xferShow(true);
+    let left = j.seconds; const tick = () => { $('xferLeft').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`; };
+    tick();
+    xferTimer = setInterval(async () => {
+      left = Math.max(0, left - 2); tick();
+      let st;
+      try { const r = await fetch('/api/transfer/status'); if (r.status === 401) st = { done: true }; else st = await r.json(); } catch (_) { return; }
+      if (st.done) {
+        xferShow(false);
+        xferMsg('xferRecvStatus', 'انستلمت البيانات ✓ هسه سجّل دخول بحسابات الجهاز الثاني.', 'ok');
+        setTimeout(() => location.href = '/login', 2500);
+      } else if (!st.receiving) { xferShow(false); xferMsg('xferRecvStatus', 'انطفى وضع الاستلام (خلص الوقت أو الرمز انكتب غلط هواية).', 'err'); }
+    }, 2000);
+  } catch (e) { xferMsg('xferRecvStatus', e.message, 'err'); }
+};
+$('xferStopBtn').onclick = async () => { xferShow(false); xferMsg('xferRecvStatus', 'انطفى الاستلام'); try { await postJSON('/api/transfer/receive', { on: false }); } catch (_) {} };
+$('xferSendBtn').onclick = async () => {
+  const target = $('xferTarget').value.trim(), code = $('xferCodeIn').value.trim();
+  if (!target || !code) return xferMsg('xferSendStatus', 'اكتب رابط الجهاز المستلم والرمز اللي طالع عنده', 'err');
+  if (!confirm('كل بيانات الجهاز الثاني (حساباته وموظفينه وإعداداته وتقاريره) راح تنستبدل ببيانات هذا الجهاز. تكمل؟')) return;
+  $('xferSendBtn').disabled = true; xferMsg('xferSendStatus', 'دا ينرسل...');
+  try {
+    const j = await postJSON('/api/transfer/send', { target, code });
+    xferMsg('xferSendStatus', `انتقلت البيانات ✓ (${j.files} ملف). الجهاز الثاني هسه يدخل بنفس حسابات هذا الجهاز.`, 'ok');
+  } catch (e) { xferMsg('xferSendStatus', e.message, 'err'); }
+  $('xferSendBtn').disabled = false;
+};
 $('reportsTable').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-repdel]'); if (!b) return;
   if (!confirm('راح ينحذف هذا التقرير والموظفين ما يشوفونه بعد (تبقى منه نسخة بمجلد backups). متأكد؟')) return;
@@ -2140,7 +2216,7 @@ $('reportsTable').addEventListener('click', async (e) => {
 
 // ---------- سجل العمليات ----------
 const ACTION_LABELS = {
-  data: 'سحب البيانات', login: 'دخول', loginFailed: 'محاولة دخول فاشلة', logout: 'خروج', setup: 'إنشاء أول حساب (صلاحية مطلقة)', myPassword: 'غيّر كلمة سره',
+  data: 'سحب البيانات', login: 'دخول', loginFailed: 'محاولة دخول فاشلة', transferReceive: 'شغّل استلام البيانات', transferIn: 'استلم البيانات من جهاز ثاني', transferOut: 'نقل البيانات لجهاز ثاني', logout: 'خروج', setup: 'إنشاء أول حساب (صلاحية مطلقة)', myPassword: 'غيّر كلمة سره',
   userCreate: 'إضافة مستخدم', userUpdate: 'تعديل مستخدم', userDelete: 'حذف مستخدم', denied: 'محاولة بدون صلاحية',
   profileSave: 'تعديل بيانات إضافية', profileImport: 'استيراد بيانات الموظفين',
   syncTime: 'مزامنة الوقت', refresh: 'تحديث بيانات الجهاز', testVoice: 'تشغيل صوت', unlock: 'فتح الباب', lcdWrite: 'رسالة على الشاشة',

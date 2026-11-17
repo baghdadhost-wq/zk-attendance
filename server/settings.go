@@ -26,6 +26,9 @@ type workSchedule struct {
 	Dedup int    `json:"dedup"` // تجاهل البصمة المكررة خلال كم دقيقة
 	// أوقات تختلف لأيام معيّنة: "4" → {08:00 13:00}. اليوم اللي ما بيه يتبع البداية والنهاية فوق
 	Days map[string]dayTime `json:"days,omitempty"`
+	// Strict: البصمة بعد السماحية = بدون دخول (تأخر)، وقبل نهاية الدوام بأكثر من السماحية = بدون خروج (مبكر)،
+	// والثنتين = غياب (عدم التزام)
+	Strict bool `json:"strict,omitempty"`
 }
 
 type dayTime struct {
@@ -221,7 +224,7 @@ func checkSchedule(ws workSchedule) (workSchedule, error) {
 		}
 		days[strconv.Itoa(d)] = dayTime{ds, de}
 	}
-	return workSchedule{Start: s, End: e, Off: off, Grace: ws.Grace, Dedup: ws.Dedup, Days: days}, nil
+	return workSchedule{Start: s, End: e, Off: off, Grace: ws.Grace, Dedup: ws.Dedup, Days: days, Strict: ws.Strict}, nil
 }
 
 // ---------- الواجهة ----------
@@ -286,6 +289,9 @@ func scheduleText(ws workSchedule) string {
 		if t, ok := ws.Days[strconv.Itoa(d)]; ok {
 			out += "، " + dayNamesAr[d] + " " + t.Start + "-" + t.End
 		}
+	}
+	if ws.Strict {
+		out += "، البصمة خارج الوقت = عدم التزام"
 	}
 	return out
 }
