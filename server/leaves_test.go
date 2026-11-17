@@ -175,3 +175,28 @@ func TestLeavesRealFile(t *testing.T) {
 		t.Fatalf("multi-day rows = %d", multi)
 	}
 }
+
+func TestLeaveStartPart(t *testing.T) {
+	cases := []struct{ clock, part, start, want string }{
+		{"08:30–09:30", "صباحية", "08:30", "am"},
+		{"09:59-11:00", "", "09:59", "am"},
+		{"10:00–14:00", "صباحية", "10:00", "pm"}, // الوقت يحسم، مو كلمة صباحية
+		{"11:00–14:00", "صباحية", "11:00", "pm"},
+		{"١٢:٠٠–١٤:٠٠", "", "12:00", "pm"},
+		{"", "مسائية", "", "pm"},
+		{"", "صباحية", "", "am"},
+		{"", "", "", ""},
+	}
+	for _, c := range cases {
+		s, p := leaveStartPart(cellAt([]sheetCell{{s: c.clock}}, 0), sheetCell{s: c.part})
+		if s != c.start || p != c.want {
+			t.Errorf("%q/%q → %q %q, want %q %q", c.clock, c.part, s, p, c.start, c.want)
+		}
+	}
+	if d, err := parseLeaveDate(sheetCell{s: "0026/11/12"}); err != nil || d != "2026-11-12" {
+		t.Errorf("0026/11/12 → %q %v", d, err)
+	}
+	if classifyLeaveStatus("ألغته الموارد البشرية", true) != "withdrawn" || classifyLeaveStatus("معتمد (استثناء)", true) != "approved" {
+		t.Error("status words")
+	}
+}

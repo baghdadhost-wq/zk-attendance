@@ -3,7 +3,9 @@ package server
 // تقرير الإجازات والزمنيات: يُرفع من نظام الإجازات (Excel ‎.xlsx‎ أو CSV) ويُستخدم لتصفية الغياب
 // ونقص البصمة. الربط برقم البصمة فقط (الأسماء ممكن تختلف بالكتابة).
 //   رقم بخانة الأيام  → إجازة (تبرّر غياب يوم كامل)
-//   رقم بخانة الساعات → زمنية (تبرّر نقص بصمة الصباح أو المساء)
+//   رقم بخانة الساعات → زمنية: إذا تبدي قبل الساعة 10 تبرّر نقص بصمة الدخول (الصباح)،
+//                         وإذا من 10 وطالع تبرّر نقص بصمة الخروج (المساء). وما تبرّر غياب يوم كامل.
+//   الإجازة لأكثر من يوم تبرّر غياب كل يوم من «من» إلى «إلى».
 // بس الطلبات المعتمدة تبرّر؛ «بانتظار…» تنعرض بدون تبرير، و«مسحوب/مرفوض» تنهمل.
 
 import (
@@ -39,7 +41,9 @@ type leaveRec struct {
 	To         string  `json:"to"`
 	Days       float64 `json:"days,omitempty"`
 	Minutes    int     `json:"minutes,omitempty"`
-	Status     string  `json:"status"` // approved | pending | withdrawn
+	Start      string  `json:"start,omitempty"` // بداية الزمنية 15:04
+	Part       string  `json:"part,omitempty"`  // am = تبرّر بصمة الدخول ، pm = تبرّر بصمة الخروج
+	Status     string  `json:"status"`          // approved | pending | withdrawn
 	StatusText string  `json:"statusText,omitempty"`
 	Row        int     `json:"row"`
 }
@@ -345,6 +349,7 @@ func normText(s string) string {
 
 type leaveCols struct {
 	id, name, dept, typ, from, to, hours, days, status int
+	clock, part                                        int
 	idHeader                                           string
 }
 
@@ -358,6 +363,8 @@ var colCandidates = map[string][]string{
 	"hours":  {"الساعات", "ساعات", "عدد الساعات", "المدة بالساعات", "hours"},
 	"days":   {"الايام", "الأيام", "ايام", "أيام", "عدد الايام", "عدد الأيام", "المدة بالايام", "days"},
 	"status": {"الحالة", "حالة الطلب", "status"},
+	"clock":  {"من ساعة إلى ساعة", "من ساعة الى ساعة", "من الساعة", "وقت الزمنية", "الوقت", "time"},
+	"part":   {"صباحية / مسائية", "صباحية/مسائية", "صباحي / مسائي", "الفترة", "period"},
 }
 
 // أعمدة ما لازم تنطابق كأيام/ساعات (الرصيد المتبقي مثلاً)
@@ -371,7 +378,7 @@ func excludedHeader(h string) bool {
 }
 
 func detectColumns(header []sheetCell) (leaveCols, int) {
-	cols := leaveCols{-1, -1, -1, -1, -1, -1, -1, -1, -1, ""}
+	cols := leaveCols{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, ""}
 	norm := make([]string, len(header))
 	for i, c := range header {
 		norm[i] = normText(c.s)
@@ -413,6 +420,7 @@ func detectColumns(header []sheetCell) (leaveCols, int) {
 	cols.hours, cols.days = pick("hours"), pick("days")
 	cols.status, cols.typ = pick("status"), pick("typ")
 	cols.name, cols.dept = pick("name"), pick("dept")
+	cols.clock, cols.part = pick("clock"), pick("part")
 	score := 0
 	for _, v := range []int{cols.id, cols.from, cols.to, cols.hours, cols.days, cols.status, cols.typ, cols.name} {
 		if v >= 0 {
@@ -465,6 +473,9 @@ func parseLeaveDate(c sheetCell) (string, error) {
 	switch {
 	case len(strings.TrimSpace(p[0])) == 4: // سنة/شهر/يوم
 		y, m, d = n[0], n[1], n[2]
+		if y < 100 { // «0026/11/12» غلطة كتابة شائعة
+			y += 2000
+		}
 	case len(strings.TrimSpace(p[2])) == 4 || len(strings.TrimSpace(p[2])) == 2: // يوم/شهر/سنة (الأصل بالعراق)
 		d, m, y = n[0], n[1], n[2]
 		if y < 100 {
@@ -540,7 +551,7 @@ func classifyLeaveStatus(text string, hasCol bool) string {
 		return false
 	}
 	switch {
-	case has("مسحوب", "مرفوض", "رفض", "ملغي", "ملغى", "الغاء", "إلغاء", "withdrawn", "rejected", "cancel", "denied"):
+	case has("مسحوب", "مرفوض", "رفض", "ملغي", "ملغى", "الغاء", "إلغاء", "ألغت", "ألغي", "ألغاه", "withdrawn", "rejected", "cancel", "denied"):
 		return "withdrawn"
 	case has("بانتظار", "انتظار", "قيد", "pending", "waiting"):
 		return "pending"
@@ -560,6 +571,37 @@ func digitsOnly(s string) bool {
 		}
 	}
 	return true
+}
+
+var clockRe = regexp.MustCompile(`(\d{1,2})\s*[:.]\s*(\d{2})`)
+
+// بداية الزمنية من «08:30–09:30»، وأي بصمة تبرّر: قبل الساعة 10 الدخول، ومن 10 وطالع الخروج.
+// إذا ما بيه وقت نعتمد على «صباحية / مسائية».
+func leaveStartPart(clock sheetCell, part sheetCell) (string, string) {
+	if clock.num {
+		if f, err := strconv.ParseFloat(clock.s, 64); err == nil && f >= 0 && f < 1 {
+			m := int(math.Round(f * 1440))
+			clock.s = fmt.Sprintf("%02d:%02d", m/60, m%60)
+		}
+	}
+	if m := clockRe.FindStringSubmatch(clock.s); m != nil {
+		h, _ := strconv.Atoi(m[1])
+		mi, _ := strconv.Atoi(m[2])
+		if h < 24 && mi < 60 {
+			p := "pm"
+			if h < 10 {
+				p = "am"
+			}
+			return fmt.Sprintf("%02d:%02d", h, mi), p
+		}
+	}
+	switch n := normText(part.s); {
+	case strings.Contains(n, "صباح"):
+		return "", "am"
+	case strings.Contains(n, "مساء") || strings.Contains(n, "مسائ"):
+		return "", "pm"
+	}
+	return "", ""
 }
 
 type leaveParse struct {
@@ -685,6 +727,7 @@ func parseLeaveSheet(rows [][]sheetCell) (*leaveParse, error) {
 			From: from, To: to, Status: st, StatusText: stText, Row: line}
 		if kind == "hour" {
 			rec.Minutes = mins
+			rec.Start, rec.Part = leaveStartPart(cellAt(row, cols.clock), cellAt(row, cols.part))
 		} else {
 			rec.Days = days
 		}

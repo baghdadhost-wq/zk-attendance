@@ -9,7 +9,7 @@ import (
 )
 
 // Version رقم نسخة البرنامج
-const Version = "2.8.3"
+const Version = "2.8.4"
 
 //go:embed public
 var publicFS embed.FS

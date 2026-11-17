@@ -970,7 +970,8 @@ function buildLeaveIndex() {
     }
   }
 }
-const fmtLeave = (l) => l.kind === 'hour' ? `زمنية ${fmtDur(l.minutes || 0)}` : `${l.type || 'إجازة'}${l.days ? ' (' + l.days + ' يوم)' : ''}`;
+const PART = { am: 'صباحية', pm: 'مسائية' };
+const fmtLeave = (l) => l.kind === 'hour' ? `زمنية ${fmtDur(l.minutes || 0)}${l.part ? ' ' + PART[l.part] : ''}${l.start ? ' من ' + l.start : ''}` : `${l.type || 'إجازة'}${l.days ? ' (' + l.days + ' يوم)' : ''}`;
 async function loadLeaves() {
   try {
     const r = await fetch('/api/leaves'); const j = await r.json();
@@ -981,6 +982,9 @@ async function loadLeaves() {
   render();
 }
 
+// الزمنية: إذا تبدي قبل الساعة 10 (صباحية) تبرّر نقص بصمة الدخول، ومن 10 وطالع (مسائية) تبرّر نقص بصمة الخروج.
+// القديمة اللي ما بيها وقت تبرّر الثنتين.
+const hourFits = (l, r) => !l.part || (r.missingIn ? l.part === 'am' : l.part === 'pm');
 // لكل موظف ولكل يوم دوام بالفترة: غياب أو نقص بصمة (ويا التأخير إذا الخيار مفعّل) ومطابقته بالإجازات
 function reconcile(daily) {
   const coverLate = $('lvHourLate').checked;
@@ -1003,10 +1007,15 @@ function reconcile(daily) {
       else { code = 'bad'; note = hourOk ? 'عنده زمنية بس غاب اليوم كامل' : hourPend ? 'عنده زمنية بانتظار الموافقة' : ''; }
     } else if (r.missingIn || r.missingOut) {
       state = r.missingIn ? 'بدون دخول' : 'بدون خروج';
-      if (hourOk) code = 'hour';
+      const fit = lv.hour.filter(l => hourFits(l, r));
+      const fitOk = fit.some(l => l.status === 'approved');
+      if (fitOk) code = 'hour';
       else if (dayOk) { code = 'leave'; note = 'إجازة ويا بصمة وحدة'; }
-      else if (hourPend || dayPend) code = 'pending';
-      else code = 'bad';
+      else if (fit.length || dayPend) code = 'pending';
+      else {
+        code = 'bad';
+        if (lv.hour.length) note = r.missingIn ? 'الزمنية مسائية، تبرّر بصمة الخروج بس' : 'الزمنية صباحية، تبرّر بصمة الدخول بس';
+      }
     } else if (dayOk) {
       state = 'حاضر'; code = 'presentLeave'; note = 'عنده إجازة معتمدة بس بصم دخول وخروج';
     } else if (coverLate && (r.late || r.early) && (hourOk || hourPend)) {
