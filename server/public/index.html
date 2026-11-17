@@ -90,6 +90,13 @@
   .t-info { background:#e8f0fe; color:#1a56c4; white-space:nowrap; }
   label.chk { flex-direction:row; align-items:center; gap:6px; font-size:13px; }
   label.chk input { width:auto; min-width:0; }
+  .pinfo { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px 16px; margin:4px 0 8px; font-size:13px; }
+  .pinfo span { display:block; color:var(--muted); font-size:12px; } .pinfo b { font-weight:600; }
+  .dayTimes { display:grid; grid-template-columns:max-content minmax(84px,120px) minmax(84px,120px) max-content max-content; gap:6px 8px; align-items:center; font-size:13px; margin-top:8px; }
+  .dayTimes input[type=time] { min-width:0; width:100%; padding-inline:4px; }
+  .dayTimes input[type=checkbox] { justify-self:center; width:auto; min-width:0; }
+  .dayTimes .h { color:var(--muted); font-size:12px; }
+  .dayTimes .off { color:var(--muted); }
   .days { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; margin-top:10px; font-size:13px; }
   .days > span { color:var(--muted); font-size:12px; }
   .days label.chk input:disabled + span { color:var(--muted); }
@@ -425,6 +432,10 @@
       <label>تجاهل البصمة المكررة خلال (دقيقة) <input type="number" id="dedup" value="3" min="0" max="120" style="min-width:80px" data-gen></label>
     </div>
     <div class="days" id="genOff"><span>العطلة الأسبوعية:</span></div>
+    <details id="genDaysBox" style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">أوقات تختلف لبعض الأيام <span id="genDaysSum" class="hint"></span></summary>
+      <div class="hint" style="font-size:12px">اليوم الفارغ يتبع بداية ونهاية الدوام فوق.</div>
+      <div class="dayTimes" id="genDays"></div>
+    </details>
     <div class="row" style="margin-top:12px" data-min="super" hidden>
       <button class="primary" id="schedSaveBtn">حفظ النظام العام</button>
       <button id="schedResetBtn" hidden>رجّع المحفوظ</button>
@@ -442,6 +453,7 @@
       <button data-tab="raw">سجل البصمات</button>
       <button data-tab="users">الموظفون</button>
       <button data-tab="leaves">التصفية والإجازات</button>
+      <button data-tab="person">تقرير موظف</button>
     </div>
     <div class="row no-print" style="margin-bottom:10px">
       <button id="csvBtn">تصدير Excel (CSV)</button>
@@ -454,9 +466,13 @@
         <input type="file" id="profFile" accept=".csv,.txt" hidden>
         <input type="file" id="mdbFile" accept=".mdb" hidden>
       </div>
+      <div class="tools" id="personTools" style="display:none">
+        <label>الموظف <select id="personSel"></select></label>
+      </div>
       <div class="tools" id="leavesTools" style="display:none">
         <button id="lvUploadBtn" class="primary" data-min="admin" hidden>رفع تقرير الإجازات (Excel / CSV)</button>
         <button id="lvClearBtn" class="danger" data-min="admin" hidden>مسح بيانات الإجازات</button>
+        <label>العرض <select id="lvView"><option value="days">حسب الأيام</option><option value="emp">حسب الموظفين</option></select></label>
         <label class="chk"><input type="checkbox" id="lvOnlyBad"> غير المبرّر فقط</label>
         <label class="chk"><input type="checkbox" id="lvHourLate"> الزمنية تغطي التأخير والخروج المبكر</label>
         <input type="file" id="lvFile" accept=".xlsx,.csv,.txt" hidden>
@@ -529,6 +545,13 @@
       <label class="edCustom">نهاية دوامه <input type="time" data-pf="workEnd" id="edEnd"></label>
       <div class="wide edCustom days" id="edOff" style="margin:0 0 10px"><span>أيام عطلته:</span></div>
       <input type="hidden" data-pf="offDays" id="edOffVal">
+      <div class="wide edCustom">
+        <div style="font-size:13px">أوقات كل يوم والاستثناء من البصمة <span class="hint" style="font-size:12px">(الوقت الفارغ يتبع بداية ونهاية دوامه فوق)</span></div>
+        <div class="dayTimes" id="edDays"></div>
+      </div>
+      <input type="hidden" data-pf="dayTimes" id="edDayTimes">
+      <input type="hidden" data-pf="exemptIn" id="edExIn">
+      <input type="hidden" data-pf="exemptOut" id="edExOut">
     </div>
     <div class="hint" id="edSchedHint" style="margin:-4px 0 4px"></div>
     <div class="sec-title">بيانات إضافية (تنحفظ بالحاسبة، مو بالجهاز)</div>
@@ -691,10 +714,11 @@ function setStatus(msg, cls='') { $('status').className = cls; $('status').textC
 // البيانات الإضافية للموظفين (من ملف data/employees.json بالحاسبة)
 let PROFILES = {};
 const PF = ['fullName','department','title','gender','mobile','officePhone','homePhone','birthday','hireDate','address','nationalId','notes',
-  'attendance','schedMode','workStart','workEnd','offDays'];
+  'attendance','schedMode','workStart','workEnd','offDays','dayTimes','exemptIn','exemptOut'];
 const PF_LABELS = { fullName:'الاسم الكامل', department:'القسم', title:'العنوان الوظيفي', gender:'الجنس', mobile:'الهاتف المحمول',
   officePhone:'هاتف العمل', homePhone:'هاتف المنزل', birthday:'تاريخ الميلاد', hireDate:'تاريخ التعيين', address:'العنوان', nationalId:'رقم الهوية', notes:'ملاحظات',
-  attendance:'البصمة', schedMode:'نظام الدوام', workStart:'بداية الدوام الخاص', workEnd:'نهاية الدوام الخاص', offDays:'عطلة الموظف' };
+  attendance:'البصمة', schedMode:'نظام الدوام', workStart:'بداية الدوام الخاص', workEnd:'نهاية الدوام الخاص', offDays:'عطلة الموظف',
+  dayTimes:'أوقات أيام خاصة', exemptIn:'بدون بصمة صباحية (أيام)', exemptOut:'بدون بصمة مسائية (أيام)' };
 
 // ---------- الدوام: النظام العام (محفوظ بالبرنامج، نفسه بكل الأجهزة) ونظام خاص لكل موظف ----------
 const ATT_IN = 'مشمول', ATT_EXEMPT = 'غير مشمول', MODE_GEN = 'عام', MODE_CUSTOM = 'خاص', NO_OFF = 'بدون';
@@ -704,15 +728,47 @@ let GEN_META = {};
 let CUR_GEN = null, SCHED_CACHE = new Map(), RANGE_CACHE = null; // تتصفّر بكل حساب
 const parseOff = (v) => !v || v === NO_OFF ? [] : String(v).split(',').map(Number).filter(n => n >= 0 && n <= 6);
 const offText = (off) => off.length ? WEEK.filter(d => off.includes(d)).map(d => DAYS[d]).join(' و') : 'بدون عطلة';
-const genText = (g) => `${g.start} - ${g.end}، العطلة: ${offText(g.off)}`;
+// أوقات الأيام: {4: {start, end}} ← من النظام العام (كائن) أو من الموظف ("4=08:00-13:00,0=...")
+function parseDayTimes(v) {
+  const out = {};
+  if (v && typeof v === 'object') { for (const [d, t] of Object.entries(v)) if (t && t.start && t.end) out[+d] = { start: t.start, end: t.end }; return out; }
+  for (const it of String(v || '').split(',')) { const m = it.match(/^(\d)=(\d\d:\d\d)-(\d\d:\d\d)$/); if (m) out[+m[1]] = { start: m[2], end: m[3] }; }
+  return out;
+}
+const dayTimesStr = (dt) => Object.keys(dt).map(Number).sort((a, b) => a - b).map(d => `${d}=${dt[d].start}-${dt[d].end}`).join(',');
+const dayTimesText = (dt) => WEEK.filter(d => dt[d]).map(d => `${DAYS[d]} ${dt[d].start}-${dt[d].end}`).join(' و');
+const genText = (g) => `${g.start} - ${g.end}، العطلة: ${offText(g.off)}` + (Object.keys(parseDayTimes(g.days)).length ? '، ' + dayTimesText(parseDayTimes(g.days)) : '');
+// جدول أيام الأسبوع: بداية ونهاية لكل يوم، ويا الاستثناء من البصمة إذا ex
+function dayTimesTable(box, attr, ex) {
+  $(box).innerHTML = `<span class="h">اليوم</span><span class="h">البداية</span><span class="h">النهاية</span>` + (ex ? '<span class="h" title="ما يحتاج بصمة دخول">بلا صباحية</span><span class="h" title="ما يحتاج بصمة خروج">بلا مسائية</span>' : '<span></span><span></span>') +
+    WEEK.map(d => `<span data-${attr}-name="${d}">${DAYS[d]}</span><input type="time" data-${attr}-s="${d}"><input type="time" data-${attr}-e="${d}">` +
+      (ex ? `<input type="checkbox" data-${attr}-xi="${d}" title="ما يحتاج بصمة دخول هذا اليوم"><input type="checkbox" data-${attr}-xo="${d}" title="ما يحتاج بصمة خروج هذا اليوم">` : '<span></span><span></span>')).join('');
+}
+const dtEl = (attr, k, d) => document.querySelector(`[data-${attr}-${k}="${d}"]`);
+function readDayTimes(attr, start, end) {
+  const out = {};
+  for (const d of WEEK) { const s = dtEl(attr, 's', d).value, e = dtEl(attr, 'e', d).value;
+    if (!s && !e) continue; const t = { start: s || start, end: e || end }; if (t.start !== start || t.end !== end) out[d] = t; }
+  return out;
+}
+function fillDayTimes(attr, dt, off) {
+  for (const d of WEEK) { dtEl(attr, 's', d).value = dt[d] ? dt[d].start : ''; dtEl(attr, 'e', d).value = dt[d] ? dt[d].end : '';
+    dtEl(attr, 'name', d).className = off && off.includes(d) ? 'off' : ''; }
+}
+const checkedDays = (attr, k) => WEEK.filter(d => dtEl(attr, k, d).checked).sort((a, b) => a - b);
 function dayBoxes(box, attr) {
   $(box).insertAdjacentHTML('beforeend', WEEK.map(d => `<label class="chk"><input type="checkbox" data-${attr}="${d}"><span>${DAYS[d]}</span></label>`).join(''));
 }
 const offOf = (attr) => [...document.querySelectorAll(`[data-${attr}]`)].filter(x => x.checked).map(x => +x.dataset[attr]).sort((a, b) => a - b);
 function setOff(attr, days) { document.querySelectorAll(`[data-${attr}]`).forEach(x => { x.checked = days.includes(+x.dataset[attr]); }); }
-function genForm() { return { start: $('start').value, end: $('end').value, off: offOf('goff'), grace: +$('grace').value || 0, dedup: +$('dedup').value || 0 }; }
-function fillGen(g) { $('start').value = g.start; $('end').value = g.end; $('grace').value = g.grace; $('dedup').value = g.dedup; setOff('goff', g.off); }
-const sameGen = (a, b) => a.start === b.start && a.end === b.end && +a.grace === +b.grace && +a.dedup === +b.dedup && a.off.join() === b.off.join();
+function genForm() { const start = $('start').value, end = $('end').value;
+  return { start, end, off: offOf('goff'), grace: +$('grace').value || 0, dedup: +$('dedup').value || 0, days: readDayTimes('gday', start, end) }; }
+function fillGen(g) { $('start').value = g.start; $('end').value = g.end; $('grace').value = g.grace; $('dedup').value = g.dedup; setOff('goff', g.off);
+  fillDayTimes('gday', parseDayTimes(g.days), g.off); genDaysSum(); }
+function genDaysSum() { const t = dayTimesText(parseDayTimes(genForm().days)); $('genDaysSum').textContent = t ? '— ' + t : '';
+  const off = offOf('goff'); for (const d of WEEK) dtEl('gday', 'name', d).className = off.includes(d) ? 'off' : ''; }
+const sameGen = (a, b) => a.start === b.start && a.end === b.end && +a.grace === +b.grace && +a.dedup === +b.dedup && a.off.join() === b.off.join() &&
+  dayTimesStr(parseDayTimes(a.days)) === dayTimesStr(parseDayTimes(b.days));
 // دوام الموظف: نظامه الخاص إذا عنده، وإلا النظام العام (مثل ما مكتوب هسه بالشاشة، حتى التجربة قبل الحفظ تبين)
 function schedOf(id) {
   let sc = SCHED_CACHE.get(id);
@@ -720,22 +776,36 @@ function schedOf(id) {
   const p = prof(id), g = CUR_GEN || genForm();
   const exempt = p.attendance === ATT_EXEMPT;
   sc = p.schedMode === MODE_CUSTOM && p.workStart && p.workEnd
-    ? { exempt, custom: true, start: p.workStart, end: p.workEnd, off: parseOff(p.offDays) }
-    : { exempt, custom: false, start: g.start, end: g.end, off: g.off };
+    ? { exempt, custom: true, start: p.workStart, end: p.workEnd, off: parseOff(p.offDays), days: parseDayTimes(p.dayTimes),
+        exIn: parseOff(p.exemptIn), exOut: parseOff(p.exemptOut) }
+    : { exempt, custom: false, start: g.start, end: g.end, off: g.off, days: parseDayTimes(g.days), exIn: [], exOut: [] };
   sc.startM = toMin(sc.start); sc.endM = toMin(sc.end);
+  // دوام كل يوم: وقته الخاص إذا إله، وإلا البداية والنهاية العامة. والاستثناء من البصمة الصباحية أو المسائية
+  const per = [];
+  for (let d = 0; d < 7; d++) {
+    const t = sc.days[d] || sc;
+    per[d] = { start: t.start, end: t.end, startM: toMin(t.start), endM: toMin(t.end), exIn: sc.exIn.includes(d), exOut: sc.exOut.includes(d) };
+    per[d].exAll = per[d].exIn && per[d].exOut;
+  }
+  sc.at = (dow) => per[dow];
   SCHED_CACHE.set(id, sc);
   return sc;
 }
 function schedText(id) {
   const sc = schedOf(id);
   if (sc.exempt) return 'غير مشمول بالبصمة';
-  return sc.custom ? `خاص ${sc.start} - ${sc.end}، العطلة: ${offText(sc.off)}` : 'النظام العام';
+  if (!sc.custom) return 'النظام العام';
+  let t = `خاص ${sc.start} - ${sc.end}، العطلة: ${offText(sc.off)}`;
+  if (Object.keys(sc.days).length) t += '، ' + dayTimesText(sc.days);
+  if (sc.exIn.length) t += '، بدون بصمة صباحية: ' + offText(sc.exIn).replace('بدون عطلة', '');
+  if (sc.exOut.length) t += '، بدون بصمة مسائية: ' + offText(sc.exOut).replace('بدون عطلة', '');
+  return t;
 }
 // للمقارنة والتصدير: القيم الافتراضية مكتوبة، والنظام العام بدون أوقات خاصة
 function effProf(p) {
   const q = { ...p };
   q.attendance = q.attendance || ATT_IN; q.schedMode = q.schedMode || MODE_GEN;
-  if (q.schedMode !== MODE_CUSTOM) { delete q.workStart; delete q.workEnd; delete q.offDays; } else q.offDays = q.offDays || NO_OFF;
+  if (q.schedMode !== MODE_CUSTOM) { for (const k of ['workStart', 'workEnd', 'offDays', 'dayTimes', 'exemptIn', 'exemptOut']) delete q[k]; } else q.offDays = q.offDays || NO_OFF;
   return q;
 }
 const prof = (id) => PROFILES[id] || {};
@@ -757,7 +827,7 @@ async function loadProfiles() {
 // تغيير الأوقات (النظام العام ودوام كل موظف) للصلاحية المطلقة بس
 function applyGenLock() {
   const ed = can('super');
-  document.querySelectorAll('[data-gen], [data-goff], #edAtt, #edMode, #edStart, #edEnd, [data-eoff]').forEach(el => { el.disabled = !ed; });
+  document.querySelectorAll('[data-gen], [data-goff], #edAtt, #edMode, #edStart, #edEnd, [data-eoff], #genDays input, #edDays input').forEach(el => { el.disabled = !ed; });
 }
 function genStatus() {
   const box = $('schedStatus'), dirty = can('super') && !sameGen(genForm(), GEN);
@@ -799,6 +869,7 @@ async function migrateLocalSchedule() {
 async function saveGeneral() {
   const g = genForm();
   if (toMin(g.end) <= toMin(g.start)) return genMsg('نهاية الدوام لازم تكون بعد بدايته', 'err');
+  for (const [d, t] of Object.entries(g.days)) if (toMin(t.end) <= toMin(t.start)) return genMsg(`${DAYS[d]}: نهاية الدوام لازم تكون بعد بدايته`, 'err');
   $('schedSaveBtn').disabled = true;
   try {
     const j = await postJSON('/api/settings/schedule', { schedule: g });
@@ -883,26 +954,29 @@ function dailyRows() {
   const rows = [];
   for (const [k, punches] of groups) {
     const [userId, day] = k.split('|');
-    const sc = schedOf(userId), startM = sc.startM, endM = sc.endM, midM = (startM + endM) / 2;
+    const sc = schedOf(userId), dt = sc.at(dowOf(day)), startM = dt.startM, endM = dt.endM, midM = (startM + endM) / 2;
     const offDay = sc.off.includes(dowOf(day));
-    const tracked = !sc.exempt && !offDay; // يوم دوام لموظف مشمول: ينحسب عليه التأخير والنقص
+    const exDay = !sc.exempt && !offDay && dt.exAll; // مستثنى من البصمة كل هذا اليوم
+    const tracked = !sc.exempt && !offDay && !exDay; // يوم دوام لموظف مشمول: ينحسب عليه التأخير والنقص
     let firstP = punches[0], lastP = punches.length > 1 ? punches[punches.length-1] : null;
     if (!lastP) {
       // بصمة وحدة باليوم: قبل منتصف الدوام = دخول (ناقصه خروج)، وبعده = خروج (ناقصه دخول). اليدوية حسب نوعها
       const m = firstP.d.getHours()*60 + firstP.d.getMinutes();
-      if (firstP.manual ? firstP.manual.type === 'out' : m >= midM) { lastP = firstP; firstP = null; }
+      // ولمن مستثنى من وحدة منهن، البصمة الوحيدة هي الثانية
+      const isOut = firstP.manual ? firstP.manual.type === 'out' : dt.exIn !== dt.exOut ? dt.exIn : m >= midM;
+      if (isOut) { lastP = firstP; firstP = null; }
     }
     const first = firstP ? firstP.d : null, last = lastP ? lastP.d : null;
     const inM = first ? first.getHours()*60 + first.getMinutes() : null;
     const outM = last ? last.getHours()*60 + last.getMinutes() : null;
     const worked = first && last ? (last - first) / 60000 : null;
-    const late = tracked && inM != null && inM - startM - grace > 0 ? inM - startM : 0;
-    const early = tracked && outM != null && outM < endM ? endM - outM : 0;
+    const late = tracked && !dt.exIn && inM != null && inM - startM - grace > 0 ? inM - startM : 0;
+    const early = tracked && !dt.exOut && outM != null && outM < endM ? endM - outM : 0;
     // بيوم عطلته كل الشغل إضافي
     const overtime = sc.exempt ? 0 : offDay ? Math.round(worked || 0) : outM != null && outM > endM ? outM - endM : 0;
     rows.push({ userId, name: userName(userId), day, dow: DAYS[(first || last).getDay()], first, last,
-      worked, late, early, overtime, count: punches.length, offDay, exempt: sc.exempt, tracked,
-      missingIn: !first, missingOut: !last,
+      worked, late, early, overtime, count: punches.length, offDay, exempt: sc.exempt, tracked, exDay,
+      missingIn: !first && !dt.exIn, missingOut: !last && !dt.exOut, startM, endM,
       manualIn: firstP && firstP.manual || null, manualOut: lastP && lastP.manual || null, manualCount: punches.filter(p => p.manual).length });
   }
   rows.sort((a,b) => a.day.localeCompare(b.day) || Number(a.userId) - Number(b.userId));
@@ -920,7 +994,8 @@ const dowOf = (day) => new Date(day + 'T00:00:00').getDay();
 // أيام العمل بالنظام العام
 function workingDays() { const off = (CUR_GEN || genForm()).off; return daysInRange().filter(d => !off.includes(dowOf(d))); }
 // أيام دوام موظف معيّن (حسب أيام عطلته). غير المشمول بالبصمة ما عنده أيام مطلوبة
-function workingDaysFor(id) { const sc = schedOf(id); return sc.exempt ? [] : daysInRange().filter(d => !sc.off.includes(dowOf(d))); }
+// واليوم المستثنى من البصمتين ما ينحسب بيه غياب
+function workingDaysFor(id) { const sc = schedOf(id); return sc.exempt ? [] : daysInRange().filter(d => !sc.off.includes(dowOf(d)) && !sc.at(dowOf(d)).exAll); }
 
 function summaryRows(daily, recon) {
   const emp = empFilter(), dept = deptFilter();
@@ -1079,6 +1154,72 @@ function table(headers, rows, htmlRows, extraTh = '') {
 function syncTools() {
   $('usersTools').style.display = currentTab === 'users' ? 'flex' : 'none';
   $('leavesTools').style.display = currentTab === 'leaves' ? 'flex' : 'none';
+  $('personTools').style.display = currentTab === 'person' ? 'flex' : 'none';
+  if (currentTab === 'person') { $('personSel').innerHTML = '<option value="">اختر موظف…</option>' + [...$('emp').options].slice(1).map(o => o.outerHTML).join(''); $('personSel').value = $('emp').value; }
+}
+
+// ---------- حسب الموظف: كل نوع وتواريخه بسطر واحد ----------
+const DIGEST = [
+  ['absent', 'الغياب غير المبرّر'], ['leave', 'الإجازات'], ['hour', 'الزمنيات'],
+  ['badIn', 'دخول غير مبرّر'], ['badOut', 'خروج غير مبرّر'], ['pending', 'بانتظار الموافقة'], ['partial', 'تأخير غير مبرّر'],
+];
+const shortDay = (d) => d.slice(8) + '/' + d.slice(5, 7);
+function digestOf(list) {
+  const g = Object.fromEntries(DIGEST.map(([k]) => [k, []]));
+  for (const x of list) {
+    const k = x.code === 'bad' ? (x.absent ? 'absent' : x.state === 'بدون دخول' ? 'badIn' : 'badOut')
+      : x.code === 'leave' ? 'leave' : x.code === 'hour' ? 'hour' : x.code === 'pending' ? 'pending' : x.code === 'partial' ? 'partial' : null;
+    if (k) g[k].push(x.day);
+  }
+  return g;
+}
+const digestCell = (days) => days.length ? `(${days.length}) ` + days.map(shortDay).join('، ') : '';
+function byEmployee(recon) {
+  const ids = [...new Set(recon.map(x => x.userId))].sort((a, b) => Number(a) - Number(b));
+  return ids.map(id => ({ userId: id, name: userName(id), dept: deptOf(id), g: digestOf(recon.filter(x => x.userId === id)) }));
+}
+
+// ---------- تقرير موظف واحد ----------
+function personReport(id, daily, recon, summ) {
+  const p = prof(id), u = deviceUser(id), sc = schedOf(id), sm = summ.find(r => r.userId === id);
+  const rs = new Map(daily.filter(r => r.userId === id).map(r => [r.day, r]));
+  const rc = new Map(recon.filter(x => x.userId === id).map(x => [x.day, x]));
+  const info = [['الرقم', id], ['الاسم', userName(id)], ['الاسم بالجهاز', u ? u.name : '—'], ['القسم', p.department], ['العنوان الوظيفي', p.title],
+    ['الهاتف', p.mobile], ['تاريخ التعيين', p.hireDate], ['الدوام', schedText(id) === 'النظام العام' ? 'النظام العام: ' + genText(CUR_GEN || GEN) : schedText(id)]]
+    .filter(([, v]) => v);
+  let html = `<div class="pinfo">${info.map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>`;
+  if (!sc.exempt && sm) {
+    const st = [['أيام الحضور', sm.present], ['أيام الغياب', sm.absent ?? '—'], ['مرات التأخير', sm.lateCount], ['مجموع التأخير', fmtDur(sm.lateMin)],
+      ['مجموع الخروج المبكر', fmtDur(sm.earlyMin)], ['الإضافي', fmtDur(sm.overtime)], ['بدون دخول', sm.missingIn], ['بدون خروج', sm.missingOut],
+      ['ساعات العمل', fmtDur(sm.worked)], ['بصمات يدوية', sm.manual]];
+    html += `<div class="stats" style="margin:10px 0">${st.map(([k, v]) => `<div class="stat">${k}<b>${esc(v)}</b></div>`).join('')}</div>`;
+    const g = digestOf([...rc.values()]);
+    const lines = DIGEST.filter(([k]) => g[k].length);
+    if (lines.length) html += `<table style="margin-bottom:12px"><thead><tr><th>البند</th><th>العدد</th><th>التواريخ</th></tr></thead><tbody>` +
+      lines.map(([k, l]) => `<tr><td>${l}</td><td class="num">${g[k].length}</td><td style="white-space:normal">${esc(g[k].map(shortDay).join('، '))}</td></tr>`).join('') + '</tbody></table>';
+  } else if (sc.exempt) html += '<div class="hint" style="margin:8px 0">غير مشمول بالبصمة: ما ينحسب عليه غياب ولا تأخير.</div>';
+  const H = ['التاريخ', 'اليوم', 'الدوام', 'الدخول', 'الخروج', 'ساعات العمل', 'التأخير', 'خروج مبكر', 'إضافي', 'الحالة', 'الإجازة / الزمنية', 'التصفية'];
+  const rows = [], cls = [];
+  for (const day of daysInRange()) {
+    const r = rs.get(day), x = rc.get(day), dow = dowOf(day), dt = sc.at(dow), off = sc.off.includes(dow);
+    let state = '', c = '';
+    if (sc.exempt) state = 'غير مشمول';
+    else if (off) state = r ? 'يوم عطلة (بصم)' : 'يوم عطلة';
+    else if (dt.exAll) state = 'مستثنى من البصمة';
+    else if (!r) { state = 'غائب'; c = 't-miss'; }
+    else if (r.missingIn) { state = 'بدون دخول'; c = 't-miss'; }
+    else if (r.missingOut) { state = 'بدون خروج'; c = 't-miss'; }
+    else if (r.late) { state = 'متأخر'; c = 't-late'; }
+    else { state = 'منتظم'; c = 't-ok'; }
+    const ex = [dt.exIn && !dt.exAll ? 'بدون بصمة صباحية' : '', dt.exOut && !dt.exAll ? 'بدون بصمة مسائية' : ''].filter(Boolean).join('، ');
+    rows.push([day, DAYS[dow], off || sc.exempt ? '—' : `${dt.start}-${dt.end}` + (ex ? ` (${ex})` : ''), r ? hhmm(r.first) : '', r ? hhmm(r.last) : '',
+      r ? fmtDur(r.worked) : '', r ? fmtDur(r.late || null) : '', r ? fmtDur(r.early || null) : '', r ? fmtDur(r.overtime || null) : '',
+      state, x ? x.leaveText : '', x ? RECON[x.code].label + (x.note ? ' — ' + x.note : '') : '']);
+    cls.push([c, x ? RECON[x.code].cls : '']);
+  }
+  html += table(H, rows, rows.map((r, i) => '<tr>' + r.map((v, j) => j === 9 ? `<td>${cls[i][0] ? `<span class="tag ${cls[i][0]}">${esc(v)}</span>` : esc(v)}</td>`
+    : j === 11 && v ? `<td style="white-space:normal"><span class="tag ${cls[i][1]}">${esc(v)}</span></td>` : `<td${j === 10 ? ' style="white-space:normal"' : ''}>${esc(v)}</td>`).join('') + '</tr>'));
+  return html;
 }
 function render() {
   syncTools();
@@ -1105,7 +1246,7 @@ function render() {
     $('printTitleText').textContent = 'التقرير اليومي للحضور: ' + period;
     const H = ['التاريخ','اليوم','الرقم','الاسم','الدخول','الخروج','ساعات العمل','التأخير','خروج مبكر','إضافي','الحالة'];
     const mark = (t, p) => p ? `${t} (يدوية)` : t;
-    const baseSt = (r) => r.exempt ? 'غير مشمول' : r.offDay ? 'يوم عطلة' + (r.count === 1 ? ' (بصمة وحدة)' : '')
+    const baseSt = (r) => r.exempt ? 'غير مشمول' : r.offDay ? 'يوم عطلة' + (r.count === 1 ? ' (بصمة وحدة)' : '') : r.exDay ? 'مستثنى من البصمة'
       : r.missingIn ? 'بدون دخول' : r.missingOut ? 'بدون خروج' : r.late ? 'متأخر' : 'منتظم';
     const recOf = (r) => recIdx.get(r.userId + '|' + r.day);
     const rows = daily.map(r => { const x = recOf(r);
@@ -1138,11 +1279,23 @@ function render() {
   } else if (currentTab === 'leaves') {
     $('printTitleText').textContent = 'تصفية الغياب ونقص البصمة بالإجازات والزمنيات: ' + period;
     const list = $('lvOnlyBad').checked ? recon.filter(x => x.code === 'bad' || x.code === 'partial') : recon;
+    if ($('lvView').value === 'emp') {
+      const emps = byEmployee(list), cols = DIGEST.filter(([k]) => emps.some(e => e.g[k].length));
+      const H = ['الرقم', 'الاسم', 'القسم', ...cols.map(([, l]) => l)];
+      const rows = emps.map(e => [e.userId, e.name, e.dept, ...cols.map(([k]) => digestCell(e.g[k]))]);
+      html = table(H, rows, rows.map(r => '<tr>' + r.map((c, j) => `<td${j >= 3 ? ' style="white-space:normal;min-width:120px"' : ''}>${esc(c)}</td>`).join('') + '</tr>'));
+    } else {
     const H = ['التاريخ','اليوم','الرقم','الاسم','الحالة بالجهاز','الإجازة / الزمنية','النتيجة','ملاحظة'];
     const rows = list.map(x => [x.day, x.dow, x.userId, x.name, x.state, x.leaveText || '—', RECON[x.code].label, x.note]);
     html = table(H, rows, list.map((x, i) => `<tr>${rows[i].slice(0, 4).map(c => `<td>${esc(c)}</td>`).join('')}` +
       `<td>${esc(x.state)}</td><td style="white-space:normal;min-width:180px"${x.fileName && x.fileName !== x.name ? ` title="الاسم بتقرير الإجازات: ${esc(x.fileName)}"` : ''}>${esc(rows[i][5])}</td>` +
       `<td><span class="tag ${RECON[x.code].cls}">${RECON[x.code].label}</span></td><td style="white-space:normal">${esc(x.note)}</td></tr>`));
+    }
+  } else if (currentTab === 'person') {
+    const id = $('emp').value;
+    $('printTitleText').textContent = 'تقرير الموظف ' + (id ? userName(id) + ' (' + id + ')' : '') + ': ' + period;
+    lastTable = null;
+    html = id ? personReport(id, daily, recon, summ) : '<div class="empty">اختر موظف من القائمة فوق</div>';
   } else if (currentTab === 'raw') {
     $('printTitleText').textContent = 'سجل البصمات: ' + period;
     const logs = filteredLogs();
@@ -1341,6 +1494,10 @@ function syncEdSched() {
   document.querySelectorAll('.edCustom').forEach(el => { el.hidden = !custom; });
   const off = offOf('eoff');
   $('edOffVal').value = custom ? (off.join(',') || NO_OFF) : '';
+  $('edDayTimes').value = custom ? dayTimesStr(readDayTimes('eday', $('edStart').value, $('edEnd').value)) : '';
+  $('edExIn').value = custom ? checkedDays('eday', 'xi').join(',') : '';
+  $('edExOut').value = custom ? checkedDays('eday', 'xo').join(',') : '';
+  for (const d of WEEK) dtEl('eday', 'name', d).className = off.includes(d) ? 'off' : '';
   $('edSchedHint').textContent = (exempt ? 'غير مشمول: ما ينحسب عليه غياب ولا تأخير ولا نقص بصمة، وبصماته (إذا بصم) تبقى بالسجل. ' : '') +
     (custom ? '' : 'النظام العام: ' + genText(GEN) + '. ') + (can('super') ? '' : 'الدوام يتعدل بالصلاحية المطلقة بس.');
 }
@@ -1348,7 +1505,7 @@ function profileFromForm() {
   syncEdSched();
   const p = {};
   document.querySelectorAll('[data-pf]').forEach(el => { const v = el.value.trim(); if (v) p[el.dataset.pf] = v; });
-  if (p.schedMode !== MODE_CUSTOM) { delete p.workStart; delete p.workEnd; delete p.offDays; }
+  if (p.schedMode !== MODE_CUSTOM) { for (const k of ['workStart', 'workEnd', 'offDays', 'dayTimes', 'exemptIn', 'exemptOut']) delete p[k]; }
   return p;
 }
 const sameProfile = (a, b) => { a = effProf(a); b = effProf(b); return PF.every(k => (a[k] || '') === (b[k] || '')); };
@@ -1377,6 +1534,10 @@ function openEdit(userId) {
   $('edAtt').value = ep.attendance; $('edMode').value = ep.schedMode;
   $('edStart').value = ep.workStart || GEN.start; $('edEnd').value = ep.workEnd || GEN.end;
   setOff('eoff', ep.schedMode === MODE_CUSTOM ? parseOff(ep.offDays) : GEN.off);
+  const custom = ep.schedMode === MODE_CUSTOM;
+  fillDayTimes('eday', custom ? parseDayTimes(ep.dayTimes) : parseDayTimes(GEN.days));
+  const xi = custom ? parseOff(ep.exemptIn) : [], xo = custom ? parseOff(ep.exemptOut) : [];
+  for (const d of WEEK) { dtEl('eday', 'xi', d).checked = xi.includes(d); dtEl('eday', 'xo', d).checked = xo.includes(d); }
   syncEdSched();
   $('editStatus').textContent = ''; $('editStatus').className = '';
   $('editOverlay').classList.add('open');
@@ -1415,6 +1576,7 @@ async function saveEdit() {
     if (!newProf.workStart || !newProf.workEnd) return err('اكتب وقت بداية ونهاية دوامه');
     if (toMin(newProf.workEnd) <= toMin(newProf.workStart)) return err('نهاية دوامه لازم تكون بعد بدايته بنفس اليوم');
     if (offOf('eoff').length === 7) return err('ما يصير كل أيام الأسبوع عطلة');
+    for (const [d, t] of Object.entries(parseDayTimes(newProf.dayTimes))) if (toMin(t.end) <= toMin(t.start)) return err(`${DAYS[d]}: نهاية دوامه لازم تكون بعد بدايته`);
   }
   const profChanged = !sameProfile(newProf, prof(userId));
   if (!devChange && !profChanged) { closeEdit(); setTabStatus('ما أكو أي تغيير'); return; }
@@ -1461,7 +1623,9 @@ function exportProfiles() {
     const p = prof(u.userId);
     const e = effProf(p);
     const val = (k) => k === 'attendance' || k === 'schedMode' ? e[k] : k === 'offDays' ? (e.schedMode === MODE_CUSTOM ? (parseOff(e.offDays).length ? offText(parseOff(e.offDays)) : NO_OFF) : '')
-      : k === 'workStart' || k === 'workEnd' ? (e[k] || '') : p[k];
+      : k === 'workStart' || k === 'workEnd' ? (e[k] || '')
+      : k === 'dayTimes' ? (e.schedMode === MODE_CUSTOM ? dayTimesText(parseDayTimes(e.dayTimes)).replace(/ و/g, '، ') : '')
+      : k === 'exemptIn' || k === 'exemptOut' ? (e.schedMode === MODE_CUSTOM && e[k] ? offText(parseOff(e[k])).replace(/ و/g, '، ') : '') : p[k];
     lines.push([q(u.userId), q(u.onDevice ? u.name : ''), ...PF.map(k => PHONE_FIELDS.includes(k) ? keep0(p[k]) : q(val(k)))].join(','));
   }
   const a = document.createElement('a');
@@ -1503,6 +1667,9 @@ const HEADER_ALIASES = {
   workStart: ['بداية الدوام الخاص', 'بداية الدوام', 'وقت الدخول', 'work start'],
   workEnd: ['نهاية الدوام الخاص', 'نهاية الدوام', 'وقت الخروج', 'work end'],
   offDays: ['عطلة الموظف', 'أيام العطلة', 'العطلة', 'off days'],
+  dayTimes: ['أوقات أيام خاصة', 'أوقات الأيام', 'day times'],
+  exemptIn: ['بدون بصمة صباحية (أيام)', 'بدون بصمة صباحية', 'استثناء صباحي'],
+  exemptOut: ['بدون بصمة مسائية (أيام)', 'بدون بصمة مسائية', 'استثناء مسائي'],
 };
 // وقت من Excel: 8:00 أو 08:00:00 أو 8:00 AM أو 8:00 ص أو كسر يوم (0.333)
 function normTime(v) {
@@ -1918,7 +2085,7 @@ function buildPublished() {
     const byEmp = new Map();
     for (const r of daily) { if (!byEmp.has(r.userId)) byEmp.set(r.userId, new Map()); byEmp.get(r.userId).set(r.day, { r }); }
     for (const x of recon) { if (!byEmp.has(x.userId)) byEmp.set(x.userId, new Map()); const m = byEmp.get(x.userId); m.set(x.day, { ...(m.get(x.day) || {}), x }); }
-    const st = (r) => r.exempt ? 'غير مشمول' : r.offDay ? 'يوم عطلة' + (r.count === 1 ? ' (بصمة وحدة)' : '')
+    const st = (r) => r.exempt ? 'غير مشمول' : r.offDay ? 'يوم عطلة' + (r.count === 1 ? ' (بصمة وحدة)' : '') : r.exDay ? 'مستثنى من البصمة'
       : r.missingIn ? 'بدون دخول' : r.missingOut ? 'بدون خروج' : r.late ? 'متأخر' : 'منتظم';
     for (const sm of summ) {
       const days = [...(byEmp.get(sm.userId) || new Map()).entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([day, { r, x }]) => ({
@@ -2090,6 +2257,9 @@ $('lvClearBtn').onclick = async () => {
   catch (x) { setTabStatus(x.message, 'err'); }
 };
 $('lvOnlyBad').onchange = render;
+try { $('lvView').value = localStorage.getItem('zkLvView') || 'days'; } catch (_) {}
+$('lvView').onchange = () => { try { localStorage.setItem('zkLvView', $('lvView').value); } catch (_) {} render(); };
+$('personSel').onchange = () => { $('emp').value = $('personSel').value; render(); };
 try { $('lvHourLate').checked = localStorage.getItem('zkHourLate') === '1'; } catch (_) {}
 $('lvHourLate').onchange = () => { try { localStorage.setItem('zkHourLate', $('lvHourLate').checked ? '1' : ''); } catch (_) {} render(); };
 
@@ -2110,9 +2280,10 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   b.classList.add('active'); currentTab = b.dataset.tab; render();
 });
 ['from','to','emp','dept'].forEach(id => $(id).addEventListener('change', render));
-dayBoxes('genOff', 'goff'); dayBoxes('edOff', 'eoff');
+dayBoxes('genOff', 'goff'); dayBoxes('edOff', 'eoff'); dayTimesTable('genDays', 'gday', false); dayTimesTable('edDays', 'eday', true);
 fillGen(GEN);
-$('schedCard').addEventListener('change', (e) => { if (e.target.matches('[data-gen], [data-goff]')) { delete $('schedStatus').dataset.keep; render(); } });
+$('schedCard').addEventListener('change', (e) => { if (e.target.matches('[data-gen], [data-goff], #genDays input')) { delete $('schedStatus').dataset.keep; genDaysSum(); render(); } });
+$('edOff').addEventListener('change', syncEdSched); $('edDays').addEventListener('change', syncEdSched);
 $('schedSaveBtn').onclick = saveGeneral;
 $('schedResetBtn').onclick = () => { fillGen(GEN); delete $('schedStatus').dataset.keep; render(); };
 $('edMode').addEventListener('change', syncEdSched);

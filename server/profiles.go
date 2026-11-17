@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,7 +20,7 @@ import (
 
 var profileFields = []string{"fullName", "department", "title", "gender", "mobile", "officePhone", "homePhone",
 	"birthday", "hireDate", "address", "nationalId", "notes",
-	"attendance", "schedMode", "workStart", "workEnd", "offDays"}
+	"attendance", "schedMode", "workStart", "workEnd", "offDays", "dayTimes", "exemptIn", "exemptOut"}
 
 // دوام الموظف: يتبع النظام العام، أو إله نظام خاص (وقت دخول وخروج وأيام عطلة). والمو مشمول بالبصمة ما ينحسب عليه غياب ولا تأخير
 const (
@@ -105,47 +107,113 @@ func normWord(v string) string {
 
 // parseOffDays يقبل "5,6" أو أسماء الأيام ("الجمعة، السبت") أو "بدون"، ويرجع "5,6" أو "بدون"
 func parseOffDays(v string) (string, error) {
-	v = strings.TrimSpace(toASCIIDigits(v))
-	if v == "" || normWord(v) == normWord(noOffDays) || normWord(v) == "لا يوجد" {
-		return noOffDays, nil
-	}
-	parts := strings.FieldsFunc(v, func(r rune) bool {
-		return r == ',' || r == '،' || r == '؛' || r == ';' || r == '/' || r == ' ' || r == '-'
-	})
-	var days []int
-	for _, part := range parts {
-		w := normWord(strings.TrimPrefix(strings.TrimPrefix(part, "و"), "ال"))
-		if w == "" {
-			continue // "الجمعة و السبت"
-		}
-		d := -1
-		if n, err := strconv.Atoi(part); err == nil {
-			d = n
-		} else {
-			for i, name := range dayNamesAr {
-				if normWord(strings.TrimPrefix(name, "ال")) == w {
-					d = i
-				}
-			}
-		}
-		if d < 0 || d > 6 {
-			return "", badReq("ما عرفت يوم العطلة «" + part + "»")
-		}
-		days = append(days, d)
-	}
-	days, err := cleanOffDays(days)
+	days, err := parseDaySet(v, "العطلة")
 	if err != nil {
 		return "", err
 	}
+	if days, err = cleanOffDays(days); err != nil {
+		return "", err
+	}
+	return daySetString(days), nil
+}
+
+func daySetString(days []int) string {
 	if len(days) == 0 {
-		return noOffDays, nil
+		return noOffDays
 	}
 	out := make([]string, len(days))
 	for i, d := range days {
 		out[i] = strconv.Itoa(d)
 	}
+	return strings.Join(out, ",")
+}
+
+// dayOfWord رقم اليوم من رقمه أو اسمه («الخميس» أو «خميس»)، أو -1
+func dayOfWord(part string) int {
+	if n, err := strconv.Atoi(part); err == nil {
+		if n >= 0 && n <= 6 {
+			return n
+		}
+		return -1
+	}
+	w := normWord(strings.TrimPrefix(strings.TrimPrefix(part, "و"), "ال"))
+	for i, name := range dayNamesAr {
+		if normWord(strings.TrimPrefix(name, "ال")) == w {
+			return i
+		}
+	}
+	return -1
+}
+
+// parseDaySet قائمة أيام بدون تكرار ومرتبة (تقبل كل الأسبوع)
+func parseDaySet(v, what string) ([]int, error) {
+	v = strings.TrimSpace(toASCIIDigits(v))
+	if v == "" || normWord(v) == normWord(noOffDays) || normWord(v) == "لا يوجد" {
+		return []int{}, nil
+	}
+	if normWord(v) == normWord("كل الأيام") || normWord(v) == normWord("كل الايام") {
+		return []int{0, 1, 2, 3, 4, 5, 6}, nil
+	}
+	parts := strings.FieldsFunc(v, func(r rune) bool {
+		return r == ',' || r == '،' || r == '؛' || r == ';' || r == '/' || r == ' ' || r == '-'
+	})
+	seen := map[int]bool{}
+	days := []int{}
+	for _, part := range parts {
+		if normWord(strings.TrimPrefix(strings.TrimPrefix(part, "و"), "ال")) == "" {
+			continue // "الجمعة و السبت"
+		}
+		d := dayOfWord(part)
+		if d < 0 {
+			return nil, badReq("ما عرفت اليوم «" + part + "» بخانة " + what)
+		}
+		if !seen[d] {
+			seen[d] = true
+			days = append(days, d)
+		}
+	}
+	sort.Ints(days)
+	return days, nil
+}
+
+// parseDayTimes أوقات خاصة لأيام معيّنة: «4=08:00-13:00,0=09:00-14:00» أو «الخميس 08:00-13:00، الأحد 09:00-14:00»
+// ويرجع الصيغة الموحدة مرتبة حسب اليوم، أو "" إذا ماكو.
+func parseDayTimes(v string) (string, error) {
+	v = strings.TrimSpace(toASCIIDigits(v))
+	if v == "" || normWord(v) == normWord(noOffDays) {
+		return "", nil
+	}
+	items := strings.FieldsFunc(v, func(r rune) bool { return r == ',' || r == '،' || r == '؛' || r == ';' || r == '\n' })
+	got := map[int]string{}
+	for _, it := range items {
+		it = strings.TrimSpace(it)
+		if it == "" {
+			continue
+		}
+		m := dayTimeRe.FindStringSubmatch(it)
+		if m == nil {
+			return "", badReq("وقت اليوم «" + it + "» مو مفهوم، اكتبه مثل: الخميس 08:00-13:00")
+		}
+		d := dayOfWord(strings.TrimSpace(m[1]))
+		if d < 0 {
+			return "", badReq("ما عرفت اليوم «" + m[1] + "»")
+		}
+		s, e, err := checkTimes(m[2], m[3])
+		if err != nil {
+			return "", badReq(dayNamesAr[d] + ": " + err.Error())
+		}
+		got[d] = s + "-" + e
+	}
+	var out []string
+	for d := 0; d < 7; d++ {
+		if t, ok := got[d]; ok {
+			out = append(out, strconv.Itoa(d)+"="+t)
+		}
+	}
 	return strings.Join(out, ","), nil
 }
+
+var dayTimeRe = regexp.MustCompile(`^\s*([^\d=:\s][^=:]*?|\d)\s*[=:]?\s*(\d{1,2}:\d{2})\s*(?:-|–|—|إلى|الى|to)\s*(\d{1,2}:\d{2})\s*$`)
 
 // normSchedFields يوحّد حقول الدوام ويتأكد منها. النظام العام ما يحتاج أوقات، فتنشال
 func normSchedFields(p profile) error {
@@ -170,9 +238,9 @@ func normSchedFields(p profile) error {
 		}
 	}
 	if p["schedMode"] != schedCustom {
-		delete(p, "workStart")
-		delete(p, "workEnd")
-		delete(p, "offDays")
+		for _, k := range []string{"workStart", "workEnd", "offDays", "dayTimes", "exemptIn", "exemptOut"} {
+			delete(p, k)
+		}
 		return nil
 	}
 	s, e, err := checkTimes(p["workStart"], p["workEnd"])
@@ -184,7 +252,37 @@ func normSchedFields(p profile) error {
 		return err
 	}
 	p["workStart"], p["workEnd"], p["offDays"] = s, e, off
+	dt, err := parseDayTimes(p["dayTimes"])
+	if err != nil {
+		return err
+	}
+	setOrDel(p, "dayTimes", dt)
+	for k, what := range map[string]string{"exemptIn": "استثناء البصمة الصباحية", "exemptOut": "استثناء البصمة المسائية"} {
+		days, err := parseDaySet(p[k], what)
+		if err != nil {
+			return err
+		}
+		setOrDel(p, k, map[bool]string{true: "", false: daySetString(days)}[len(days) == 0])
+	}
 	return nil
+}
+
+func setOrDel(p profile, k, v string) {
+	if v == "" {
+		delete(p, k)
+	} else {
+		p[k] = v
+	}
+}
+
+func daysText(v string) string {
+	days := []int{}
+	for _, x := range strings.Split(v, ",") {
+		if n, err := strconv.Atoi(x); err == nil {
+			days = append(days, n)
+		}
+	}
+	return offDaysText(days)
 }
 
 // schedSummary وصف دوام الموظف للسجل
@@ -200,6 +298,22 @@ func schedSummary(p profile) string {
 			}
 		}
 		out = "خاص " + p["workStart"] + "-" + p["workEnd"] + "، العطلة: " + offDaysText(days)
+		if p["dayTimes"] != "" {
+			var parts []string
+			for _, it := range strings.Split(p["dayTimes"], ",") {
+				d, t, _ := strings.Cut(it, "=")
+				if n, err := strconv.Atoi(d); err == nil && n >= 0 && n < 7 {
+					parts = append(parts, dayNamesAr[n]+" "+t)
+				}
+			}
+			out += "، أوقات خاصة: " + strings.Join(parts, " و")
+		}
+		if p["exemptIn"] != "" {
+			out += "، بدون بصمة صباحية: " + daysText(p["exemptIn"])
+		}
+		if p["exemptOut"] != "" {
+			out += "، بدون بصمة مسائية: " + daysText(p["exemptOut"])
+		}
 	}
 	if p["attendance"] == attExempt {
 		out = "غير مشمول بالبصمة، " + out
@@ -218,7 +332,7 @@ func keepSched(p, before profile) {
 	}
 }
 
-var schedKeys = []string{"attendance", "schedMode", "workStart", "workEnd", "offDays"}
+var schedKeys = []string{"attendance", "schedMode", "workStart", "workEnd", "offDays", "dayTimes", "exemptIn", "exemptOut"}
 
 // mode: merge = القيم الجديدة تكتب فوق القديمة | fill = تملأ الحقول الفارغة بس
 func importProfiles(incoming map[string]map[string]any, mode string) (map[string]any, error) {

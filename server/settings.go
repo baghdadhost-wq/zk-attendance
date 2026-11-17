@@ -24,6 +24,13 @@ type workSchedule struct {
 	Off   []int  `json:"off"`   // أيام العطلة: 0 الأحد ... 5 الجمعة، 6 السبت
 	Grace int    `json:"grace"` // سماحية التأخير بالدقائق
 	Dedup int    `json:"dedup"` // تجاهل البصمة المكررة خلال كم دقيقة
+	// أوقات تختلف لأيام معيّنة: "4" → {08:00 13:00}. اليوم اللي ما بيه يتبع البداية والنهاية فوق
+	Days map[string]dayTime `json:"days,omitempty"`
+}
+
+type dayTime struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
 }
 
 type appSettings struct {
@@ -59,6 +66,13 @@ func getSettings() appSettings {
 
 func copySettings(s appSettings) appSettings {
 	s.Schedule.Off = append([]int{}, s.Schedule.Off...)
+	if s.Schedule.Days != nil {
+		m := make(map[string]dayTime, len(s.Schedule.Days))
+		for k, v := range s.Schedule.Days {
+			m[k] = v
+		}
+		s.Schedule.Days = m
+	}
 	return s
 }
 
@@ -189,7 +203,25 @@ func checkSchedule(ws workSchedule) (workSchedule, error) {
 	if ws.Dedup < 0 || ws.Dedup > 120 {
 		return ws, badReq("مدة تجاهل البصمة المكررة لازم تكون بين 0 و 120 دقيقة")
 	}
-	return workSchedule{Start: s, End: e, Off: off, Grace: ws.Grace, Dedup: ws.Dedup}, nil
+	var days map[string]dayTime
+	for k, v := range ws.Days {
+		d, err := strconv.Atoi(k)
+		if err != nil || d < 0 || d > 6 {
+			return ws, badReq("يوم غلط بأوقات الأيام")
+		}
+		ds, de, err := checkTimes(v.Start, v.End)
+		if err != nil {
+			return ws, badReq(dayNamesAr[d] + ": " + err.Error())
+		}
+		if ds == s && de == e {
+			continue // نفس الأوقات العامة
+		}
+		if days == nil {
+			days = map[string]dayTime{}
+		}
+		days[strconv.Itoa(d)] = dayTime{ds, de}
+	}
+	return workSchedule{Start: s, End: e, Off: off, Grace: ws.Grace, Dedup: ws.Dedup, Days: days}, nil
 }
 
 // ---------- الواجهة ----------
@@ -249,5 +281,11 @@ func offDaysText(off []int) string {
 }
 
 func scheduleText(ws workSchedule) string {
-	return fmt.Sprintf("%s-%s، العطلة: %s، السماحية %d د، المكرر %d د", ws.Start, ws.End, offDaysText(ws.Off), ws.Grace, ws.Dedup)
+	out := fmt.Sprintf("%s-%s، العطلة: %s، السماحية %d د، المكرر %d د", ws.Start, ws.End, offDaysText(ws.Off), ws.Grace, ws.Dedup)
+	for d := 0; d < 7; d++ {
+		if t, ok := ws.Days[strconv.Itoa(d)]; ok {
+			out += "، " + dayNamesAr[d] + " " + t.Start + "-" + t.End
+		}
+	}
+	return out
 }

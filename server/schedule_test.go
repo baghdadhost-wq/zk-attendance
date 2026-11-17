@@ -367,3 +367,36 @@ func TestSetupOnlyOnTheDeviceItself(t *testing.T) {
 		t.Fatalf("remote setup: %d", w.Code)
 	}
 }
+
+func TestPerDaySchedule(t *testing.T) {
+	ws, err := checkSchedule(workSchedule{Start: "08:00", End: "14:00", Off: []int{5}, Grace: 10, Dedup: 3,
+		Days: map[string]dayTime{"4": {"8:00", "13:00"}, "0": {"08:00", "14:00"}}})
+	if err != nil || len(ws.Days) != 1 || ws.Days["4"] != (dayTime{"08:00", "13:00"}) {
+		t.Fatalf("days: %+v %v", ws.Days, err)
+	}
+	if _, err := checkSchedule(workSchedule{Start: "08:00", End: "14:00", Days: map[string]dayTime{"9": {"08:00", "13:00"}}}); err == nil {
+		t.Error("bad day accepted")
+	}
+	if _, err := checkSchedule(workSchedule{Start: "08:00", End: "14:00", Days: map[string]dayTime{"4": {"13:00", "08:00"}}}); err == nil {
+		t.Error("reversed times accepted")
+	}
+	p := profile{"schedMode": "خاص", "workStart": "08:00", "workEnd": "14:00", "offDays": "5",
+		"dayTimes": "الخميس 08:00-12:30، 0=09:00–15:00", "exemptIn": "الخميس", "exemptOut": "كل الأيام"}
+	if err := normSchedFields(p); err != nil {
+		t.Fatal(err)
+	}
+	if p["dayTimes"] != "0=09:00-15:00,4=08:00-12:30" || p["exemptIn"] != "4" || p["exemptOut"] != "0,1,2,3,4,5,6" {
+		t.Errorf("custom: %v", p)
+	}
+	if s := schedSummary(p); !strings.Contains(s, "الخميس 08:00-12:30") || !strings.Contains(s, "بدون بصمة صباحية: الخميس") {
+		t.Error(s)
+	}
+	g := profile{"schedMode": "عام", "dayTimes": "4=08:00-12:00", "exemptIn": "4"}
+	normSchedFields(g)
+	if _, ok := g["dayTimes"]; ok {
+		t.Error("general mode kept custom day times")
+	}
+	if err := normSchedFields(profile{"schedMode": "خاص", "workStart": "08:00", "workEnd": "14:00", "dayTimes": "الخميس ثمانية"}); err == nil {
+		t.Error("bad dayTimes accepted")
+	}
+}
