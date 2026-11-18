@@ -468,7 +468,7 @@
     </div>
     <div style="margin-top:10px">
       <label class="chk"><input type="checkbox" id="strict" data-gen> البصمة خارج الوقت والسماحية تنحسب عدم التزام</label>
-      <div class="hint" style="font-size:12px">الدخول بعد السماحية = «بدون دخول (تأخر)»، والخروج قبل نهاية الدوام بأكثر من السماحية = «بدون خروج (مبكر)»، والثنتين باليوم = «غياب (عدم التزام)». الزمنية والإجازة تبرّرهن مثل نقص البصمة.</div>
+      <div class="hint" style="font-size:12px">الدخول بعد السماحية = «تأخر بالبصمة الصباحية»، والخروج قبل نهاية الدوام بأكثر من السماحية = «بصمة مسائية قبل الوقت»، والثنتين باليوم = «غياب (عدم التزام)». الزمنية والإجازة تبرّرهن مثل نقص البصمة.</div>
     </div>
     <div class="days" id="genOff"><span>العطلة الأسبوعية:</span></div>
     <details id="genDaysBox" style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">أوقات تختلف لبعض الأيام <span id="genDaysSum" class="hint"></span></summary>
@@ -780,7 +780,7 @@ const dayTimesStr = (dt) => Object.keys(dt).map(Number).sort((a, b) => a - b).ma
 const dayTimesText = (dt) => WEEK.filter(d => dt[d]).map(d => `${DAYS[d]} ${dt[d].start}-${dt[d].end}`).join(' و');
 const genText = (g) => `${g.start} - ${g.end}، العطلة: ${offText(g.off)}` + (Object.keys(parseDayTimes(g.days)).length ? '، ' + dayTimesText(parseDayTimes(g.days)) : '') + (g.strict ? '، البصمة خارج الوقت = عدم التزام' : '');
 // اسم حالة اليوم إذا ناقصه بصمة (أو بصمته خارج الوقت بالالتزام الصارم)
-const missLabel = (r) => r.noncomp ? 'غياب (عدم التزام)' : r.missingIn ? (r.lateMiss ? 'بدون دخول (تأخر)' : 'بدون دخول') : r.missingOut ? (r.earlyMiss ? 'بدون خروج (مبكر)' : 'بدون خروج') : '';
+const missLabel = (r) => r.noncomp ? 'غياب (عدم التزام)' : r.missingIn ? (r.lateMiss ? 'تأخر بالبصمة الصباحية' : 'بدون دخول') : r.missingOut ? (r.earlyMiss ? 'بصمة مسائية قبل الوقت' : 'بدون خروج') : '';
 // جدول أيام الأسبوع: بداية ونهاية لكل يوم، ويا الاستثناء من البصمة إذا ex
 function dayTimesTable(box, attr, ex) {
   $(box).innerHTML = `<span class="h">اليوم</span><span class="h">البداية</span><span class="h">النهاية</span>` + (ex ? '<span class="h" title="ما يحتاج بصمة دخول">بلا صباحية</span><span class="h" title="ما يحتاج بصمة خروج">بلا مسائية</span>' : '<span></span><span></span>') +
@@ -1209,8 +1209,8 @@ function syncTools() {
 // ---------- حسب الموظف: كل نوع وتواريخه بسطر واحد ----------
 const DIGEST = [
   ['absent', 'الغياب غير المبرّر'], ['leave', 'الإجازات'], ['hour', 'الزمنيات'],
-  ['badIn', 'دخول غير مبرّر'], ['badOut', 'خروج غير مبرّر'],
-  ['badLate', 'بدون دخول (تأخر)'], ['badEarly', 'بدون خروج (مبكر)'], ['noncomp', 'غياب (عدم التزام)'],
+  ['badIn', 'بصمة صباحية لا توجد'], ['badOut', 'بصمة مسائية لا توجد'],
+  ['badLate', 'تأخر بالبصمة الصباحية'], ['badEarly', 'بصمة مسائية قبل الوقت'], ['noncomp', 'غياب (عدم التزام)'],
   ['pending', 'بانتظار الموافقة'], ['partial', 'تأخير غير مبرّر'],
 ];
 const shortDay = (d) => d.slice(8) + '/' + d.slice(5, 7);
@@ -1219,7 +1219,7 @@ function digestOf(list) {
   for (const x of list) {
     // غير المبرّر: عدم الالتزام والتأخر والمبكر (بالالتزام الصارم) بجداول لحالهن
     const k = x.code === 'bad' ? (x.state === 'غياب (عدم التزام)' ? 'noncomp' : x.absent ? 'absent'
-        : x.state === 'بدون دخول (تأخر)' ? 'badLate' : x.state === 'بدون خروج (مبكر)' ? 'badEarly' : x.state.startsWith('بدون دخول') ? 'badIn' : 'badOut')
+        : x.state === 'تأخر بالبصمة الصباحية' ? 'badLate' : x.state === 'بصمة مسائية قبل الوقت' ? 'badEarly' : x.state.startsWith('بدون دخول') ? 'badIn' : 'badOut')
       : x.code === 'leave' ? 'leave' : x.code === 'hour' ? 'hour' : x.code === 'pending' ? 'pending' : x.code === 'partial' ? 'partial' : null;
     if (k) g[k].push(x.day);
   }
@@ -1333,7 +1333,8 @@ function render() {
       : `<td class="${j>=4?'num':''}">${esc(c)}</td>`).join('')}</tr>`));
   } else if (currentTab === 'leaves') {
     $('printTitleText').textContent = 'تصفية الغياب ونقص البصمة بالإجازات والزمنيات: ' + period;
-    const list = $('lvOnlyBad').checked ? recon.filter(x => x.code === 'bad' || x.code === 'partial') : recon;
+    // غير المبرّر فقط: ويا اللي بانتظار الموافقة (لأنها بعدها ما تبرّرت)
+    const list = $('lvOnlyBad').checked ? recon.filter(x => x.code === 'bad' || x.code === 'partial' || x.code === 'pending') : recon;
     if ($('lvView').value === 'emp') {
       // الحقول تطلع دايماً (حتى لو فارغة)، إلا «تأخير غير مبرّر» يطلع إذا الزمنية تغطي التأخير
       const emps = byEmployee(list), cols = DIGEST.filter(([k]) => k !== 'partial' || emps.some(e => e.g[k].length));
