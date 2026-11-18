@@ -136,6 +136,13 @@
   @media print {
     header, .no-print, .tabs { display:none !important; }
     body { background:#fff; } .card { border:none; padding:0; } .tablewrap { max-height:none; overflow:visible; }
+    /* أسماء الحقول تتكرر بكل صفحة، والجدول ينطوي على عرض الورقة بدل ما ينقص من الطرف */
+    @page { size: A4 landscape; margin: 10mm; }
+    thead { display: table-header-group; }
+    th { position: static !important; background:#eef1f4 !important; color:#000 !important; font-weight:700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    table { table-layout: auto; width: 100% !important; }
+    th, td { white-space: normal !important; min-width: 0 !important; word-break: normal; overflow-wrap: break-word; font-size: 10px; padding: 3px 4px !important; border: 1px solid #ccc !important; }
+    tr { break-inside: avoid; }
     #printTitle { margin:0 0 12px; } #printTitle h2 { font-size:18px; }
   }
   #printTitle { margin:16px 0 8px; } #printTitle h2 { margin:0; font-size:16px; } #printSub { color:var(--muted); font-size:12px; margin-top:2px; }
@@ -1328,7 +1335,8 @@ function render() {
     $('printTitleText').textContent = 'تصفية الغياب ونقص البصمة بالإجازات والزمنيات: ' + period;
     const list = $('lvOnlyBad').checked ? recon.filter(x => x.code === 'bad' || x.code === 'partial') : recon;
     if ($('lvView').value === 'emp') {
-      const emps = byEmployee(list), cols = DIGEST.filter(([k]) => emps.some(e => e.g[k].length));
+      // الحقول تطلع دايماً (حتى لو فارغة)، إلا «تأخير غير مبرّر» يطلع إذا الزمنية تغطي التأخير
+      const emps = byEmployee(list), cols = DIGEST.filter(([k]) => k !== 'partial' || emps.some(e => e.g[k].length));
       const H = ['الرقم', 'الاسم', 'القسم', ...cols.map(([, l]) => l)];
       const rows = emps.map(e => [e.userId, e.name, e.dept, ...cols.map(([k]) => digestCell(e.g[k]))]);
       html = table(H, rows, rows.map(r => '<tr>' + r.map((c, j) => `<td${j >= 3 ? ' style="white-space:normal;min-width:120px"' : ''}>${esc(c)}</td>`).join('') + '</tr>'));

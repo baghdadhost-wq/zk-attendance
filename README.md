@@ -25,7 +25,7 @@
 ```
 ./build.sh             # يبني لكل الأنظمة بمجلد dist
 ./tools/package.sh     # يجهز ملفات التوزيع: ويندوز ولينكس وماك وأندرويد
-git tag v2.10.2 && git push origin v2.10.2   # يبني تطبيق الآيفون والآيباد على GitHub (فرع ci-results)
+git tag v2.10.3 && git push origin v2.10.3   # يبني تطبيق الآيفون والآيباد على GitHub (فرع ci-results)
 ```
 
 ## الدخول والصلاحيات
