@@ -157,7 +157,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         case "zkDownload":
             handleDownload(message.body)
         case "zkPrint":
-            printPage()
+            printPage(title: message.body as? String)
         case "zkTest":
             if let body = message.body as? [String: Any] { recordTest(body) }
         default:
@@ -192,11 +192,13 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         topController.present(share, animated: true)
     }
 
-    private func printPage() {
+    /// title: اسم التقرير، يصير اسم ملف الـ PDF لمن تحفظه
+    private func printPage(title: String? = nil) {
         let printer = UIPrintInteractionController.shared
         let info = UIPrintInfo(dictionary: nil)
         info.outputType = .general
-        info.jobName = "تقارير الحضور"
+        let name = (title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        info.jobName = name.isEmpty ? "تقارير الحضور" : name
         printer.printInfo = info
         printer.printFormatter = webView.viewPrintFormatter()
         if UIDevice.current.userInterfaceIdiom == .pad {
@@ -239,7 +241,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         }
         return originalClick.call(this);
       };
-      window.print = function () { post('zkPrint', ''); };
+      window.print = function () { var t = document.getElementById('printTitleText'); post('zkPrint', t ? t.textContent : ''); };
       document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('input[type=file]').forEach(function (input) { input.removeAttribute('accept'); });
       });

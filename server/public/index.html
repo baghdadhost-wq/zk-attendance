@@ -136,8 +136,9 @@
   @media print {
     header, .no-print, .tabs { display:none !important; }
     body { background:#fff; } .card { border:none; padding:0; } .tablewrap { max-height:none; overflow:visible; }
-    #printTitle { display:block !important; }
+    #printTitle { margin:0 0 12px; } #printTitle h2 { font-size:18px; }
   }
+  #printTitle { margin:16px 0 8px; } #printTitle h2 { margin:0; font-size:16px; } #printSub { color:var(--muted); font-size:12px; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -474,10 +475,12 @@
     <div id="schedStatus" class="hint" style="font-size:12px"></div>
   </section>
 
+  <!-- اسم التقرير: يطلع بالشاشة وبأول الصفحة بالطباعة وبـ PDF -->
+  <div id="printTitle"><h2 id="printTitleText"></h2><div id="printSub"></div></div>
+
   <section class="stats" id="stats"></section>
 
   <section class="card" style="margin-top:14px">
-    <div id="printTitle" style="display:none"><h2 id="printTitleText"></h2></div>
     <div class="tabs">
       <button data-tab="daily" class="active">التقرير اليومي</button>
       <button data-tab="summary">ملخص الموظفين</button>
@@ -1283,6 +1286,9 @@ function render() {
 
   const period = `${$('from').value || '...'} إلى ${$('to').value || '...'}`;
   let html = '';
+  const selText = (id) => $(id).value ? $(id).options[$(id).selectedIndex].text : '';
+  $('printSub').textContent = [$('emp').value && currentTab !== 'person' ? 'الموظف: ' + selText('emp') : '', $('dept').value ? 'القسم: ' + selText('dept') : '',
+    currentTab === 'leaves' ? 'العرض: ' + selText('lvView') + ($('lvOnlyBad').checked ? '، غير المبرّر فقط' : '') : ''].filter(Boolean).join(' · ');
   if (currentTab === 'daily') {
     $('printTitleText').textContent = 'التقرير اليومي للحضور: ' + period;
     const H = ['التاريخ','اليوم','الرقم','الاسم','الدخول','الخروج','ساعات العمل','التأخير','خروج مبكر','إضافي','الحالة'];
@@ -2346,7 +2352,20 @@ $('lvHourLate').onchange = () => { try { localStorage.setItem('zkHourLate', $('l
 // ---------- الأحداث ----------
 $('fetchBtn').onclick = fetchData;
 $('csvBtn').onclick = exportCSV;
-$('printBtn').onclick = () => window.print();
+// اسم التقرير يصير اسم ملف الـ PDF، ووقت الطباعة يطلع تحت الاسم
+let savedTitle = null;
+function beforePrint() {
+  if (savedTitle === null) savedTitle = document.title;
+  document.title = $('printTitleText').textContent.replace(/[\\/:*?"<>|]/g, '-');
+  const t = new Date(), p2 = (n) => String(n).padStart(2, '0');
+  const at = `طُبع ${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())} ${p2(t.getHours())}:${p2(t.getMinutes())}`;
+  if ($('printSub').dataset.base === undefined) $('printSub').dataset.base = $('printSub').textContent;
+  $('printSub').textContent = [$('printSub').dataset.base, at].filter(Boolean).join(' · ');
+}
+function afterPrint() { if (savedTitle !== null) document.title = savedTitle; savedTitle = null;
+  if ($('printSub').dataset.base !== undefined) { $('printSub').textContent = $('printSub').dataset.base; delete $('printSub').dataset.base; } }
+window.addEventListener('beforeprint', beforePrint); window.addEventListener('afterprint', afterPrint);
+$('printBtn').onclick = () => { beforePrint(); window.print(); setTimeout(afterPrint, 60000); };
 $('saveFileBtn').onclick = saveBackup;
 $('loadFileBtn').onclick = () => $('fileInput').click();
 $('fileInput').onchange = async (e) => {
