@@ -29,6 +29,14 @@ type workSchedule struct {
 	// Strict: البصمة بعد السماحية = بدون دخول (تأخر)، وقبل نهاية الدوام بأكثر من السماحية = بدون خروج (مبكر)،
 	// والثنتين = غياب (عدم التزام)
 	Strict bool `json:"strict,omitempty"`
+	// HourSplit: الزمنية اللي تبدي قبل هالوقت صباحية (تبرّر بصمة الدخول)، ومن عنده وطالع مسائية. الافتراضي 10:00
+	HourSplit string `json:"hourSplit,omitempty"`
+}
+
+// holiday عطلة رسمية: يوم كامل ما ينحسب بيه دوام لأي موظف
+type holiday struct {
+	Date string `json:"date"`
+	Name string `json:"name"`
 }
 
 type dayTime struct {
@@ -41,6 +49,7 @@ type appSettings struct {
 	ScheduleSaved bool         `json:"scheduleSaved"` // انحفظ النظام العام مرة على الأقل (قبلها كان بكل متصفح لحاله)
 	ScheduleBy    string       `json:"scheduleBy,omitempty"`
 	ScheduleAt    string       `json:"scheduleAt,omitempty"`
+	Holidays      []holiday    `json:"holidays,omitempty"`
 }
 
 var (
@@ -69,6 +78,7 @@ func getSettings() appSettings {
 
 func copySettings(s appSettings) appSettings {
 	s.Schedule.Off = append([]int{}, s.Schedule.Off...)
+	s.Holidays = append([]holiday(nil), s.Holidays...)
 	if s.Schedule.Days != nil {
 		m := make(map[string]dayTime, len(s.Schedule.Days))
 		for k, v := range s.Schedule.Days {
@@ -224,13 +234,26 @@ func checkSchedule(ws workSchedule) (workSchedule, error) {
 		}
 		days[strconv.Itoa(d)] = dayTime{ds, de}
 	}
-	return workSchedule{Start: s, End: e, Off: off, Grace: ws.Grace, Dedup: ws.Dedup, Days: days, Strict: ws.Strict}, nil
+	split := strings.TrimSpace(ws.HourSplit)
+	if split != "" {
+		if split, _, err = checkTimes(split, "23:59"); err != nil {
+			return ws, badReq("وقت فصل الزمنية الصباحية عن المسائية غلط")
+		}
+		if split == "10:00" {
+			split = ""
+		}
+	}
+	return workSchedule{Start: s, End: e, Off: off, Grace: ws.Grace, Dedup: ws.Dedup, Days: days, Strict: ws.Strict, HourSplit: split}, nil
 }
 
 // ---------- الواجهة ----------
 
 func settingsJSON(s appSettings) map[string]any {
-	return map[string]any{"schedule": s.Schedule, "scheduleSaved": s.ScheduleSaved, "scheduleBy": s.ScheduleBy, "scheduleAt": s.ScheduleAt}
+	h := s.Holidays
+	if h == nil {
+		h = []holiday{}
+	}
+	return map[string]any{"schedule": s.Schedule, "scheduleSaved": s.ScheduleSaved, "scheduleBy": s.ScheduleBy, "scheduleAt": s.ScheduleAt, "holidays": h}
 }
 
 func handleSettings(w http.ResponseWriter, r *http.Request) {
@@ -270,6 +293,57 @@ func handleScheduleSave(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": true, "settings": settingsJSON(s)})
 }
 
+// POST /api/settings/holidays {holidays:[{date,name}]} — العطل الرسمية (الصلاحية المطلقة)
+func handleHolidaysSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, apiErr{405, "طريقة غير مسموحة"}, "")
+		return
+	}
+	var req struct {
+		Holidays []holiday `json:"holidays"`
+	}
+	if err := readJSONBody(r, 64<<10, &req); err != nil {
+		writeErr(w, err, "")
+		return
+	}
+	if len(req.Holidays) > 500 {
+		writeErr(w, badReq("العطل هواية"), "")
+		return
+	}
+	seen := map[string]bool{}
+	var list []holiday
+	for _, h := range req.Holidays {
+		d, err := time.Parse("2006-01-02", strings.TrimSpace(h.Date))
+		if err != nil {
+			writeErr(w, badReq("تاريخ العطلة غلط: "+h.Date), "")
+			return
+		}
+		key := d.Format("2006-01-02")
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		name := strings.TrimSpace(h.Name)
+		if len([]rune(name)) > 80 {
+			name = string([]rune(name)[:80])
+		}
+		list = append(list, holiday{key, name})
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].Date < list[j].Date })
+	setMu.Lock()
+	s := copySettings(loadSettingsLocked())
+	old := len(s.Holidays)
+	s.Holidays = list
+	err := saveSettingsLocked(s)
+	setMu.Unlock()
+	audit(r, "holidaysSave", map[string]any{"what": fmt.Sprintf("%d ← %d عطلة", len(list), old)}, err)
+	if err != nil {
+		writeErr(w, err, "ما گدرت أحفظ العطل: ")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"ok": true, "settings": settingsJSON(s)})
+}
+
 var dayNamesAr = []string{"الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"}
 
 func offDaysText(off []int) string {
@@ -292,6 +366,9 @@ func scheduleText(ws workSchedule) string {
 	}
 	if ws.Strict {
 		out += "، البصمة خارج الوقت = عدم التزام"
+	}
+	if ws.HourSplit != "" {
+		out += "، الزمنية الصباحية قبل " + ws.HourSplit
 	}
 	return out
 }
