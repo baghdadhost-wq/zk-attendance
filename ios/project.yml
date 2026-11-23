@@ -6,7 +6,7 @@ options:
 settings:
   base:
     MARKETING_VERSION: "2.11.0"
-    CURRENT_PROJECT_VERSION: "14"
+    CURRENT_PROJECT_VERSION: "15"
 targets:
   ZKAttendance:
     type: application

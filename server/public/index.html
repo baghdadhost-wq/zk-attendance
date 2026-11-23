@@ -2378,8 +2378,9 @@ $('csvBtn').onclick = exportCSV;
 // قبل الطباعة: اسم التقرير يصير اسم الملف ووقت الطباعة تحته، الحقول الفارغة كلها تنشال،
 // والجدول ينقسم على صفحات A4 بالعرض وكل صفحة تبدي بأسماء الحقول. بعد الطباعة يرجع مثل ما چان.
 const inApp = () => !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.zkPrint);
-// المساحة اللي تنكتب بيها الصفحة: A4 بالعرض ناقص حواف 5 ملم (بالآيفون بالنقاط، وبالمتصفح بـ 96 نقطة بالإنچ)
-const printArea = () => inApp() ? { w: 814, h: 567 } : { w: 1084, h: 755 };
+// المساحة اللي تنكتب بيها الصفحة: A4 بالعرض ناقص حواف 5 ملم. بالمتصفح 96 نقطة بالإنچ (1084 × 755)،
+// وطباعة الآيفون ترتّب الصفحة بعرض 980 وتصغّرها على 814 × 567 نقطة، فارتفاعها 680 تقريباً
+const printArea = () => inApp() ? { w: 980, h: 680 } : { w: 1084, h: 755 };
 let printPrep = null;
 function dropEmptyCols() {
   for (const t of $('tableArea').querySelectorAll('table')) {
