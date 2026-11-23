@@ -82,6 +82,7 @@ PY
   sleep 5
   shot "$udid" "$kind-share"
   cp "$data/Documents/selftest.json" "$OUT/$kind-selftest.json"
+  cp "$data/Documents/selftest-print.pdf" "$OUT/$kind-print.pdf" 2> /dev/null || echo "no print PDF"
   echo "--- $kind:"; cat "$OUT/$kind-selftest.json"
   # يبقى شغال بالخلفية؟ وللمقارنة نفس الشي بدون البقاء بالخلفية (المفروض iOS يجمّده)
   bg_check "$udid" "$kind" on

@@ -22,6 +22,7 @@ for path in sys.argv[1:]:
     answered = lambda res: any(v.get('status') == 200 for v in res.values())
     checks['another device opens the phone link'] = answered(side('-net.json'))
     checks['keep-alive started (stays running in the background)'] = r.get('keepAlive') == 'on'
+    checks['print / PDF: A4 pages made, page restored after'] = (r.get('printPages') or 0) >= 1 and r.get('printRestored') is True
     checks['another device opens it while the app is in the background'] = answered(side('-bg-on.json'))
     control = side('-bg-off.json')
     m = re.search(r'(\d\d):(\d\d):\d\d', r.get('jsTime', ''))

@@ -4,7 +4,7 @@ import Mobile
 
 /// يشغّل البرنامج (Go) داخل التطبيق ويعرضه بمتصفح مدمج.
 /// ما نفتح Safari لأن iOS يجمّد التطبيق بالخلفية، فيوقف البرنامج.
-final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, UIPrintInteractionControllerDelegate {
     private var webView: WKWebView!
     private var serverURL: URL?
     private var loadFailures = 0
@@ -159,7 +159,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         case "zkPrint":
             printPage(title: message.body as? String)
         case "zkTest":
-            if let body = message.body as? [String: Any] { recordTest(body) }
+            if let body = message.body as? [String: Any] {
+                if body["printPdf"] != nil { selfTestPDF() } else { recordTest(body) }
+            }
         default:
             break
         }
@@ -192,20 +194,61 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         topController.present(share, animated: true)
     }
 
+    // ورقة A4 بالعرض وحواف 5 ملم (14 نقطة). الصفحة نفسها تقسم الجدول على هالمساحة (814 × 567)
+    static let a4Landscape = CGSize(width: 841.89, height: 595.28)
+    static let pageInset: CGFloat = 14
+
+    private func pageFormatter() -> UIViewPrintFormatter {
+        let f = webView.viewPrintFormatter()
+        f.perPageContentInsets = UIEdgeInsets(top: Self.pageInset, left: Self.pageInset, bottom: Self.pageInset, right: Self.pageInset)
+        return f
+    }
+
     /// title: اسم التقرير، يصير اسم ملف الـ PDF لمن تحفظه
     private func printPage(title: String? = nil) {
         let printer = UIPrintInteractionController.shared
         let info = UIPrintInfo(dictionary: nil)
         info.outputType = .general
+        info.orientation = .landscape
         let name = (title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         info.jobName = name.isEmpty ? "تقارير الحضور" : name
         printer.printInfo = info
-        printer.printFormatter = webView.viewPrintFormatter()
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            printer.present(from: CGRect(x: view.bounds.midX, y: 80, width: 1, height: 1), in: view, animated: true, completionHandler: nil)
-        } else {
-            printer.present(animated: true, completionHandler: nil)
+        printer.delegate = self
+        printer.printFormatter = pageFormatter()
+        // بعد ما تخلص الطباعة أو تحفظ الـ PDF (أو تلغي) الصفحة ترجع مثل ما چانت
+        let done: UIPrintInteractionController.CompletionHandler = { [weak self] _, _, _ in
+            self?.webView.evaluateJavaScript("typeof afterPrint === 'function' && afterPrint(); 0", completionHandler: nil)
         }
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            printer.present(from: CGRect(x: view.bounds.midX, y: 80, width: 1, height: 1), in: view, animated: true, completionHandler: done)
+        } else {
+            printer.present(animated: true, completionHandler: done)
+        }
+    }
+
+    /// يختار ورق A4 (والطابعة اللي ما بيها A4 تاخذ أقرب ورق إله)
+    func printInteractionController(_ controller: UIPrintInteractionController, choosePaper paperList: [UIPrintPaper]) -> UIPrintPaper {
+        UIPrintPaper.bestPaper(forPageSize: CGSize(width: Self.a4Landscape.height, height: Self.a4Landscape.width), withPapersFrom: paperList)
+    }
+
+    /// للاختبار على المحاكي: نفس الطباعة بس تنحفظ PDF بالملفات حتى نشوفها
+    private func selfTestPDF() {
+        let renderer = UIPrintPageRenderer()
+        renderer.addPrintFormatter(pageFormatter(), startingAtPageAt: 0)
+        let paper = CGRect(origin: .zero, size: Self.a4Landscape)
+        renderer.setValue(NSValue(cgRect: paper), forKey: "paperRect")
+        renderer.setValue(NSValue(cgRect: paper), forKey: "printableRect")
+        let data = NSMutableData()
+        UIGraphicsBeginPDFContextToData(data, paper, nil)
+        renderer.prepare(forDrawingPages: NSRange(location: 0, length: renderer.numberOfPages))
+        for i in 0..<renderer.numberOfPages {
+            UIGraphicsBeginPDFPage()
+            renderer.drawPage(at: i, in: UIGraphicsGetPDFContextBounds())
+        }
+        UIGraphicsEndPDFContext()
+        _ = data.write(to: documentsURL.appendingPathComponent("selftest-print.pdf"), atomically: true)
+        recordTest(["printPages": renderer.numberOfPages])
+        webView.evaluateJavaScript("afterPrint(); 0", completionHandler: nil)
     }
 
     private func showMessage(_ text: String) {
@@ -296,6 +339,15 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             document.querySelector('[data-tab=summary]').click();
             await wait(500);
             post({ summaryRows: document.querySelectorAll('#tableArea tbody tr').length });
+            document.querySelector('[data-tab=daily]').click();
+            await wait(500);
+            beforePrint();
+            post({ printTables: document.querySelectorAll('#tableArea table').length, printRows: document.querySelectorAll('#tableArea tbody tr').length });
+            post({ printPdf: true });
+            await until(function () { return !document.body.classList.contains('printing'); }, 20000);
+            post({ printRestored: !document.body.classList.contains('printing') });
+            document.querySelector('[data-tab=summary]').click();
+            await wait(500);
             window.scrollTo(0, document.querySelector('.tabs').getBoundingClientRect().top + window.scrollY - 20);
             await wait(5000);
             post({ done: true });

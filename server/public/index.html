@@ -136,15 +136,23 @@
   @media print {
     header, .no-print, .tabs { display:none !important; }
     body { background:#fff; } .card { border:none; padding:0; } .tablewrap { max-height:none; overflow:visible; }
-    /* أسماء الحقول تتكرر بكل صفحة، والجدول ينطوي على عرض الورقة بدل ما ينقص من الطرف */
-    @page { size: A4 landscape; margin: 10mm; }
+    /* A4 بالعرض بحواف صغيرة. الجدول ينقسم صفحات (بالجافاسكربت قبل الطباعة) وكل صفحة تبدي بأسماء الحقول */
+    @page { size: A4 landscape; margin: 5mm; }
     thead { display: table-header-group; }
-    th { position: static !important; background:#eef1f4 !important; color:#000 !important; font-weight:700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    table { table-layout: auto; width: 100% !important; }
-    th, td { white-space: normal !important; min-width: 0 !important; word-break: normal; overflow-wrap: break-word; font-size: 10px; padding: 3px 4px !important; border: 1px solid #ccc !important; }
     tr { break-inside: avoid; }
-    #printTitle { margin:0 0 12px; } #printTitle h2 { font-size:18px; }
+    .pbreak { break-before: page; page-break-before: always; }
   }
+  /* شكل الطباعة: ينطبق وقت التجهيز هم حتى نقيس ارتفاع الأسطر مثل الورقة بالضبط */
+  body.printing header, body.printing .no-print, body.printing .tabs { display:none !important; }
+  body.printing { background:#fff; } body.printing main { max-width:none !important; padding:0 !important; margin:0 !important; }
+  body.printing .card { border:none; padding:0; box-shadow:none; } body.printing .tablewrap { max-height:none; overflow:visible; }
+  body.printing #tableArea table { table-layout: auto; width: 100% !important; border-collapse: collapse; }
+  body.printing #tableArea th { position: static !important; background:#eef1f4 !important; color:#000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body.printing #tableArea th, body.printing #tableArea td { white-space: normal !important; min-width: 0 !important; word-break: normal; overflow-wrap: break-word;
+    font-size: 12px; font-weight: 700; padding: 3px 4px !important; border: 1px solid #bbb !important; color:#000; }
+  body.printing #printTitle { margin:0 0 10px; } body.printing #printTitle h2 { font-size:18px; }
+  /* شاشة الموبايل ضيّقة، بس الورقة عريضة: نرجّع شكل الحاسبة حتى القياس يطابق الطباعة */
+  body.printing .stats { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)) !important; } body.printing .stat b { font-size:22px !important; }
   #printTitle { margin:16px 0 8px; } #printTitle h2 { margin:0; font-size:16px; } #printSub { color:var(--muted); font-size:12px; margin-top:2px; }
 </style>
 </head>
@@ -516,6 +524,7 @@
         <label>العرض <select id="lvView"><option value="days">حسب الأيام</option><option value="emp">حسب الموظفين</option></select></label>
         <label class="chk"><input type="checkbox" id="lvOnlyBad"> غير المبرّر فقط</label>
         <label class="chk"><input type="checkbox" id="lvHourLate"> الزمنية تغطي التأخير والخروج المبكر</label>
+        <label class="chk"><input type="checkbox" id="lvHourAbs"> احذف الغياب إذا عنده زمنية بنفس اليوم</label>
         <input type="file" id="lvFile" accept=".xlsx,.csv,.txt" hidden>
       </div>
     </div>
@@ -1110,7 +1119,7 @@ async function loadLeaves() {
 const hourFits = (l, r) => !l.part || (r.missingIn ? l.part === 'am' : l.part === 'pm');
 // لكل موظف ولكل يوم دوام بالفترة: غياب أو نقص بصمة (ويا التأخير إذا الخيار مفعّل) ومطابقته بالإجازات
 function reconcile(daily) {
-  const coverLate = $('lvHourLate').checked;
+  const coverLate = $('lvHourLate').checked, coverAbs = $('lvHourAbs').checked;
   const emp = empFilter(), dept = deptFilter();
   const byKey = new Map(daily.map(r => [r.userId + '|' + r.day, r]));
   const ids = (emp ? [emp] : [...new Set([...DATA.users.map(u => u.userId), ...daily.map(r => r.userId)])])
@@ -1127,6 +1136,8 @@ function reconcile(daily) {
       state = r ? 'غياب (عدم التزام)' : 'غائب'; absent = true;
       if (dayOk) code = 'leave';
       else if (dayPend) code = 'pending';
+      else if (coverAbs && hourOk) { code = 'hour'; note = 'غياب انحذف لأن عنده زمنية بنفس اليوم'; }
+      else if (coverAbs && hourPend) code = 'pending';
       else { code = 'bad'; note = hourOk ? 'عنده زمنية بس غاب اليوم كامل' : hourPend ? 'عنده زمنية بانتظار الموافقة' : ''; }
     } else if (r.missingIn || r.missingOut) {
       state = missLabel(r);
@@ -2357,24 +2368,75 @@ $('lvView').onchange = () => { try { localStorage.setItem('zkLvView', $('lvView'
 $('personSel').onchange = () => { $('emp').value = $('personSel').value; render(); };
 try { $('lvHourLate').checked = localStorage.getItem('zkHourLate') === '1'; } catch (_) {}
 $('lvHourLate').onchange = () => { try { localStorage.setItem('zkHourLate', $('lvHourLate').checked ? '1' : ''); } catch (_) {} render(); };
+try { $('lvHourAbs').checked = localStorage.getItem('zkHourAbs') === '1'; } catch (_) {}
+$('lvHourAbs').onchange = () => { try { localStorage.setItem('zkHourAbs', $('lvHourAbs').checked ? '1' : ''); } catch (_) {} render(); };
 
 // ---------- الأحداث ----------
 $('fetchBtn').onclick = fetchData;
 $('csvBtn').onclick = exportCSV;
-// اسم التقرير يصير اسم ملف الـ PDF، ووقت الطباعة يطلع تحت الاسم
-let savedTitle = null;
+// ---------- الطباعة و PDF ----------
+// قبل الطباعة: اسم التقرير يصير اسم الملف ووقت الطباعة تحته، الحقول الفارغة كلها تنشال،
+// والجدول ينقسم على صفحات A4 بالعرض وكل صفحة تبدي بأسماء الحقول. بعد الطباعة يرجع مثل ما چان.
+const inApp = () => !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.zkPrint);
+// المساحة اللي تنكتب بيها الصفحة: A4 بالعرض ناقص حواف 5 ملم (بالآيفون بالنقاط، وبالمتصفح بـ 96 نقطة بالإنچ)
+const printArea = () => inApp() ? { w: 814, h: 567 } : { w: 1084, h: 755 };
+let printPrep = null;
+function dropEmptyCols() {
+  for (const t of $('tableArea').querySelectorAll('table')) {
+    const rows = t.tBodies[0] ? [...t.tBodies[0].rows] : [], head = t.tHead && t.tHead.rows[0];
+    if (!rows.length || !head) continue;
+    for (let c = head.cells.length - 1; c >= 0; c--)
+      if (rows.every(r => !r.cells[c] || !r.cells[c].textContent.trim())) { head.cells[c].remove(); rows.forEach(r => r.cells[c] && r.cells[c].remove()); }
+  }
+}
+function splitPages() {
+  const H = printArea().h - 14; // شوية احتياط
+  let cursor = 0, prevBottom = $('printTitle').getBoundingClientRect().top;
+  const plans = [];
+  for (const t of $('tableArea').querySelectorAll('table')) {
+    const box = t.getBoundingClientRect(), rows = t.tBodies[0] ? [...t.tBodies[0].rows] : [];
+    const th = t.tHead ? t.tHead.getBoundingClientRect().height : 0, hs = rows.map(r => r.getBoundingClientRect().height);
+    cursor += box.top - prevBottom;
+    let newPage = false;
+    if (cursor > 0 && cursor + th + (hs[0] || 0) > H) { newPage = true; cursor = 0; }
+    cursor += th;
+    const chunks = []; let cur = [];
+    rows.forEach((r, i) => { if (cur.length && cursor + hs[i] > H) { chunks.push(cur); cur = []; cursor = th; } cur.push(r); cursor += hs[i]; });
+    if (cur.length) chunks.push(cur);
+    plans.push({ t, chunks, newPage }); prevBottom = box.bottom;
+  }
+  for (const { t, chunks, newPage } of plans) {
+    if (newPage) t.classList.add('pbreak');
+    if (chunks.length < 2) continue;
+    const frag = document.createDocumentFragment();
+    chunks.forEach((rows, i) => {
+      const nt = t.cloneNode(false); nt.classList.toggle('pbreak', i > 0 || newPage);
+      if (t.tHead) nt.appendChild(t.tHead.cloneNode(true));
+      const tb = document.createElement('tbody'); rows.forEach(r => tb.appendChild(r)); nt.appendChild(tb); frag.appendChild(nt);
+    });
+    t.replaceWith(frag);
+  }
+}
 function beforePrint() {
-  if (savedTitle === null) savedTitle = document.title;
+  if (printPrep) return;
+  printPrep = { title: document.title, sub: $('printSub').textContent, scroll: window.scrollY };
   document.title = $('printTitleText').textContent.replace(/[\\/:*?"<>|]/g, '-');
   const t = new Date(), p2 = (n) => String(n).padStart(2, '0');
-  const at = `طُبع ${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())} ${p2(t.getHours())}:${p2(t.getMinutes())}`;
-  if ($('printSub').dataset.base === undefined) $('printSub').dataset.base = $('printSub').textContent;
-  $('printSub').textContent = [$('printSub').dataset.base, at].filter(Boolean).join(' · ');
+  $('printSub').textContent = [printPrep.sub, `طُبع ${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())} ${p2(t.getHours())}:${p2(t.getMinutes())}`].filter(Boolean).join(' · ');
+  document.body.classList.add('printing');
+  document.querySelector('main').style.width = printArea().w + 'px';
+  dropEmptyCols(); splitPages();
 }
-function afterPrint() { if (savedTitle !== null) document.title = savedTitle; savedTitle = null;
-  if ($('printSub').dataset.base !== undefined) { $('printSub').textContent = $('printSub').dataset.base; delete $('printSub').dataset.base; } }
+function afterPrint() {
+  if (!printPrep) return;
+  const p = printPrep; printPrep = null;
+  document.body.classList.remove('printing'); document.querySelector('main').style.width = '';
+  document.title = p.title; $('printSub').textContent = p.sub;
+  render(); window.scrollTo(0, p.scroll);
+}
 window.addEventListener('beforeprint', beforePrint); window.addEventListener('afterprint', afterPrint);
-$('printBtn').onclick = () => { beforePrint(); window.print(); setTimeout(afterPrint, 60000); };
+// بالآيفون التطبيق يرجّعه بعد ما تخلص الطباعة أو تحفظ الـ PDF
+$('printBtn').onclick = () => { beforePrint(); window.print(); };
 $('saveFileBtn').onclick = saveBackup;
 $('loadFileBtn').onclick = () => $('fileInput').click();
 $('fileInput').onchange = async (e) => {
