@@ -38,6 +38,9 @@ button:disabled { opacity:.55; cursor:wait; transform:none; }
 button.small { padding:4px 11px; min-height:30px; font-size:12.5px; }
 input, select, textarea { font:inherit; color:var(--text); background:var(--sunk); border:1px solid var(--line); border-radius:var(--r-sm);
   padding:7px 10px; min-height:38px; transition:border-color .15s, background-color .15s, box-shadow .15s; }
+/* حقول التاريخ والوقت بالآيفون إلها عرض ثابت: نخليها تلتزم بعرض مكانها */
+input[type=date], input[type=time], input[type=datetime-local] { -webkit-appearance:none; appearance:none; min-width:0; max-width:100%; display:block; }
+input[type=date]::-webkit-date-and-time-value, input[type=time]::-webkit-date-and-time-value { text-align:right; }
 input[type=checkbox], input[type=radio] { min-height:0; accent-color:var(--ink-2); width:16px; height:16px; }
 input:hover, select:hover, textarea:hover { border-color:#bfcdc6; }
 input:focus, select:focus, textarea:focus { outline:none; background:#fff; border-color:var(--brass); box-shadow:0 0 0 3px var(--brass-ring); }
