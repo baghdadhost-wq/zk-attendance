@@ -42,6 +42,7 @@ func main() {
 		adminUser   = flag.String("admin-user", "admin", "اسم حساب الصلاحية المطلقة ويا --password أو --reset-admin")
 		password    = flag.String("password", os.Getenv("APP_PASSWORD"), "كلمة سر حساب الصلاحية المطلقة بدون سؤال (للخدمات)")
 		noBrowser   = flag.Bool("no-browser", false, "لا تفتح المتصفح تلقائياً")
+		hidden      = flag.Bool("hidden", false, "اشتغل مخفي بالخلفية (التشغيل التلقائي ويا الحاسبة)")
 		verifyAudit = flag.Bool("verify-audit", false, "تحقق من سلامة سجل التدقيق (hash chain) واخرج")
 		auditMirror = flag.String("audit-mirror", os.Getenv("AUDIT_MIRROR"), "انسخ كل قيد تدقيق لهذا الملف أيضاً (يُفضّل مجلد إلحاق-فقط أو جهاز آخر)")
 		tlsCert     = flag.String("tls-cert", os.Getenv("TLS_CERT"), "ملف شهادة TLS لتشغيل البرنامج على https (يُنصح به بوضع الشبكة)")
@@ -50,6 +51,26 @@ func main() {
 	flag.Parse()
 	server.Configure(chooseDataDir(*data), *demo)
 	log.SetFlags(log.Ltime)
+
+	// التشغيل التلقائي يعيد نفس إعدادات هذا التشغيل (بدون كلمات السر وأوامر الحسابات)
+	var startArgs []string
+	flag.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "network", "demo":
+			if f.Value.String() == "true" {
+				startArgs = append(startArgs, "--"+f.Name)
+			}
+		case "port", "tls-cert", "tls-key", "audit-mirror":
+			startArgs = append(startArgs, "--"+f.Name, f.Value.String())
+		case "data":
+			startArgs = append(startArgs, "--data", server.DataDir())
+		}
+	})
+	server.SetDesktop(desktopHooks(startArgs))
+	if *hidden {
+		hideConsole()
+		server.SetHidden(true)
+	}
 
 	fmt.Printf("ZK Attendance %s\n", server.Version)
 	fmt.Println("Data folder / مجلد البيانات:", server.DataDir())
@@ -129,11 +150,18 @@ func main() {
 	ln, err := net.Listen("tcp", addr)
 	localURL := fmt.Sprintf("http://localhost:%d", *port)
 	if err != nil {
-		if isAddrInUse(err) && !*network {
+		if isAddrInUse(err) {
+			// البرنامج شغّال (ممكن مخفي بالخلفية): نرجّع نافذته ونفتحه بالمتصفح، ويطلب كلمة السر
 			fmt.Println("The program is already running. Opening it... / البرنامج شغال من قبل، أفتحه بالمتصفح...")
-			openBrowser(localURL)
+			c := &http.Client{Timeout: 3 * time.Second}
+			if resp, err := c.Post(fmt.Sprintf("http://127.0.0.1:%d/api/app/show", *port), "application/json", strings.NewReader("{}")); err == nil {
+				resp.Body.Close()
+			}
+			if !*hidden {
+				openBrowser(localURL)
+			}
 			time.Sleep(2 * time.Second)
-			return
+			os.Exit(3) // ملف التشغيل (.bat) يعرف إنه انفتح الشغّال ويسد نافذته بدون «اضغط أي زر»
 		}
 		fatal(fmt.Sprintf("Cannot use port %d / ما گدرت أستخدم المنفذ %d: %v", *port, *port, err))
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 // Version رقم نسخة البرنامج
-const Version = "2.14.0"
+const Version = "2.15.0"
 
 //go:embed public
 var publicFS embed.FS
@@ -59,6 +59,11 @@ func NewHandler(users *UserStore) http.Handler {
 	mux.HandleFunc("/api/autooff/check", need(RoleSuper, handleAutoOffCheck))
 	mux.HandleFunc("/api/autooff/cancel", need(RoleSuper, handleAutoOffCancel))
 	startAutoOff()
+	// نسخة الحاسبة: الإخفاء بالخلفية والتشغيل ويا الحاسبة (من نفس الحاسبة بس)
+	mux.HandleFunc("/api/app", need(RoleViewer, handleApp))
+	mux.HandleFunc("/api/app/hide", need(RoleViewer, handleAppHide))
+	mux.HandleFunc("/api/app/autostart", need(RoleSuper, handleAppAutoStart))
+	mux.HandleFunc("/api/app/show", handleAppShow)
 	// ملف Excel الشامل: كل التقارير والبيانات بأوراق، وهو نفسه النسخة الاحتياطية
 	mux.HandleFunc("/api/xlsx/write", need(RoleViewer, handleBookWrite))
 	mux.HandleFunc("/api/xlsx/read", need(RoleViewer, handleBookRead))

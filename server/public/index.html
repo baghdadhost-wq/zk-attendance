@@ -176,6 +176,14 @@
   <span id="shareNote"></span>
 </div>
 <main>
+  <section class="card no-print" id="appCard" hidden>
+    <div class="row" style="align-items:center;gap:14px">
+      <b>البرنامج على هذي الحاسبة</b>
+      <label class="chk" id="autoStartL" data-min="super" hidden><input type="checkbox" id="autoStart"> يشتغل تلقائياً ويا تشغيل الحاسبة (مخفي بالخلفية)</label>
+      <button id="hideAppBtn">إخفاء البرنامج (يبقى يشتغل بالخلفية)</button>
+    </div>
+    <div class="hint" id="appMsg" style="margin-top:6px;font-size:12px">الإخفاء يسد نافذة البرنامج ويطلّعك منه حتى يقل استهلاك الذاكرة، والبصمات والأعضاء والإطفاء التلقائي يبقون يشتغلون. حتى ترجعه: افتح البرنامج من جديد من نفس الأيقونة، ويطلب كلمة السر.</div>
+  </section>
   <section class="card no-print">
     <h2>الاتصال بالجهاز</h2>
     <div class="row">
@@ -701,6 +709,7 @@ async function initSession() {
     if (j.auth && !j.user) { location.href = '/login'; return; }
     if (j.user) ME = j.user;
     APP_VERSION = j.version || '';
+    if (j.auth && j.user) loadApp();
     if (!j.auth) { ['usersCard', 'myPassLink', 'reportsCard', 'publishBtn'].forEach(id => $(id).remove()); } // بدون نظام دخول (تطبيق الموبايل): ما أكو حسابات موظفين
     if (j.auth) {
       if (ME.role === 'employee') { location.replace('/me'); return; } // الموظف يشوف تقريره بس
@@ -2223,7 +2232,7 @@ const ACTION_LABELS = {
   clearLogs: 'مسح سجل البصمات', updateUser: 'تعديل موظف بالجهاز', addUser: 'إضافة موظف للجهاز', setPrivilege: 'تغيير صلاحية موظف',
   setPin: 'تغيير رقم سري', deleteUser: 'حذف موظف من الجهاز', deleteFingers: 'حذف بصمات أصابع', clearAdmins: 'إلغاء مدراء الجهاز',
   clearOplog: 'مسح سجل عمليات الجهاز', clearAccess: 'تصفير إعدادات الأبواب', clearAllData: 'مسح كل بيانات الجهاز',
-  readOption: 'قراءة إعداد مخفي', writeOption: 'كتابة إعداد مخفي', setTime: 'ضبط وقت محدد', restoreUsers: 'استرجاع موظفين', autoOffSave: 'إعداد الإطفاء التلقائي', autoOffCheck: 'كشف جهاز البصمة', autoOffPowerOff: 'إطفاء تلقائي لجهاز البصمة', autoOffCancel: 'إلغاء الإطفاء التلقائي', holidaysSave: 'العطل الرسمية', manualReplace: 'استبدال البصمات اليدوية', bookExport: 'تصدير Excel شامل',
+  readOption: 'قراءة إعداد مخفي', writeOption: 'كتابة إعداد مخفي', setTime: 'ضبط وقت محدد', restoreUsers: 'استرجاع موظفين', autoOffSave: 'إعداد الإطفاء التلقائي', autoOffCheck: 'كشف جهاز البصمة', autoOffPowerOff: 'إطفاء تلقائي لجهاز البصمة', autoOffCancel: 'إلغاء الإطفاء التلقائي', appHide: 'إخفاء البرنامج', appAutoStart: 'التشغيل التلقائي ويا الحاسبة', holidaysSave: 'العطل الرسمية', manualReplace: 'استبدال البصمات اليدوية', bookExport: 'تصدير Excel شامل',
   manualAdd: 'إضافة بصمة يدوية', manualDelete: 'حذف بصمة يدوية', leavesImport: 'رفع تقرير الإجازات', leavesClear: 'مسح بيانات الإجازات', deviceSecurityCheck: 'فحص أمان الجهاز', setDeviceCommKey: 'ضبط كلمة سر اتصال الجهاز',
   scheduleSave: 'تعديل النظام العام للدوام', reportPublish: 'حفظ تقرير للموظفين', reportDelete: 'حذف تقرير محفوظ',
 };
@@ -2332,6 +2341,30 @@ $('lvClearBtn').onclick = async () => {
   catch (x) { setTabStatus(x.message, 'err'); }
 };
 $('lvOnlyBad').onchange = render;
+// ---------- نسخة الحاسبة: الإخفاء والتشغيل التلقائي ----------
+async function loadApp() {
+  try {
+    const j = await (await fetch('/api/app')).json();
+    if (!j.desktop) return;
+    $('appCard').hidden = false; $('autoStart').checked = !!j.autostart;
+  } catch (_) {}
+}
+$('autoStart').onchange = async () => {
+  const on = $('autoStart').checked;
+  try { const j = await postJSON('/api/app/autostart', { on }); $('autoStart').checked = j.autostart;
+    $('appMsg').className = 'hint ok'; $('appMsg').textContent = j.autostart ? 'صار البرنامج يشتغل وحده (مخفي) أول ما تشتغل الحاسبة.' : 'انطفى التشغيل التلقائي.'; }
+  catch (e) { $('autoStart').checked = !on; $('appMsg').className = 'hint err'; $('appMsg').textContent = e.message; }
+};
+$('hideAppBtn').onclick = async () => {
+  if (!confirm('البرنامج يختفي ويبقى يشتغل بالخلفية، وتطلع من حسابك.\nحتى ترجعه افتح البرنامج من جديد من نفس الأيقونة، ويطلب كلمة السر.\nتكمل؟')) return;
+  try {
+    await postJSON('/api/app/hide', {});
+    try { await fetch('/logout', { redirect: 'manual' }); } catch (_) {}
+    document.body.innerHTML = '<div style="max-width:520px;margin:80px auto;padding:24px;text-align:center;font-family:inherit;line-height:1.9">' +
+      '<h2>البرنامج مخفي ويشتغل بالخلفية ✓</h2><p>تگدر تسد هذي الصفحة. حتى ترجعه: افتح البرنامج من جديد من نفس الأيقونة، ويطلب كلمة السر.</p></div>';
+    setTimeout(() => { try { window.close(); } catch (_) {} }, 1500);
+  } catch (e) { $('appMsg').className = 'hint err'; $('appMsg').textContent = e.message; }
+};
 // ---------- الإطفاء التلقائي ----------
 let AO = null, aoTimer = null;
 const aoMsg = (t, cls) => { $('aoStatus').className = cls || ''; $('aoStatus').textContent = t; };

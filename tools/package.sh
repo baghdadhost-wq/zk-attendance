@@ -42,7 +42,7 @@ W=dist/pkg/zk-attendance-windows
 if want windows; then
 mkdir -p $W
 build windows amd64 $W/zk-attendance.exe
-printf '@echo off\r\ncd /d "%%~dp0"\r\nzk-attendance.exe --network\r\npause\r\n' >$W/start-network.bat
+printf '@echo off\r\ncd /d "%%~dp0"\r\nzk-attendance.exe --network\r\nif errorlevel 3 exit /b\r\npause\r\n' >$W/start-network.bat
 printf '@echo off\r\ncd /d "%%~dp0"\r\nzk-attendance.exe --demo\r\npause\r\n' >$W/start-demo.bat
 printf '@echo off\r\ncd /d "%%~dp0"\r\nzk-attendance.exe --reset-admin\r\npause\r\n' >$W/reset-admin.bat
 printf '@echo off\r\ncd /d "%%~dp0"\r\nzk-attendance.exe --reset-users\r\npause\r\n' >$W/reset-users.bat
