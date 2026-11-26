@@ -14,8 +14,20 @@
 <link rel="stylesheet" href="/theme.css">
 <style>
   body { min-height:100vh; min-height:100dvh; display:grid; grid-template-columns:minmax(0, 1.1fr) minmax(380px, 1fr); }
-  .side { position:relative; overflow:hidden; background:var(--ink) var(--ridges) no-repeat; background-size:min(900px, 120%); background-position:center 120%;
-    color:#fff; display:flex; flex-direction:column; justify-content:space-between; padding:clamp(24px, 5vw, 64px); border-inline-end:4px solid var(--brass); }
+  .side { position:relative; overflow:hidden; isolation:isolate; color:#fff; display:flex; flex-direction:column; justify-content:space-between;
+    padding:clamp(24px, 5vw, 64px); border-inline-end:4px solid var(--brass);
+    background:radial-gradient(120% 80% at 70% 105%, #1f6f68 0%, rgba(31,111,104,0) 55%), radial-gradient(90% 70% at 10% -10%, #164e4f 0%, rgba(22,78,79,0) 60%), linear-gradient(165deg, #0f4243 0%, #0b3132 55%, #082627 100%); }
+  .side > * { position:relative; z-index:1; }
+  /* البصمة: خطوط خافتة، وفوقها نبض ضوئي يمشي من مركزها لبرّه ببطء */
+  .fp { position:absolute !important; z-index:0 !important; width:min(860px, 125%); aspect-ratio:1; left:50%; bottom:-30%; transform:translateX(-50%); pointer-events:none; }
+  .fp i { position:absolute; inset:0; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520' viewBox='0 0 520 520' fill='none' stroke='%23ffffff' stroke-opacity='.11' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M260 470c-60-40-90-110-90-190a90 90 0 0 1 180 0c0 40-10 70-30 100'/%3E%3Cpath d='M210 455c-50-50-75-115-75-175a125 125 0 0 1 250 0c0 55-15 95-40 130'/%3E%3Cpath d='M160 430c-40-50-60-100-60-150a160 160 0 0 1 320 0c0 60-15 110-45 150'/%3E%3Cpath d='M118 392c-30-40-53-80-53-112a195 195 0 0 1 390 0c0 70-20 120-50 165'/%3E%3Cpath d='M300 280c0 60-20 110-60 150'/%3E%3Cpath d='M260 280c0 50-15 95-45 130'/%3E%3Cpath d='M220 280a40 40 0 0 1 80 0'/%3E%3Cpath d='M85 330c-12-22-20-40-20-50a195 195 0 0 1 32-108'/%3E%3C/svg%3E") center / contain no-repeat; }
+  .fp i.glow { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520' viewBox='0 0 520 520' fill='none' stroke='%23f2c46b' stroke-opacity='.95' stroke-width='3.4' stroke-linecap='round'%3E%3Cpath d='M260 470c-60-40-90-110-90-190a90 90 0 0 1 180 0c0 40-10 70-30 100'/%3E%3Cpath d='M210 455c-50-50-75-115-75-175a125 125 0 0 1 250 0c0 55-15 95-40 130'/%3E%3Cpath d='M160 430c-40-50-60-100-60-150a160 160 0 0 1 320 0c0 60-15 110-45 150'/%3E%3Cpath d='M118 392c-30-40-53-80-53-112a195 195 0 0 1 390 0c0 70-20 120-50 165'/%3E%3Cpath d='M300 280c0 60-20 110-60 150'/%3E%3Cpath d='M260 280c0 50-15 95-45 130'/%3E%3Cpath d='M220 280a40 40 0 0 1 80 0'/%3E%3Cpath d='M85 330c-12-22-20-40-20-50a195 195 0 0 1 32-108'/%3E%3C/svg%3E"); filter:drop-shadow(0 0 6px rgba(242,196,107,.55));
+    -webkit-mask-image:radial-gradient(circle at 50% 54%, transparent calc(var(--r) - 70px), #000 calc(var(--r) - 18px), transparent calc(var(--r) + 26px));
+    mask-image:radial-gradient(circle at 50% 54%, transparent calc(var(--r) - 70px), #000 calc(var(--r) - 18px), transparent calc(var(--r) + 26px));
+    animation:radar 7s cubic-bezier(.35,.1,.4,1) infinite; opacity:.85; }
+  @property --r { syntax:"<length>"; inherits:false; initial-value:0px; }
+  @keyframes radar { 0% { --r:0px; opacity:0; } 8% { opacity:.85; } 70% { opacity:.6; } 100% { --r:520px; opacity:0; } }
+  @media (prefers-reduced-motion: reduce) { .fp i.glow { display:none; } }
   .side .mark { display:flex; align-items:center; gap:12px; font-weight:600; color:#cfe2dc; }
   .side .mark img { width:44px; height:44px; border-radius:12px; box-shadow:0 0 0 1px rgba(255,255,255,.14); }
   .side h2 { font-family:var(--display); font-weight:600; font-size:clamp(34px, 4.4vw, 60px); line-height:1.25; margin:0; word-spacing:.15em; max-width:12ch; }
@@ -24,12 +36,24 @@
   .side .now b i { font-style:normal; color:var(--brass); animation:tick 2s steps(1) infinite; }
   .side .now span { color:#a9c6bf; font-size:15px; }
   @keyframes tick { 50% { opacity:.25; } }
-  .wrap { display:flex; align-items:center; justify-content:center; padding:32px 20px; }
-  .box { width:min(380px, 100%); }
+  .wrap { display:flex; align-items:center; justify-content:center; padding:32px 20px;
+    background:radial-gradient(70% 50% at 50% 0%, #f6f9f7 0%, rgba(246,249,247,0) 70%), var(--paper); }
+  .box { width:min(420px, 100%); background:#fff; border:1px solid var(--line-2); border-radius:22px; padding:34px 30px 28px;
+    box-shadow:0 1px 0 rgba(13,59,60,.04), 0 24px 60px -28px rgba(13,59,60,.38), 0 8px 20px -14px rgba(13,59,60,.18); }
+  .field { position:relative; margin-bottom:12px; }
+  .field:has(> input[hidden]) { display:none; }
+  .field > svg { position:absolute; inset-inline-start:14px; top:50%; transform:translateY(-50%); width:20px; height:20px; fill:none; stroke:#7f938c; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; transition:stroke .15s; }
+  .field:focus-within > svg { stroke:var(--brass-2); }
+  .field input { margin:0; padding-inline-start:44px; }
+  .field .eye { position:absolute; inset-inline-end:6px; top:50%; transform:translateY(-50%); width:38px; min-height:38px; height:38px; padding:0; border:none; background:none; border-radius:9px; display:grid; place-items:center; color:#7f938c; }
+  .field .eye:hover { background:var(--sunk); color:var(--ink); }
+  .field .eye svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .field .eye .off { display:none; } .field .eye[aria-pressed=true] .on { display:none; } .field .eye[aria-pressed=true] .off { display:block; }
+  .field:has(.eye) input { padding-inline-end:48px; }
   .box img { display:none; }
   h1 { font-weight:700; font-size:24px; color:var(--ink); margin:0 0 6px; }
   p { color:var(--muted); font-size:13.5px; margin:0 0 22px; line-height:1.7; }
-  input { width:100%; padding:12px 14px; font-size:16px; min-height:48px; margin-bottom:12px; background:#fff; }
+  input { width:100%; padding:12px 14px; font-size:16px; min-height:50px; margin-bottom:12px; background:var(--sunk); }
   button { width:100%; min-height:48px; font-size:16px; }
   #btn { background:var(--ink-2); border-color:var(--ink-2); color:#fff; font-weight:600; margin-top:4px; }
   #btn:hover { background:var(--ink-3); }
@@ -41,12 +65,16 @@
     .side { border-inline-end:none; border-bottom:3px solid var(--brass); padding:18px 20px 20px; gap:14px; background-size:520px; background-position:left -160px center; }
     .side h2 { font-size:24px; max-width:none; }
     .side .now b { font-size:40px; } .side .now span { font-size:13px; }
-    .wrap { align-items:flex-start; padding:26px 18px 32px; }
+    .wrap { align-items:flex-start; padding:0 14px 32px; background:var(--paper); }
+    .box { margin-top:-18px; padding:26px 20px 22px; border-radius:20px; position:relative; z-index:2; }
+    .side { padding-bottom:34px; }
+    .fp { width:560px; bottom:auto; top:-40%; left:auto; right:-210px; transform:none; }
   }
 </style>
 </head>
 <body>
 <aside class="side" aria-hidden="true">
+  <div class="fp"><i></i><i class="glow"></i></div>
   <div class="mark"><img src="/icon-192.png" alt="">جهاز البصمة</div>
   <h2>تقارير الحضور والانصراف</h2>
   <div class="now"><b id="clk">--:--</b><span id="clkD"></span></div>
@@ -56,9 +84,9 @@
   <img src="/icon-192.png" alt="">
   <h1 id="title">تقارير الحضور</h1>
   <p id="sub">ادخل باسم المستخدم وكلمة السر</p>
-  <input id="user" autocomplete="username" placeholder="اسم المستخدم" autocapitalize="none" autocorrect="off" spellcheck="false" dir="auto" required>
-  <input type="password" id="pw" autocomplete="current-password" placeholder="كلمة السر" required>
-  <input type="password" id="pw2" autocomplete="new-password" placeholder="أعد كتابة كلمة السر" hidden>
+  <div class="field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c.9-3.9 3.9-6 7.5-6s6.6 2.1 7.5 6"/></svg><input id="user" autocomplete="username" placeholder="اسم المستخدم" autocapitalize="none" autocorrect="off" spellcheck="false" dir="auto" required></div>
+  <div class="field"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><circle cx="12" cy="15.5" r="1.2"/></svg><input type="password" id="pw" autocomplete="current-password" placeholder="كلمة السر" required><button type="button" class="eye" data-eye="pw" aria-label="إظهار كلمة السر" aria-pressed="false"><svg class="on" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg><svg class="off" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.6A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3 3.8M6.2 6.9A16.5 16.5 0 0 0 2.5 12S6 18.5 12 18.5a9 9 0 0 0 4.2-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button></div>
+  <div class="field"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><circle cx="12" cy="15.5" r="1.2"/></svg><input type="password" id="pw2" autocomplete="new-password" placeholder="أعد كتابة كلمة السر" hidden><button type="button" class="eye" data-eye="pw2" aria-label="إظهار كلمة السر" aria-pressed="false"><svg class="on" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg><svg class="off" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.6A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3 3.8M6.2 6.9A16.5 16.5 0 0 0 2.5 12S6 18.5 12 18.5a9 9 0 0 0 4.2-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button></div>
   <button id="btn">دخول</button>
   <div id="err"></div>
   <div id="demo" hidden></div>
@@ -121,6 +149,14 @@ $('f').onsubmit = async (e) => {
     $('clkD').textContent = `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
   tick(); setInterval(tick, 1000);
 })();
+
+// إظهار وإخفاء كلمة السر
+document.querySelectorAll('[data-eye]').forEach(b => b.addEventListener('click', () => {
+  const inp = $(b.dataset.eye), show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  b.setAttribute('aria-pressed', show); b.setAttribute('aria-label', show ? 'إخفاء كلمة السر' : 'إظهار كلمة السر');
+  inp.focus();
+}));
 </script>
 </body>
 </html>

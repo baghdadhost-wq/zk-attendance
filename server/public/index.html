@@ -13,25 +13,38 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="الحضور">
 <style>
-  /* الرأس: شريط حبر بخطوط بصمة، الاسم يمين والساعة بالنص والمستخدم يسار */
-  header { position:relative; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px 20px;
-    background:var(--ink) var(--ridges) no-repeat; background-position:left -90px center; background-size:460px;
-    color:#fff; padding:14px clamp(14px, 2.4vw, 32px); border-bottom:3px solid var(--brass); }
-  header .brand { display:flex; align-items:center; gap:12px; min-width:0; }
-  header .brand img { width:40px; height:40px; border-radius:11px; flex:none; box-shadow:0 0 0 1px rgba(255,255,255,.12); }
-  header h1 { margin:0; font-family:var(--display); font-weight:600; font-size:22px; word-spacing:.18em; line-height:1.25; }
-  header small { color:#a9c6bf; font-size:12.5px; }
-  .clock { display:flex; flex-direction:column; align-items:center; line-height:1; color:#fff; user-select:none; }
+  /* القائمة الجانبية: حبر بخطوط بصمة، وبالموبايل تصير شريط تحت */
+  #sidenav { background:var(--ink) var(--ridges) no-repeat; background-size:520px; background-position:center calc(100% + 160px); color:#fff; z-index:5; }
+  #sidenav .brand { display:flex; align-items:center; gap:12px; padding:22px 20px 18px; border-bottom:1px solid rgba(255,255,255,.08); }
+  #sidenav .brand img { width:42px; height:42px; border-radius:12px; flex:none; box-shadow:0 0 0 1px rgba(255,255,255,.14); }
+  #sidenav h1 { margin:0; font-family:var(--display); font-weight:600; font-size:19px; word-spacing:.18em; line-height:1.3; }
+  #navList { display:flex; flex-direction:column; gap:4px; padding:16px 12px; }
+  .nav-i { display:flex; align-items:center; gap:12px; width:100%; min-height:46px; padding:10px 14px; border:none; border-radius:12px; background:none;
+    color:#bcd6cf; font-weight:500; font-size:14.5px; text-align:right; position:relative; }
+  .nav-i svg { width:22px; height:22px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .nav-i:hover { background:rgba(255,255,255,.06); color:#fff; border:none; }
+  .nav-i.active { background:rgba(255,255,255,.1); color:#fff; font-weight:600; }
+  .nav-i.active::before { content:""; position:absolute; inset-inline-start:-12px; top:10px; bottom:10px; width:4px; border-radius:0 4px 4px 0; background:var(--brass); }
+  .nav-i.active svg { color:var(--brass); }
+  .nav-i:focus-visible { box-shadow:0 0 0 2px var(--brass); }
+
+  /* الرأس: عنوان القسم والساعة والمستخدم */
+  header { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px 20px; padding:18px clamp(14px, 2.4vw, 32px) 14px; }
+  .vtitle { display:flex; align-items:center; gap:12px; min-width:0; }
+  .vtitle img { display:none; width:34px; height:34px; border-radius:9px; flex:none; }
+  #viewTitle { margin:0; font-weight:700; font-size:23px; color:var(--ink); line-height:1.3; }
+  #deviceInfo { display:block; color:var(--muted); font-size:12.5px; }
+  .clock { display:flex; flex-direction:column; align-items:center; line-height:1; color:var(--ink); user-select:none; }
   .clock b { font-family:var(--display); font-weight:500; font-size:30px; font-variant-numeric:tabular-nums; direction:ltr; letter-spacing:.5px; }
   .clock b i { font-style:normal; color:var(--brass); animation:tick 2s steps(1) infinite; padding:0 1px; }
-  .clock span { font-size:11.5px; color:#a9c6bf; margin-top:5px; }
+  .clock span { font-size:11.5px; color:var(--muted); margin-top:5px; }
   @keyframes tick { 50% { opacity:.25; } }
   header .who { display:flex; align-items:center; gap:8px 12px; flex-wrap:wrap; justify-content:flex-end; }
-  header .who a { color:#cfe2dc; font-size:12.5px; text-decoration:none; border-bottom:1px solid rgba(207,226,220,.35); }
-  header .who a:hover { color:#fff; border-color:var(--brass); }
+  header .who a { color:var(--ink-3); font-size:12.5px; text-decoration:none; border-bottom:1px solid #b8ccc5; }
+  header .who a:hover { color:var(--brass-2); border-color:var(--brass); }
   #whoBox { display:flex; align-items:center; gap:8px 12px; flex-wrap:wrap; }
-  #whoName { font-weight:600; }
-  .chip { background:rgba(255,255,255,.1); color:#e2eeea; padding:3px 10px; border-radius:20px; font-size:12px; white-space:nowrap; border:1px solid rgba(255,255,255,.14); }
+  #whoName { font-weight:600; color:var(--ink); }
+  .chip { background:var(--ink-soft); color:var(--ink-2); padding:3px 10px; border-radius:20px; font-size:12px; white-space:nowrap; border:1px solid #cfe0d9; }
   .chip.super { background:var(--brass); border-color:var(--brass); color:#21170a; font-weight:600; } .chip.custom { background:#2f7a72; border-color:#2f7a72; color:#fff; }
   .chip.admin { background:#8e2a36; color:#fff; } .chip.supervisor { background:#2d5a8a; color:#fff; }
 
@@ -46,25 +59,57 @@
   .sharebar details { font-size:12px; } .sharebar details summary { cursor:pointer; color:var(--ink-3); }
   .sharebar details button { margin:4px 0 0 6px; }
 
-  /* التخطيط: بالشاشة الكبيرة عمودين، الأدوات يمين (ثابتة وقت التمرير) والتقرير يسار */
-  main { max-width:1120px; margin:0 auto; padding:20px clamp(12px, 2.4vw, 32px) 48px; }
-  .rail, .desk { min-width:0; }
-  .rail:not(:has(> :not([hidden]))) { display:none; }
-  @media (min-width:1280px) {
-    main { max-width:1720px; }
-    main:has(> .rail > :not([hidden])) { display:grid; grid-template-columns:minmax(360px, 410px) minmax(0, 1fr); gap:22px; align-items:start; }
-    .rail { position:sticky; top:16px; max-height:calc(100vh - 32px); overflow:auto; overscroll-behavior:contain; padding:2px 2px 28px; margin:-2px;
-      -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 28px), transparent); mask-image:linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
-    .rail .row > label { flex:1 1 150px; }
-    .rail .row > label input, .rail .row > label select { width:100%; min-width:0 !important; }
-    .rail .ctl .row > button { flex:1 1 auto; }
+  /* التخطيط: قائمة جانبية + شبكة بطاقات (بينتو). كل بطاقة بقسمها، وتبين بس إذا إلها صلاحية */
+  @media screen and (min-width:1024px) {
+    body { display:grid; grid-template-columns:264px minmax(0, 1fr); grid-template-rows:auto auto 1fr; min-height:100vh; }
+    #sidenav { grid-column:1; grid-row:1 / span 3; position:sticky; top:0; height:100vh; overflow:auto; border-inline-end:3px solid var(--brass); }
+    header, .sharebar, main { grid-column:2; }
   }
+  main { max-width:1480px; width:100%; margin:0 auto; padding:6px clamp(12px, 2.4vw, 32px) 48px; display:grid; grid-template-columns:repeat(12, minmax(0, 1fr)); gap:16px; align-content:start; }
+  main > * { grid-column:1 / -1; min-width:0; margin:0 !important; align-self:start; }
+  #homeAct, #periodCard { align-self:stretch; }
+  #periodCard { display:flex; flex-direction:column; justify-content:center; }
+  .off-view { display:none !important; }
+  @media (min-width:1100px) {
+    #homeAct { grid-column:span 4; } #periodCard { grid-column:span 8; }
+    #connCard { grid-column:span 5; } #ctlCard { grid-column:span 7; }
+    #schedCard { grid-column:span 7; } #manualCard { grid-column:span 5; }
+    #usersCard { grid-column:span 6; } #auditCard { grid-column:span 6; }
+    #appCard:not([hidden]) + #xferCard, #appCard { grid-column:span 6; }
+    #xferCard { grid-column:1 / -1; }
+  }
+  /* قسم الموظفين: نفس الجدول بتبويب «الموظفون» بدون شريط التبويبات */
+  body[data-view=emps] #reportCard .tabs { display:none; }
+
+  /* مؤشرات الفترة */
+  .kpis { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
+  .kpi { position:relative; background:var(--card); border:1px solid var(--line-2); border-radius:var(--r-lg); box-shadow:var(--lift); padding:16px 18px 16px;
+    display:grid; grid-template-columns:1fr auto; grid-template-areas:"lab ico" "val ico" "sub sub"; align-items:center; gap:2px 12px; min-width:0; }
+  .kpi i { grid-area:ico; width:48px; height:48px; border-radius:14px; display:grid; place-items:center; align-self:start; }
+  .kpi i svg { width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .kpi span { grid-area:lab; font-size:13px; font-weight:600; color:var(--muted); }
+  .kpi b { grid-area:val; font-family:var(--display); font-weight:600; font-size:38px; line-height:1.1; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .kpi small { grid-area:sub; font-size:12px; color:var(--muted); margin-top:4px; padding-top:8px; border-top:1px dashed var(--line); min-height:18px; }
+  .k-ok i { background:#e2f2e9; color:var(--ok); } .k-late i { background:#fbeed6; color:var(--warn); } .k-abs i { background:#fbe5e2; color:var(--bad); }
+  .kpi .ring { --p:0; background:conic-gradient(var(--ink-3) calc(var(--p) * 1%), var(--ink-soft) 0); border-radius:50%; position:relative; }
+  .kpi .ring::after { content:""; position:absolute; inset:6px; border-radius:50%; background:var(--card); }
+  .kpi .ring em { position:relative; z-index:1; font-style:normal; font-size:11px; font-weight:700; color:var(--ink-2); }
+  .k-late b { color:var(--warn); } .k-abs b { color:var(--bad); }
+
+  /* بيانات الجهاز بالرئيسية */
+  #homeAct { display:flex; flex-direction:column; gap:10px; background:linear-gradient(160deg, #fff 55%, var(--brass-soft)); }
+  #homeAct h2 { margin:0; }
+  #homeAct .ha-dev { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 12px; border-radius:var(--r-sm); background:var(--sunk); border:1px solid var(--line-2); font-size:13px; }
+  #homeAct .ha-dev span { color:var(--muted); } #homeAct .ha-dev b { font-weight:600; color:var(--ink); }
+  #haFetch { min-height:48px; font-size:15px; font-weight:600; }
+  #haStatus { margin:0; min-height:18px; }
+  #homeAct .ha-go { align-self:flex-start; margin-top:auto; }
 
   /* البطاقات */
   .card { background:var(--card); border:1px solid var(--line-2); border-radius:var(--r-lg); padding:16px 18px; margin-bottom:14px; box-shadow:var(--lift); }
   .card h2 { margin:0 0 12px; font-weight:700; font-size:16.5px; color:var(--ink); line-height:1.35; }
-  details.card { padding:0; }
-  details.card > summary { list-style:none; cursor:pointer; display:flex; align-items:center; flex-wrap:wrap; gap:2px 8px; padding:14px 18px 14px 44px; position:relative;
+  details.card { padding:0 18px; }
+  details.card > summary { list-style:none; cursor:pointer; display:flex; align-items:center; flex-wrap:wrap; gap:2px 8px; padding:14px 18px 14px 44px; margin:0 -18px; position:relative;
     font-weight:700; font-size:15.5px; color:var(--ink); border-radius:var(--r-lg); }
   details.card > summary::-webkit-details-marker { display:none; }
   details.card > summary::after { content:""; position:absolute; left:18px; top:50%; width:8px; height:8px; margin-top:-6px;
@@ -72,7 +117,6 @@
   details.card[open] > summary::after { transform:rotate(135deg); margin-top:-2px; }
   details.card > summary:hover { background:var(--sunk); }
   details.card[open] > summary { border-bottom:1px solid var(--line-2); border-radius:var(--r-lg) var(--r-lg) 0 0; margin-bottom:0; }
-  details.card > :not(summary) { margin-inline:18px; }
   details.card[open] > summary + * { margin-top:14px; }
   details.card[open] { padding-bottom:16px; }
   details.card > summary small { font-weight:400; color:var(--muted); font-size:12px; }
@@ -121,6 +165,7 @@
   .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); background:var(--card); border:1px solid var(--line-2);
     border-radius:var(--r-lg); box-shadow:var(--lift); overflow:hidden; margin-bottom:14px; }
   .stats:empty { display:none; }
+  @media screen { body:not(.printing) #stats { display:none; } }
   .stat { position:relative; padding:14px 20px 16px; font-size:12.5px; color:var(--muted); border-inline-start:2px dashed var(--line); line-height:1.45; }
   .stat:first-child { border-inline-start:none; }
   .stat:not(:first-child)::before, .stat:not(:first-child)::after { content:""; position:absolute; inset-inline-start:-8px; width:14px; height:14px; border-radius:50%; background:var(--paper); }
@@ -181,6 +226,7 @@
   .modal .actions { display:flex; gap:8px; justify-content:flex-start; margin-top:10px; position:sticky; bottom:-22px; background:#fff; padding:10px 0 2px; }
   .pgrid { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
   .pgrid .wide { grid-column:1 / -1; }
+  .pgrid > * { min-width:0; } .pgrid input, .pgrid select { width:100%; min-width:0; }
   #editStatus { font-size:13px; margin-top:10px; min-height:18px; }
   #status { margin-top:10px; font-size:13px; }
 
@@ -194,22 +240,38 @@
   .pgroup .tag { font-size:11px; padding:0 7px; }
   #permTree { max-height:min(60vh, 560px); overflow:auto; }
 
-  /* تابلت */
-  @media (max-width:1024px) {
-    header { grid-template-columns:1fr auto; }
+  /* تابلت وموبايل: الرأس شريط حبر، والقائمة شريط تحت الشاشة */
+  @media screen and (max-width:1023.98px) {
+    header { grid-template-columns:1fr auto; background:var(--ink) var(--ridges) no-repeat; background-size:420px; background-position:left -120px center;
+      color:#fff; border-bottom:3px solid var(--brass); padding:12px 16px; }
+    .vtitle img { display:block; box-shadow:0 0 0 1px rgba(255,255,255,.14); }
+    #viewTitle { color:#fff; font-size:19px; } #deviceInfo { color:#a9c6bf; }
+    .clock, .clock b { color:#fff; } .clock span { color:#a9c6bf; }
     header .who { grid-column:1 / -1; justify-content:flex-start; border-top:1px solid rgba(255,255,255,.1); padding-top:8px; }
+    header .who a { color:#cfe2dc; border-color:rgba(207,226,220,.35); }
+    #whoName { color:#fff; } .chip { background:rgba(255,255,255,.1); color:#e2eeea; border-color:rgba(255,255,255,.14); }
+    #sidenav { position:fixed; inset:auto 0 0 0; background:var(--ink); border-top:3px solid var(--brass); padding-bottom:env(safe-area-inset-bottom); box-shadow:0 -10px 30px -18px rgba(8,32,33,.7); }
+    #sidenav .brand { display:none; }
+    #navList { flex-direction:row; gap:2px; padding:6px 6px; }
+    .nav-i { flex:1 1 0; flex-direction:column; gap:3px; min-height:54px; padding:6px 2px; font-size:0; border-radius:10px; justify-content:center; }
+    .nav-i::after { content:attr(data-short); font-size:11px; line-height:1.2; }
+    .nav-i span { display:none; }
+    .nav-i.active::before { inset-inline-start:25%; inset-inline-end:25%; top:-6px; bottom:auto; width:auto; height:3px; border-radius:0 0 3px 3px; }
+    main { padding-bottom:96px; }
+    .kpis { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; }
   }
   /* موبايل */
   @media (max-width:640px) {
     header { padding:12px 14px; gap:8px 12px; background-size:340px; background-position:left -110px center; }
-    header .brand img { width:34px; height:34px; border-radius:9px; }
-    header h1 { font-size:17px; }
+    #viewTitle { font-size:17px; }
     .clock b { font-size:24px; } .clock span { font-size:10.5px; }
-    main { padding:12px 10px 40px; }
+    main { padding:12px 10px 92px; gap:12px; }
+    .kpi { padding:12px 12px 12px; gap:2px 8px; } .kpi b { font-size:28px; } .kpi i { width:38px; height:38px; border-radius:11px; } .kpi i svg { width:21px; height:21px; }
+    .kpi span { font-size:12px; } .kpi small { font-size:11px; }
     .card { padding:14px; border-radius:14px; }
-    details.card > summary { padding:13px 14px 13px 40px; font-size:15.5px; }
+    details.card { padding:0 14px; }
+    details.card > summary { padding:13px 14px 13px 40px; margin:0 -14px; font-size:15.5px; }
     details.card > summary::after { left:16px; }
-    details.card > :not(summary) { margin-inline:14px; }
     .row > label { flex:1 1 140px; }
     .row > label input, .row > label select { width:100%; min-width:0 !important; }
     .row > button, .tools > button { flex:1 1 auto; }
@@ -226,15 +288,17 @@
     .info-grid, .bars { grid-template-columns:1fr; }
     .pgrid { grid-template-columns:1fr; }
     .modal { padding:18px 16px; border-radius:18px; }
-    .sharebar { padding:8px 12px; } .sharebar #shareBtn { width:100%; justify-content:space-between; }
+    .sharebar { padding:7px 12px; gap:6px 8px; flex-wrap:nowrap; } .sharebar .lbl { font-size:12px; white-space:nowrap; } .sharebar #shareNote { display:none; }
+    .sharebar #shareBtn { flex:1; min-width:0; justify-content:space-between; font-size:13px; } .sharebar #shareBtn bdi { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     #printTitle h2 { font-size:18px; }
   }
 
   /* الطباعة: ورقة بيضاء بسيطة */
   @media print { .t-man { border:1px solid #5a3c9c; } }
   @media print {
-    header, .no-print, .tabs, .rail { display:none !important; }
-    body { background:#fff; } main { display:block !important; max-width:none !important; }
+    header, .no-print, .tabs, #sidenav { display:none !important; }
+    body { background:#fff; display:block !important; } main { display:block !important; max-width:none !important; }
+    .off-view#printTitle, .off-view#reportCard { display:block !important; } #stats:not(:empty) { display:grid !important; }
     .card { border:none; padding:0; box-shadow:none; } .tablewrap { max-height:none; overflow:visible; border:none; }
     /* A4 بالعرض بحواف صغيرة. الجدول ينقسم صفحات (بالجافاسكربت قبل الطباعة) وكل صفحة تبدي بأسماء الحقول */
     @page { size: A4 landscape; margin: 5mm; }
@@ -243,8 +307,11 @@
     .pbreak { break-before: page; page-break-before: always; }
   }
   /* شكل الطباعة: ينطبق وقت التجهيز هم حتى نقيس ارتفاع الأسطر مثل الورقة بالضبط */
-  body.printing header, body.printing .no-print, body.printing .tabs, body.printing .rail { display:none !important; }
-  body.printing { background:#fff; } body.printing main { display:block !important; max-width:none !important; padding:0 !important; margin:0 !important; }
+  body.printing header, body.printing .no-print, body.printing .tabs, body.printing #sidenav { display:none !important; }
+  body.printing .off-view#printTitle, body.printing .off-view#reportCard { display:block !important; }
+  body.printing #stats { display:grid !important; margin-bottom:10px !important; } body.printing #stats:empty { display:none !important; }
+  body.printing #printTitle { margin:0 0 10px !important; }
+  body.printing { background:#fff; display:block !important; } body.printing main { display:block !important; max-width:none !important; padding:0 !important; margin:0 !important; }
   body.printing .card { border:none; padding:0; box-shadow:none; } body.printing .tablewrap { max-height:none; overflow:visible; border:none; border-radius:0; }
   body.printing #tableArea table { table-layout: auto; width: 100% !important; border-collapse: collapse; }
   body.printing #tableArea th { position: static !important; background:#eef1f4 !important; color:#000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -260,14 +327,27 @@
 </style>
 </head>
 <body>
-<header>
+<aside id="sidenav" class="no-print">
   <div class="brand">
     <img src="/icon-192.png" alt="" width="40" height="40">
     <h1>تقارير الحضور والانصراف</h1>
   </div>
+  <nav id="navList" aria-label="أقسام البرنامج">
+    <button type="button" class="nav-i" data-go="home" data-short="الرئيسية" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v11h13V9"/><path d="M10 20v-5.5h4V20"/></svg><span>الرئيسية والتقارير</span></button>
+    <button type="button" class="nav-i" data-go="emps" data-short="الموظفون" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.8a3.3 3.3 0 0 1 0 6.4"/><path d="M18 14.6c1.8.7 3 2.5 3.5 5.4"/></svg><span>الموظفون</span></button>
+    <button type="button" class="nav-i" data-go="sched" data-short="الدوام" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.8v3.4M16 2.8v3.4"/><path d="M12 12.5v3l2 1.4"/></svg><span>الدوام والعطل</span></button>
+    <button type="button" class="nav-i" data-go="device" data-short="الجهاز" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 18.5c-1-1.8-1.5-3.9-1.5-6.5a7 7 0 0 1 12.2-4.7"/><path d="M19 12c0 3-.5 5.5-1.6 7.6"/><path d="M9 20.5c-.9-2-1.4-4.6-1.4-8.5a4.4 4.4 0 0 1 8.8 0c0 2.4-.2 4.4-.7 6.2"/><path d="M12 12c0 3.4-.4 6.3-1.4 8.8"/></svg><span>جهاز البصمة</span></button>
+    <button type="button" class="nav-i" data-go="access" data-short="الصلاحيات" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.1 7.5 9.5 4.3-1.4 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><span>الصلاحيات والسجل</span></button>
+    <button type="button" class="nav-i" data-go="system" data-short="النقل" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13l-3.5-3.5"/><path d="M20 16H7l3.5 3.5"/></svg><span>النقل والبرنامج</span></button>
+  </nav>
+</aside>
+<header>
+  <div class="vtitle">
+    <img src="/icon-192.png" alt="" width="34" height="34">
+    <div><h2 id="viewTitle">الرئيسية والتقارير</h2><small id="deviceInfo">غير متصل</small></div>
+  </div>
   <div class="clock" id="nowClock" aria-hidden="true"><b id="clkTime">--:--</b><span id="clkDate"></span></div>
   <div class="who">
-    <small id="deviceInfo">غير متصل</small>
     <span id="whoBox" hidden>
       <span id="whoName"></span><span class="chip" id="whoRole"></span>
       <a href="#" id="myPassLink">تغيير كلمة السر</a>
@@ -282,17 +362,151 @@
   <span id="shareNote"></span>
 </div>
 <main>
-  <div class="rail" id="rail">
-  <section class="card no-print" id="appCard" hidden>
-    <div class="row" style="align-items:center;gap:14px">
-      <b>البرنامج على هذي الحاسبة</b>
-      <label class="chk" id="autoStartL" data-perm="app.autostart" hidden><input type="checkbox" id="autoStart"> يشتغل تلقائياً ويا تشغيل الحاسبة (مخفي بالخلفية)</label>
-      <button id="hideAppBtn" data-perm="app.hide" hidden>إخفاء البرنامج (يبقى يشتغل بالخلفية)</button>
-    </div>
-    <div class="hint" id="appMsg" style="margin-top:6px;font-size:12px">الإخفاء يسد نافذة البرنامج ويطلّعك منه حتى يقل استهلاك الذاكرة، والبصمات والأعضاء والإطفاء التلقائي يبقون يشتغلون. حتى ترجعه: افتح البرنامج من جديد من نفس الأيقونة، ويطلب كلمة السر.</div>
+  <section class="card no-print" data-view="home" id="noPerms" hidden>
+    <h2>ما عندك صلاحيات بعد</h2>
+    <div class="hint">حسابك «مخصص» وما مفعّلة إله ولا قائمة. اطلب من صاحب الصلاحية المطلقة يفعّل لك اللي تحتاجه من زر «تخصيص» يم اسمك.</div>
   </section>
 
-  <section class="card no-print" id="connCard" data-perm="conn.* ctl.* scan.run danger.*" hidden>
+  <!-- مؤشرات الفترة: نفس حسابات التقرير -->
+  <section class="kpis no-print" id="kpis" data-view="home" data-perm="tab.*" hidden>
+    <div class="kpi k-ok"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .4 4.1 1.3"/><path d="m15.5 18 2 2 4-4"/></svg></i><span>إجمالي الحضور</span><b id="kPresent">—</b><small id="kPresentS">اسحب البيانات حتى تطلع الأرقام</small></div>
+    <div class="kpi k-late"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></i><span>المتأخرون</span><b id="kLate">—</b><small id="kLateS"></small></div>
+    <div class="kpi k-abs"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.6 0 3 .4 4.1 1.3"/><path d="m16.5 16.5 4 4m0-4-4 4"/></svg></i><span>الغائبون</span><b id="kAbs">—</b><small id="kAbsS"></small></div>
+    <div class="kpi k-rate"><i class="ring" id="kRing"><em id="kRateN"></em></i><span>نسبة الالتزام</span><b id="kRate">—</b><small id="kRateS"></small></div>
+  </section>
+
+  <section class="card no-print" id="homeAct" data-view="home" data-perm="conn.fetch" hidden>
+    <h2>بيانات الجهاز</h2>
+    <div class="ha-dev"><span>جهاز البصمة</span><b id="haIp" dir="ltr"></b></div>
+    <button class="primary" id="haFetch">سحب البيانات من الجهاز</button>
+    <div id="haStatus" class="hint"></div>
+    <button class="small ha-go" data-go="device" data-perm="conn.* ctl.* scan.run danger.*">إعدادات الجهاز والتحكم</button>
+  </section>
+
+  <section class="card no-print" data-view="home" id="periodCard" data-perm="tab.*" hidden>
+    <h2>الفترة والتصفية</h2>
+    <div class="row">
+      <label>من تاريخ <input type="date" id="from"></label>
+      <label>إلى تاريخ <input type="date" id="to"></label>
+      <label>الموظف <select id="emp"><option value="">الكل</option></select></label>
+      <label>القسم <select id="dept"><option value="">كل الأقسام</option></select></label>
+    </div>
+  </section>
+
+  <!-- اسم التقرير: يطلع بالشاشة وبأول الصفحة بالطباعة وبـ PDF -->
+  <div data-view="home emps" id="printTitle"><h2 id="printTitleText"></h2><div id="printSub"></div></div>
+
+  <section class="stats" data-view="home" id="stats" data-perm="tab.*" hidden></section>
+
+  <section class="card" style="margin-top:14px" data-view="home emps" id="reportCard" data-perm="tab.*" hidden>
+    <div class="tabs">
+      <button data-tab="daily" class="active" data-perm="tab.daily">التقرير اليومي</button>
+      <button data-tab="summary" data-perm="tab.summary">ملخص الموظفين</button>
+      <button data-tab="raw" data-perm="tab.raw">سجل البصمات</button>
+      <button data-tab="users" data-perm="tab.users">الموظفون</button>
+      <button data-tab="leaves" data-perm="tab.leaves">التصفية والإجازات</button>
+      <button data-tab="person" data-perm="tab.person">تقرير موظف</button>
+    </div>
+    <div class="row no-print" style="margin-bottom:10px">
+      <button id="printBtn" data-perm="tab.print" hidden>طباعة / PDF</button>
+      <button id="publishBtn" class="primary" data-perm="reports.publish" hidden>حفظ التقرير للموظفين</button>
+      <div class="tools" id="usersTools" style="display:none">
+        <span class="hint" style="font-size:12px">لتعديل بيانات الموظفين بالجملة: «تصدير Excel شامل» ← عدّل ورقة «الموظفين» ← «استيراد النسخة الشاملة».</span>
+      </div>
+      <div class="tools" id="personTools" style="display:none">
+        <label>الموظف <select id="personSel"></select></label>
+      </div>
+      <div class="tools" id="leavesTools" style="display:none">
+        <button id="lvUploadBtn" class="primary" data-perm="leaves.upload" hidden>رفع تقرير الإجازات (Excel / CSV)</button>
+        <button id="lvClearBtn" class="danger" data-perm="leaves.clear" hidden>مسح بيانات الإجازات</button>
+        <label>العرض <select id="lvView"><option value="days">حسب الأيام</option><option value="emp">حسب الموظفين</option></select></label>
+        <label class="chk"><input type="checkbox" id="lvOnlyBad"> غير المبرّر فقط</label>
+        <label class="chk"><input type="checkbox" id="lvHourAbs"> احذف الغياب إذا عنده زمنية بنفس اليوم</label>
+        <input type="file" id="lvFile" accept=".xlsx,.csv,.txt" hidden>
+      </div>
+    </div>
+    <div id="tabStatus" class="no-print"></div>
+    <div id="leavesInfo" class="no-print" hidden></div>
+    <div class="tablewrap" id="tableArea"><div class="empty">اسحب البيانات من الجهاز أولاً</div></div>
+  </section>
+
+  <details class="card no-print" data-view="emps" id="reportsCard" data-perm="reports.list" hidden>
+    <summary>التقارير المحفوظة للموظفين <small>كل موظف عنده حساب يشوف تقريره منها بس</small></summary>
+    <div class="hint" style="margin:-4px 0 10px">حتى تحفظ تقرير: اسحب البيانات، اختار الفترة، ارفع تقرير الإجازات إذا عندك، وبعدها اضغط «حفظ التقرير للموظفين» فوق الجداول.</div>
+    <div class="tablewrap" id="reportsTable"><div class="empty">جارِ التحميل...</div></div>
+    <div id="reportsStatus" style="margin-top:8px;font-size:13px"></div>
+  </details>
+
+  <section class="card no-print" data-view="sched" id="schedCard" data-perm="tab.* sched.edit" hidden>
+    <h2>النظام العام للدوام <small style="font-weight:normal;color:var(--muted);font-size:12px">لكل الموظفين، إلا اللي إلهم نظام خاص بقائمة الموظفين</small></h2>
+    <div class="row">
+      <label>بداية الدوام <input type="time" id="start" value="08:00" data-gen></label>
+      <label>نهاية الدوام <input type="time" id="end" value="14:00" data-gen></label>
+      <label>سماحية التأخير (دقيقة) <input type="number" id="grace" value="10" min="0" max="240" style="min-width:80px" data-gen></label>
+      <label>تجاهل البصمة المكررة خلال (دقيقة) <input type="number" id="dedup" value="3" min="0" max="120" style="min-width:80px" data-gen></label>
+    </div>
+    <div style="margin-top:10px">
+      <label style="display:block;margin-bottom:8px">الزمنية اللي تبدي قبل <input type="time" id="hourSplit" value="10:00" data-gen style="min-width:0;width:110px"> صباحية (تبرّر البصمة الصباحية)، ومن هالوقت وطالع مسائية</label>
+      <label class="chk"><input type="checkbox" id="strict" data-gen> البصمة خارج الوقت والسماحية تنحسب عدم التزام</label>
+      <div class="hint" style="font-size:12px">الدخول بعد السماحية = «تأخر بالبصمة الصباحية»، والخروج قبل نهاية الدوام بأكثر من السماحية = «بصمة مسائية قبل الوقت»، والثنتين باليوم = «غياب (عدم التزام)». الزمنية والإجازة تبرّرهن مثل نقص البصمة.</div>
+    </div>
+    <div class="days" id="genOff"><span>العطلة الأسبوعية:</span></div>
+    <details id="genDaysBox" style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">أوقات تختلف لبعض الأيام <span id="genDaysSum" class="hint"></span></summary>
+      <div class="hint" style="font-size:12px">اليوم الفارغ يتبع بداية ونهاية الدوام فوق.</div>
+      <div class="dayTimes" id="genDays"></div>
+    </details>
+    <div class="row" style="margin-top:12px" data-perm="sched.edit" hidden>
+      <button class="primary" id="schedSaveBtn">حفظ النظام العام</button>
+      <button id="schedResetBtn" hidden>رجّع المحفوظ</button>
+    </div>
+    <div id="schedStatus" class="hint" style="font-size:12px"></div>
+  </section>
+
+  <details class="card no-print" data-view="sched" id="manualCard" data-perm="manual.punch manual.holidays" hidden>
+    <summary>البصمات اليدوية <small>لموظف نسى يبصم أو كان بواجب</small></summary>
+    <div data-perm="manual.punch">
+    <div class="hint" style="margin:-4px 0 10px">تنحفظ بالبرنامج مو بالجهاز، وتدخل بالتقارير مكتوب يمها «يدوية» ويا السبب واسم اللي ضافها، وتنسجل بسجل العمليات.</div>
+    <div class="row">
+      <label>الموظف <input id="mpEmp" list="mpEmps" inputmode="numeric" placeholder="رقم الموظف" autocomplete="off" style="min-width:150px"></label>
+      <datalist id="mpEmps"></datalist>
+      <label>التاريخ <input type="date" id="mpDate"></label>
+      <label>النوع
+        <select id="mpType">
+          <option value="both">دخول وخروج (يوم كامل)</option>
+          <option value="in">دخول فقط</option>
+          <option value="out">خروج فقط</option>
+        </select>
+      </label>
+      <label id="mpInL">وقت الدخول <input type="time" id="mpIn"></label>
+      <label id="mpOutL">وقت الخروج <input type="time" id="mpOut"></label>
+      <label>السبب
+        <select id="mpReason">
+          <option value="forgot">نسى يبصم</option>
+          <option value="duty">واجب رسمي</option>
+          <option value="device">عطل بالجهاز</option>
+          <option value="other">سبب آخر</option>
+        </select>
+      </label>
+      <label>ملاحظة <input id="mpNote" maxlength="200" placeholder="اختياري" autocomplete="off" style="min-width:180px"></label>
+      <button id="mpBtn" class="primary">إضافة</button>
+    </div>
+    <div id="mpStatus" style="margin-top:8px;font-size:13px"></div>
+    <div class="sec-title">البصمات اليدوية المضافة</div>
+    <div class="tablewrap" id="mpTable"><div class="empty">ما أكو بصمات يدوية</div></div>
+    </div>
+    <div data-perm="manual.holidays">
+    <div class="sec-title">العطل الرسمية <small class="hint">يوم كامل ما تنحسب بيه بصمة ولا غياب لكل الموظفين</small></div>
+    <div class="row">
+      <label>التاريخ <input type="date" id="holDate"></label>
+      <label>اسم العطلة <input id="holName" maxlength="80" placeholder="مثلاً: عيد الأضحى" autocomplete="off" style="min-width:180px"></label>
+      <button id="holBtn" class="primary">إضافة عطلة رسمية</button>
+    </div>
+    <div id="holStatus" style="margin-top:8px;font-size:13px"></div>
+    <div class="tablewrap" id="holTable"><div class="empty">ما أكو عطل رسمية</div></div>
+    </div>
+  </details>
+
+  <section class="card no-print" data-view="device" id="connCard" data-perm="conn.* ctl.* scan.run danger.*" hidden>
     <h2>الاتصال بالجهاز</h2>
     <div class="row">
       <label>عنوان IP للجهاز <input id="ip" value="192.168.1.201"></label>
@@ -306,7 +520,7 @@
     <div id="status"></div>
   </section>
 
-  <section class="card no-print" id="ctlCard" data-perm="ctl.*" hidden>
+  <section class="card no-print" data-view="device" id="ctlCard" data-perm="ctl.*" hidden>
     <h2>التحكم بالجهاز</h2>
     <div class="ctl">
       <div class="ctl-label">المعلومات والوقت</div>
@@ -380,7 +594,32 @@
     <div id="infoPanel"></div>
   </section>
 
-  <details class="card no-print" id="scanCard" data-perm="scan.run" hidden>
+  <details class="card no-print" data-view="device" id="autoOffCard" data-perm="autooff.manage" hidden>
+    <summary>الإطفاء التلقائي لجهاز البصمة <small id="aoSum"></small></summary>
+    <div class="hint" style="margin:-4px 0 10px">تگدر تختار أكثر من طريقة سوه: <b>كشف ثم إطفاء</b> (يكشف إذا الجهاز مشتغل، وإذا مشتغل يطفيه بعد المدة) أو <b>إطفاء مباشر</b> (يطفيه أول ما يجي الوقت)، وكل وحدة بوقت معيّن كل يوم أو كل فترة. يشتغل طول ما البرنامج مفتوح على هذا الجهاز. <b>انتبه: الجهاز المطفي يحتاج أحد يشغّله بإيده.</b></div>
+    <div class="row">
+      <label>IP جهاز البصمة <input id="aoIp" dir="ltr" placeholder="192.168.1.201" style="min-width:140px"></label>
+      <label>المنفذ <input id="aoPort" type="number" value="4370" style="min-width:80px"></label>
+      <label>كلمة سر الاتصال <input id="aoKey" type="password" inputmode="numeric" placeholder="0 = بدون" style="min-width:110px"></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="chk"><input type="checkbox" id="aoOn"> الإطفاء التلقائي شغّال</label>
+      <label>بالكشف: الإطفاء بعد <input type="number" id="aoDelay" min="0" max="1440" value="5" style="min-width:70px;width:80px"> دقيقة</label>
+    </div>
+    <div class="sec-title" style="margin-top:10px">الطرق</div>
+    <div id="aoRules"></div>
+    <button id="aoAdd" class="small" style="margin-top:6px">+ إضافة طريقة</button>
+    <div class="row" style="margin-top:8px">
+      <button id="aoSave" class="primary">حفظ</button>
+      <button id="aoCheck">كشف الآن</button>
+      <button id="aoCancel" class="danger" hidden>إلغاء الإطفاء المحدد</button>
+    </div>
+    <div id="aoStatus" style="margin-top:8px;font-size:13px"></div>
+    <div id="aoState" style="margin-top:6px;font-size:13px"></div>
+    <div class="tablewrap" id="aoEvents" style="margin-top:8px"></div>
+  </details>
+
+  <details class="card no-print" data-view="device" id="scanCard" data-perm="scan.run" hidden>
     <summary>فحص أمان الجهاز <small>هل بيانات الجهاز محمية من التعديل غير المصرّح به؟</small></summary>
     <div class="hint" style="margin:-4px 0 10px">
       فحص قراءة فقط — ما يغيّر ولا شي بالجهاز. يتأكد هل الجهاز محمي بكلمة سر اتصال، وهل عليه مدير، ويبيّن مخاطر الشبكة والبرنامج الثابت.
@@ -394,7 +633,7 @@
     <div id="scanResult" style="margin-top:12px"></div>
   </details>
 
-  <details class="card no-print danger-zone" id="adminCard" data-perm="danger.*" hidden>
+  <details class="card no-print danger-zone" data-view="device" id="adminCard" data-perm="danger.*" hidden>
     <summary>الأوامر الخطرة والمخفية <small>إضافة وحذف الموظفين، والوقت وخصائص الجهاز والمسح</small></summary>
     <div class="hint" style="margin:-4px 0 10px">كل أمر يمسح أو يغير شي يحفظ نسخة احتياطية بمجلد backups قبله، وكل شي ينسجل بسجل العمليات باسمك.</div>
     <div class="ctl" data-perm="danger.addUser">
@@ -473,32 +712,48 @@
     <div id="adminStatus" style="margin-top:12px;font-size:13px"></div>
   </details>
 
-  <details class="card no-print" id="autoOffCard" data-perm="autooff.manage" hidden>
-    <summary>الإطفاء التلقائي لجهاز البصمة <small id="aoSum"></small></summary>
-    <div class="hint" style="margin:-4px 0 10px">تگدر تختار أكثر من طريقة سوه: <b>كشف ثم إطفاء</b> (يكشف إذا الجهاز مشتغل، وإذا مشتغل يطفيه بعد المدة) أو <b>إطفاء مباشر</b> (يطفيه أول ما يجي الوقت)، وكل وحدة بوقت معيّن كل يوم أو كل فترة. يشتغل طول ما البرنامج مفتوح على هذا الجهاز. <b>انتبه: الجهاز المطفي يحتاج أحد يشغّله بإيده.</b></div>
+  <details class="card no-print" data-view="access" id="usersCard" data-perm="users.employees" hidden>
+    <summary>مستخدمو البرنامج وصلاحياتهم</summary>
+    <div class="tablewrap" id="usersTable"><div class="empty">جارِ التحميل...</div></div>
+    <div class="sec-title">إضافة مستخدم</div>
     <div class="row">
-      <label>IP جهاز البصمة <input id="aoIp" dir="ltr" placeholder="192.168.1.201" style="min-width:140px"></label>
-      <label>المنفذ <input id="aoPort" type="number" value="4370" style="min-width:80px"></label>
-      <label>كلمة سر الاتصال <input id="aoKey" type="password" inputmode="numeric" placeholder="0 = بدون" style="min-width:110px"></label>
+      <label>اسم المستخدم <input id="auName" autocomplete="off" autocapitalize="none" spellcheck="false" dir="auto"></label>
+      <label>كلمة السر <input id="auPass" type="password" autocomplete="new-password" placeholder="6 أحرف أو أكثر"></label>
+      <label>الصلاحية
+        <select id="auRole"></select>
+      </label>
+      <label id="auEmpBox" hidden>رقم بصمة الموظف <input id="auEmp" list="empIdList" inputmode="numeric" autocomplete="off" style="min-width:150px"></label>
+      <datalist id="empIdList"></datalist>
+      <button id="auBtn" class="primary">إضافة</button>
     </div>
-    <div class="row" style="margin-top:8px">
-      <label class="chk"><input type="checkbox" id="aoOn"> الإطفاء التلقائي شغّال</label>
-      <label>بالكشف: الإطفاء بعد <input type="number" id="aoDelay" min="0" max="1440" value="5" style="min-width:70px;width:80px"> دقيقة</label>
+    <div class="hint" id="rolesHint">
+      <span data-perm="super" hidden><b>صلاحية مطلقة:</b> كل شي بدون قيد، ويضيف كل أنواع المستخدمين ويخصص صلاحياتهم.<br>
+      <b>مخصص:</b> يبدي بدون صلاحيات، وبزر «تخصيص» يمّه تفعّل إله كل قائمة لوحدها وكل شي داخلها لوحده (مثلاً سحب وتصدير بدون استيراد، أو التقرير اليومي بس). التغيير يتطبق فوراً.<br></span>
+      <b>موظف:</b> يدخل ويشوف تقريره المحفوظ بس، وما يشوف أي شي عن غيره.
     </div>
-    <div class="sec-title" style="margin-top:10px">الطرق</div>
-    <div id="aoRules"></div>
-    <button id="aoAdd" class="small" style="margin-top:6px">+ إضافة طريقة</button>
-    <div class="row" style="margin-top:8px">
-      <button id="aoSave" class="primary">حفظ</button>
-      <button id="aoCheck">كشف الآن</button>
-      <button id="aoCancel" class="danger" hidden>إلغاء الإطفاء المحدد</button>
-    </div>
-    <div id="aoStatus" style="margin-top:8px;font-size:13px"></div>
-    <div id="aoState" style="margin-top:6px;font-size:13px"></div>
-    <div class="tablewrap" id="aoEvents" style="margin-top:8px"></div>
+
+    <div id="usersStatus" style="margin-top:10px;font-size:13px"></div>
   </details>
 
-  <details class="card no-print" id="xferCard" data-perm="xfer.use" hidden>
+  <details class="card no-print" data-view="access" id="auditCard" data-perm="audit.view" hidden>
+    <summary>سجل العمليات <small>منو سوّى شنو ومتى</small></summary>
+    <div class="row" style="margin-bottom:10px">
+      <button id="auditBtn">تحديث</button>
+      <label>المستخدم <select id="auditUser"><option value="">الكل</option></select></label>
+    </div>
+    <div class="tablewrap" id="auditTable"></div>
+  </details>
+
+  <section class="card no-print" data-view="system" id="appCard" hidden>
+    <div class="row" style="align-items:center;gap:14px">
+      <b>البرنامج على هذي الحاسبة</b>
+      <label class="chk" id="autoStartL" data-perm="app.autostart" hidden><input type="checkbox" id="autoStart"> يشتغل تلقائياً ويا تشغيل الحاسبة (مخفي بالخلفية)</label>
+      <button id="hideAppBtn" data-perm="app.hide" hidden>إخفاء البرنامج (يبقى يشتغل بالخلفية)</button>
+    </div>
+    <div class="hint" id="appMsg" style="margin-top:6px;font-size:12px">الإخفاء يسد نافذة البرنامج ويطلّعك منه حتى يقل استهلاك الذاكرة، والبصمات والأعضاء والإطفاء التلقائي يبقون يشتغلون. حتى ترجعه: افتح البرنامج من جديد من نفس الأيقونة، ويطلب كلمة السر.</div>
+  </section>
+
+  <details class="card no-print" data-view="system" id="xferCard" data-perm="xfer.use" hidden>
     <summary>نقل البيانات لجهاز ثاني <small>الحسابات، الموظفين ودوامهم، الإعدادات، التقارير المحفوظة</small></summary>
     <div class="hint" style="margin:-4px 0 10px">الجهازين على نفس الواي فاي. بالجهاز الجديد اضغط «استلام» ويطلع رابطه ورمز، وبهذا الجهاز اكتبهن واضغط «إرسال». البيانات تنتقل مشفّرة بالرمز، فإذا أحد سحبها بالطريق ما يگدر يقراها. بيانات الجهاز المستلم تنحفظ نسخة منها بـ backups وبعدين تنستبدل، وسجل العمليات ما ينتقل.</div>
     <div class="row" style="align-items:flex-start;gap:24px;flex-wrap:wrap">
@@ -524,169 +779,6 @@
       </div>
     </div>
   </details>
-  </div>
-
-  <div class="desk" id="desk">
-  <section class="card no-print" id="noPerms" hidden>
-    <h2>ما عندك صلاحيات بعد</h2>
-    <div class="hint">حسابك «مخصص» وما مفعّلة إله ولا قائمة. اطلب من صاحب الصلاحية المطلقة يفعّل لك اللي تحتاجه من زر «تخصيص» يم اسمك.</div>
-  </section>
-
-  <section class="card no-print" id="periodCard" data-perm="tab.*" hidden>
-    <h2>الفترة والتصفية</h2>
-    <div class="row">
-      <label>من تاريخ <input type="date" id="from"></label>
-      <label>إلى تاريخ <input type="date" id="to"></label>
-      <label>الموظف <select id="emp"><option value="">الكل</option></select></label>
-      <label>القسم <select id="dept"><option value="">كل الأقسام</option></select></label>
-    </div>
-  </section>
-
-  <section class="card no-print" id="schedCard" data-perm="tab.* sched.edit" hidden>
-    <h2>النظام العام للدوام <small style="font-weight:normal;color:var(--muted);font-size:12px">لكل الموظفين، إلا اللي إلهم نظام خاص بقائمة الموظفين</small></h2>
-    <div class="row">
-      <label>بداية الدوام <input type="time" id="start" value="08:00" data-gen></label>
-      <label>نهاية الدوام <input type="time" id="end" value="14:00" data-gen></label>
-      <label>سماحية التأخير (دقيقة) <input type="number" id="grace" value="10" min="0" max="240" style="min-width:80px" data-gen></label>
-      <label>تجاهل البصمة المكررة خلال (دقيقة) <input type="number" id="dedup" value="3" min="0" max="120" style="min-width:80px" data-gen></label>
-    </div>
-    <div style="margin-top:10px">
-      <label style="display:block;margin-bottom:8px">الزمنية اللي تبدي قبل <input type="time" id="hourSplit" value="10:00" data-gen style="min-width:0;width:110px"> صباحية (تبرّر البصمة الصباحية)، ومن هالوقت وطالع مسائية</label>
-      <label class="chk"><input type="checkbox" id="strict" data-gen> البصمة خارج الوقت والسماحية تنحسب عدم التزام</label>
-      <div class="hint" style="font-size:12px">الدخول بعد السماحية = «تأخر بالبصمة الصباحية»، والخروج قبل نهاية الدوام بأكثر من السماحية = «بصمة مسائية قبل الوقت»، والثنتين باليوم = «غياب (عدم التزام)». الزمنية والإجازة تبرّرهن مثل نقص البصمة.</div>
-    </div>
-    <div class="days" id="genOff"><span>العطلة الأسبوعية:</span></div>
-    <details id="genDaysBox" style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">أوقات تختلف لبعض الأيام <span id="genDaysSum" class="hint"></span></summary>
-      <div class="hint" style="font-size:12px">اليوم الفارغ يتبع بداية ونهاية الدوام فوق.</div>
-      <div class="dayTimes" id="genDays"></div>
-    </details>
-    <div class="row" style="margin-top:12px" data-perm="sched.edit" hidden>
-      <button class="primary" id="schedSaveBtn">حفظ النظام العام</button>
-      <button id="schedResetBtn" hidden>رجّع المحفوظ</button>
-    </div>
-    <div id="schedStatus" class="hint" style="font-size:12px"></div>
-  </section>
-
-  <!-- اسم التقرير: يطلع بالشاشة وبأول الصفحة بالطباعة وبـ PDF -->
-  <div id="printTitle"><h2 id="printTitleText"></h2><div id="printSub"></div></div>
-
-  <section class="stats" id="stats" data-perm="tab.*" hidden></section>
-
-  <section class="card" style="margin-top:14px" id="reportCard" data-perm="tab.*" hidden>
-    <div class="tabs">
-      <button data-tab="daily" class="active" data-perm="tab.daily">التقرير اليومي</button>
-      <button data-tab="summary" data-perm="tab.summary">ملخص الموظفين</button>
-      <button data-tab="raw" data-perm="tab.raw">سجل البصمات</button>
-      <button data-tab="users" data-perm="tab.users">الموظفون</button>
-      <button data-tab="leaves" data-perm="tab.leaves">التصفية والإجازات</button>
-      <button data-tab="person" data-perm="tab.person">تقرير موظف</button>
-    </div>
-    <div class="row no-print" style="margin-bottom:10px">
-      <button id="printBtn" data-perm="tab.print" hidden>طباعة / PDF</button>
-      <button id="publishBtn" class="primary" data-perm="reports.publish" hidden>حفظ التقرير للموظفين</button>
-      <div class="tools" id="usersTools" style="display:none">
-        <span class="hint" style="font-size:12px">لتعديل بيانات الموظفين بالجملة: «تصدير Excel شامل» ← عدّل ورقة «الموظفين» ← «استيراد النسخة الشاملة».</span>
-      </div>
-      <div class="tools" id="personTools" style="display:none">
-        <label>الموظف <select id="personSel"></select></label>
-      </div>
-      <div class="tools" id="leavesTools" style="display:none">
-        <button id="lvUploadBtn" class="primary" data-perm="leaves.upload" hidden>رفع تقرير الإجازات (Excel / CSV)</button>
-        <button id="lvClearBtn" class="danger" data-perm="leaves.clear" hidden>مسح بيانات الإجازات</button>
-        <label>العرض <select id="lvView"><option value="days">حسب الأيام</option><option value="emp">حسب الموظفين</option></select></label>
-        <label class="chk"><input type="checkbox" id="lvOnlyBad"> غير المبرّر فقط</label>
-        <label class="chk"><input type="checkbox" id="lvHourAbs"> احذف الغياب إذا عنده زمنية بنفس اليوم</label>
-        <input type="file" id="lvFile" accept=".xlsx,.csv,.txt" hidden>
-      </div>
-    </div>
-    <div id="tabStatus" class="no-print"></div>
-    <div id="leavesInfo" class="no-print" hidden></div>
-    <div class="tablewrap" id="tableArea"><div class="empty">اسحب البيانات من الجهاز أولاً</div></div>
-  </section>
-
-  <details class="card no-print" id="manualCard" data-perm="manual.punch manual.holidays" hidden>
-    <summary>البصمات اليدوية <small>لموظف نسى يبصم أو كان بواجب</small></summary>
-    <div data-perm="manual.punch">
-    <div class="hint" style="margin:-4px 0 10px">تنحفظ بالبرنامج مو بالجهاز، وتدخل بالتقارير مكتوب يمها «يدوية» ويا السبب واسم اللي ضافها، وتنسجل بسجل العمليات.</div>
-    <div class="row">
-      <label>الموظف <input id="mpEmp" list="mpEmps" inputmode="numeric" placeholder="رقم الموظف" autocomplete="off" style="min-width:150px"></label>
-      <datalist id="mpEmps"></datalist>
-      <label>التاريخ <input type="date" id="mpDate"></label>
-      <label>النوع
-        <select id="mpType">
-          <option value="both">دخول وخروج (يوم كامل)</option>
-          <option value="in">دخول فقط</option>
-          <option value="out">خروج فقط</option>
-        </select>
-      </label>
-      <label id="mpInL">وقت الدخول <input type="time" id="mpIn"></label>
-      <label id="mpOutL">وقت الخروج <input type="time" id="mpOut"></label>
-      <label>السبب
-        <select id="mpReason">
-          <option value="forgot">نسى يبصم</option>
-          <option value="duty">واجب رسمي</option>
-          <option value="device">عطل بالجهاز</option>
-          <option value="other">سبب آخر</option>
-        </select>
-      </label>
-      <label>ملاحظة <input id="mpNote" maxlength="200" placeholder="اختياري" autocomplete="off" style="min-width:180px"></label>
-      <button id="mpBtn" class="primary">إضافة</button>
-    </div>
-    <div id="mpStatus" style="margin-top:8px;font-size:13px"></div>
-    <div class="sec-title">البصمات اليدوية المضافة</div>
-    <div class="tablewrap" id="mpTable"><div class="empty">ما أكو بصمات يدوية</div></div>
-    </div>
-    <div data-perm="manual.holidays">
-    <div class="sec-title">العطل الرسمية <small class="hint">يوم كامل ما تنحسب بيه بصمة ولا غياب لكل الموظفين</small></div>
-    <div class="row">
-      <label>التاريخ <input type="date" id="holDate"></label>
-      <label>اسم العطلة <input id="holName" maxlength="80" placeholder="مثلاً: عيد الأضحى" autocomplete="off" style="min-width:180px"></label>
-      <button id="holBtn" class="primary">إضافة عطلة رسمية</button>
-    </div>
-    <div id="holStatus" style="margin-top:8px;font-size:13px"></div>
-    <div class="tablewrap" id="holTable"><div class="empty">ما أكو عطل رسمية</div></div>
-    </div>
-  </details>
-
-  <details class="card no-print" id="usersCard" data-perm="users.employees" hidden>
-    <summary>مستخدمو البرنامج وصلاحياتهم</summary>
-    <div class="tablewrap" id="usersTable"><div class="empty">جارِ التحميل...</div></div>
-    <div class="sec-title">إضافة مستخدم</div>
-    <div class="row">
-      <label>اسم المستخدم <input id="auName" autocomplete="off" autocapitalize="none" spellcheck="false" dir="auto"></label>
-      <label>كلمة السر <input id="auPass" type="password" autocomplete="new-password" placeholder="6 أحرف أو أكثر"></label>
-      <label>الصلاحية
-        <select id="auRole"></select>
-      </label>
-      <label id="auEmpBox" hidden>رقم بصمة الموظف <input id="auEmp" list="empIdList" inputmode="numeric" autocomplete="off" style="min-width:150px"></label>
-      <datalist id="empIdList"></datalist>
-      <button id="auBtn" class="primary">إضافة</button>
-    </div>
-    <div class="hint" id="rolesHint">
-      <span data-perm="super" hidden><b>صلاحية مطلقة:</b> كل شي بدون قيد، ويضيف كل أنواع المستخدمين ويخصص صلاحياتهم.<br>
-      <b>مخصص:</b> يبدي بدون صلاحيات، وبزر «تخصيص» يمّه تفعّل إله كل قائمة لوحدها وكل شي داخلها لوحده (مثلاً سحب وتصدير بدون استيراد، أو التقرير اليومي بس). التغيير يتطبق فوراً.<br></span>
-      <b>موظف:</b> يدخل ويشوف تقريره المحفوظ بس، وما يشوف أي شي عن غيره.
-    </div>
-
-    <div id="usersStatus" style="margin-top:10px;font-size:13px"></div>
-  </details>
-
-  <details class="card no-print" id="reportsCard" data-perm="reports.list" hidden>
-    <summary>التقارير المحفوظة للموظفين <small>كل موظف عنده حساب يشوف تقريره منها بس</small></summary>
-    <div class="hint" style="margin:-4px 0 10px">حتى تحفظ تقرير: اسحب البيانات، اختار الفترة، ارفع تقرير الإجازات إذا عندك، وبعدها اضغط «حفظ التقرير للموظفين» فوق الجداول.</div>
-    <div class="tablewrap" id="reportsTable"><div class="empty">جارِ التحميل...</div></div>
-    <div id="reportsStatus" style="margin-top:8px;font-size:13px"></div>
-  </details>
-
-  <details class="card no-print" id="auditCard" data-perm="audit.view" hidden>
-    <summary>سجل العمليات <small>منو سوّى شنو ومتى</small></summary>
-    <div class="row" style="margin-bottom:10px">
-      <button id="auditBtn">تحديث</button>
-      <label>المستخدم <select id="auditUser"><option value="">الكل</option></select></label>
-    </div>
-    <div class="tablewrap" id="auditTable"></div>
-  </details>
-  </div>
 </main>
 
 <div class="overlay no-print" id="editOverlay">
@@ -878,6 +970,7 @@ async function initSession() {
   applyRole();
   applyGenLock();
   renderManualList();
+  applyNav();
   loadShare();
   await loadGeneral();
   if (DATA) render();
@@ -1496,7 +1589,7 @@ function render() {
   syncTools();
   CUR_GEN = genForm(); SCHED_CACHE = new Map(); RANGE_CACHE = null;
   genStatus();
-  if (!DATA) { renderLeavesInfo(null); return; }
+  if (!DATA) { renderLeavesInfo(null); renderKpis(null); return; }
   saveSettings();
   const daily = dailyRows();
   const recon = reconcile(daily);
@@ -1509,6 +1602,7 @@ function render() {
   const cards = [[oneEmp ? 'أيام دوامه بالفترة' : 'أيام العمل بالفترة (النظام العام)', s.days], ['حالات التأخير', s.late], ['نقص بصمة (دخول أو خروج)', s.miss]];
   if (hasLeaves()) cards.push(['غير مبرّر بعد التصفية', recon.filter(x => x.code === 'bad' || x.code === 'partial').length]);
   $('stats').innerHTML = cards.map(([k,v]) => `<div class="stat">${k}<b>${v}</b></div>`).join('');
+  renderKpis(daily, summ);
 
   const period = `${$('from').value || '...'} إلى ${$('to').value || '...'}`;
   let html = '';
@@ -2955,6 +3049,73 @@ loadLeaves();
   };
   tick(); setInterval(tick, 1000);
 })();
+
+// ---------- مؤشرات الرئيسية: نفس حسابات التقرير للفترة والتصفية المختارة ----------
+function renderKpis(daily, summ) {
+  const set = (id, v) => { $(id).textContent = v; };
+  if (!daily) {
+    ['kPresent', 'kLate', 'kAbs', 'kRate'].forEach(id => set(id, '—'));
+    set('kPresentS', 'اسحب البيانات حتى تطلع الأرقام'); ['kLateS', 'kAbsS', 'kRateS', 'kRateN'].forEach(id => set(id, ''));
+    $('kRing').style.setProperty('--p', 0); return;
+  }
+  const emps = summ.filter(r => !r.exempt), ids = new Set(emps.map(r => r.userId));
+  const presentDays = emps.reduce((n, r) => n + r.present, 0), presentEmps = emps.filter(r => r.present > 0).length;
+  const lateRows = daily.filter(r => r.late && ids.has(r.userId)), lateEmps = new Set(lateRows.map(r => r.userId)).size;
+  const absDays = emps.reduce((n, r) => n + (r.absent || 0), 0), absEmps = emps.filter(r => r.absent > 0).length;
+  const expected = emps.reduce((n, r) => n + workingDaysFor(r.userId).length, 0);
+  const clean = daily.filter(r => ids.has(r.userId) && r.tracked && !r.late && !r.missingIn && !r.missingOut && !r.noncomp).length;
+  const pct = expected ? Math.round(Math.min(clean, expected) / expected * 100) : null;
+  set('kPresent', presentDays); set('kPresentS', `يوم حضور لـ ${presentEmps} من ${emps.length} موظف`);
+  set('kLate', lateEmps); set('kLateS', `${lateRows.length} حالة تأخير بالفترة`);
+  set('kAbs', absEmps); set('kAbsS', absDays ? `${absDays} يوم غياب غير مبرّر` : 'ما أكو غياب غير مبرّر');
+  set('kRate', pct == null ? '—' : pct + '%'); set('kRateN', pct == null ? '' : pct);
+  set('kRateS', expected ? `${clean} من ${expected} يوم دوام بدون ملاحظات` : 'ما أكو أيام دوام بالفترة');
+  $('kRing').style.setProperty('--p', pct || 0);
+}
+
+// ---------- الأقسام والقائمة الجانبية ----------
+const VIEWS = { home: 'الرئيسية والتقارير', emps: 'الموظفون', sched: 'الدوام والعطل', device: 'جهاز البصمة', access: 'الصلاحيات والسجل', system: 'النقل والبرنامج' };
+const AUTO_OPEN = { emps: ['reportsCard'], sched: ['manualCard'], access: ['usersCard', 'auditCard'], system: ['xferCard'] };
+let VIEW = 'home', VIEW_TAB = null;
+const opened = new Set();
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+const inView = (el, v) => v === 'all' || (el.dataset.view || '').split(' ').includes(v);
+const viewHasContent = (v) => v === 'emps' ? (can('tab.users') || !!($('reportsCard') && !$('reportsCard').hidden))
+  : v === 'sched' ? (can('sched.edit') || !$('manualCard').hidden) // النظام العام للقراءة بس ما يحتاج قسم
+  : [...document.querySelectorAll('main > [data-view]')].some(el => inView(el, v) && !el.hidden && el.id !== 'printTitle' && el.id !== 'stats');
+function setView(v, opts = {}) {
+  if (v !== 'all' && !VIEWS[v]) v = 'home';
+  const prev = VIEW; VIEW = v;
+  document.body.dataset.view = v;
+  document.querySelectorAll('main > [data-view]').forEach(el => el.classList.toggle('off-view', !inView(el, v)));
+  document.querySelectorAll('.nav-i').forEach(b => { b.classList.toggle('active', b.dataset.go === v); b.setAttribute('aria-current', b.dataset.go === v ? 'page' : 'false'); });
+  $('viewTitle').textContent = VIEWS[v] || 'تقارير الحضور والانصراف';
+  // الموظفون = جدول الموظفين بدون التبويبات، والرجوع للرئيسية يرجّع التبويب اللي جان
+  const tabBtn = (t) => document.querySelector(`.tabs button[data-tab="${t}"]`);
+  if (v === 'emps' && can('tab.users')) { if (prev !== 'emps') VIEW_TAB = currentTab; if (currentTab !== 'users') tabBtn('users').click(); }
+  else if (prev === 'emps' && VIEW_TAB && VIEW_TAB !== 'users' && tabBtn(VIEW_TAB) && !tabBtn(VIEW_TAB).hidden) tabBtn(VIEW_TAB).click();
+  if (!opened.has(v)) { opened.add(v); (AUTO_OPEN[v] || []).forEach(id => { const d = $(id); if (d && !d.hidden && !d.open) d.open = true; }); }
+  if (v !== 'all') lsSet('zkView', v);
+  if (!opts.keepScroll) window.scrollTo({ top: 0 });
+}
+function applyNav() {
+  let first = null;
+  document.querySelectorAll('.nav-i').forEach(b => { b.hidden = !viewHasContent(b.dataset.go); if (!b.hidden && !first) first = b.dataset.go; });
+  document.querySelectorAll('[data-go]:not(.nav-i)').forEach(b => { if (!viewHasContent(b.dataset.go)) b.hidden = true; });
+  const want = lsGet('zkView') || 'home';
+  setView(want === 'all' ? 'all' : viewHasContent(want) ? want : (first || 'home'), { keepScroll: true });
+}
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) setView(b.dataset.go); });
+
+// ---------- بيانات الجهاز بالرئيسية: نفس زر السحب ونفس الحالة ----------
+$('haFetch').onclick = () => $('fetchBtn').click();
+const haIp = () => { $('haIp').textContent = ($('ip').value || '—') + ($('port').value && $('port').value !== '4370' ? ':' + $('port').value : ''); };
+['ip', 'port'].forEach(id => $(id).addEventListener('input', haIp));
+new MutationObserver(() => { $('haStatus').textContent = $('status').textContent; $('haStatus').className = 'hint ' + $('status').className; })
+  .observe($('status'), { childList: true, characterData: true, subtree: true, attributes: true });
+new MutationObserver(() => { $('haFetch').disabled = $('fetchBtn').disabled; }).observe($('fetchBtn'), { attributes: true, attributeFilter: ['disabled'] });
+haIp(); setTimeout(haIp, 800);
 </script>
 </body>
 </html>
