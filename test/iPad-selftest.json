@@ -1,0 +1,30 @@
+{
+  "confirm" : "راح يتوقف الجهاز عن استقبال البصمات لحد ما تضغط \"إعادة تفعيل البصمة\". متأكد؟",
+  "disable" : "تم إيقاف البصمة مؤقتاً. الموظفون ما يگدرون يبصمون لحد ما تضغط \"إعادة تفعيل\"",
+  "done" : true,
+  "download" : {
+    "bytes" : 25419,
+    "name" : "الحضور_2026-11-26_20-15.xlsx"
+  },
+  "enable" : "تم تفعيل الجهاز ويستقبل البصمات بشكل طبيعي",
+  "fetch" : "تم السحب: 4 موظف، 800 بصمة",
+  "fetchMs" : 2093,
+  "goTime" : "2026-11-26T20:14:51",
+  "info" : "تمت قراءة معلومات الجهاز · الجهاز متأخر 2 دقيقة، اضغط \"مزامنة الوقت\"",
+  "infoRows" : 12,
+  "jsTime" : "Thu Nov 26 2026 20:14:51 GMT+0300 (Arabian Standard Time)",
+  "jsZone" : "Asia\/Baghdad",
+  "keepAlive" : "on",
+  "loaded" : "تقارير الحضور - جهاز البصمة",
+  "login" : "setup",
+  "loginTitle" : "أول تشغيل: حساب الصلاحية المطلقة",
+  "printPages" : 4,
+  "printRestored" : true,
+  "printRows" : 84,
+  "printTables" : 4,
+  "shareMode" : "phone",
+  "shareUrls" : [
+    "http:\/\/192.168.64.16:3000"
+  ],
+  "summaryRows" : 4
+}
