@@ -21,26 +21,26 @@ func newStore(t *testing.T) *UserStore {
 
 func TestLastSuperIsProtected(t *testing.T) {
 	s := newStore(t)
-	if _, err := s.create("boss", "password1", RoleSuper, ""); err != nil {
+	if _, err := s.create("boss", "password1", RoleSuper, "", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.remove("boss"); err == nil {
 		t.Fatal("removed the only super account")
 	}
-	if _, err := s.update("boss", RoleAdmin, "", ""); err == nil {
+	if _, err := s.update("boss", RoleCustom, "", "", nil); err == nil {
 		t.Fatal("demoted the only super account")
 	}
-	if _, err := s.create("second", "password2", RoleSuper, ""); err != nil {
+	if _, err := s.create("second", "password2", RoleSuper, "", nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.update("boss", RoleSupervisor, "", ""); err != nil {
+	if _, err := s.update("boss", RoleCustom, "", "", nil); err != nil {
 		t.Fatal("could not demote with another super present:", err)
 	}
 	if err := s.remove("second"); err == nil {
 		t.Fatal("removed the last super after demotion")
 	}
-	// المدير (admin) مو مطلقة: حذفه مسموح
-	s.create("mgr", "password3", RoleAdmin, "")
+	// المخصص مو مطلقة: حذفه مسموح
+	s.create("mgr", "password3", RoleCustom, "", nil)
 	if err := s.remove("mgr"); err != nil {
 		t.Fatal(err)
 	}
@@ -48,29 +48,29 @@ func TestLastSuperIsProtected(t *testing.T) {
 
 func TestEmployeeAccounts(t *testing.T) {
 	s := newStore(t)
-	if _, err := s.create("ali", "password1", RoleEmployee, ""); err == nil {
+	if _, err := s.create("ali", "password1", RoleEmployee, "", nil); err == nil {
 		t.Fatal("employee account without fingerprint number")
 	}
-	u, err := s.create("ali", "password1", RoleEmployee, " ٠١٢ ")
+	u, err := s.create("ali", "password1", RoleEmployee, " ٠١٢ ", nil)
 	if err != nil || u.EmpID != "012" {
 		t.Fatalf("create: %+v %v", u, err)
 	}
-	if _, err := s.create("ali2", "password1", RoleEmployee, "12"); err == nil || !strings.Contains(err.Error(), "ali") {
+	if _, err := s.create("ali2", "password1", RoleEmployee, "12", nil); err == nil || !strings.Contains(err.Error(), "ali") {
 		t.Fatalf("same employee twice (012 = 12): %v", err)
 	}
-	if u, _ := s.create("boss", "password1", RoleSuper, "99"); u.EmpID != "" {
+	if u, _ := s.create("boss", "password1", RoleSuper, "99", nil); u.EmpID != "" {
 		t.Fatal("non-employee kept an employee number")
 	}
-	if u, err := s.update("ali", RoleViewer, "", ""); err != nil || u.EmpID != "" {
+	if u, err := s.update("ali", RoleCustom, "", "", nil); err != nil || u.EmpID != "" {
 		t.Fatalf("role change kept the number: %+v %v", u, err)
 	}
-	if _, err := s.update("ali", RoleEmployee, "", ""); err == nil {
+	if _, err := s.update("ali", RoleEmployee, "", "", nil); err == nil {
 		t.Fatal("became employee without a number")
 	}
-	if u, err := s.update("ali", RoleEmployee, "", "7"); err != nil || u.EmpID != "7" {
+	if u, err := s.update("ali", RoleEmployee, "", "7", nil); err != nil || u.EmpID != "7" {
 		t.Fatalf("back to employee: %+v %v", u, err)
 	}
-	if !atLeast(RoleSuper, RoleAdmin) || atLeast(RoleAdmin, RoleSuper) || atLeast(RoleEmployee, RoleViewer) || !atLeast(RoleEmployee, RoleEmployee) {
+	if !atLeast(RoleSuper, RoleCustom) || atLeast(RoleCustom, RoleSuper) || atLeast(RoleEmployee, RoleCustom) || !atLeast(RoleEmployee, RoleEmployee) {
 		t.Fatal("role ranking is wrong")
 	}
 }
@@ -93,25 +93,67 @@ func TestOldAdminBecomesSuper(t *testing.T) {
 	if u, ok := s.authenticate("admin", "old-pass1"); !ok || u.Role != RoleSuper {
 		t.Fatalf("old admin: %+v", u)
 	}
-	if u, _ := s.get("sup"); u.Role != RoleSupervisor {
-		t.Fatal("supervisor changed")
+	if u, _ := s.get("sup"); u.Role != RoleCustom || strings.Join(u.Perms, ",") != strings.Join(legacyPerms["supervisor"], ",") {
+		t.Fatalf("supervisor must become custom with the same permissions: %+v", u)
 	}
 	b, _ := os.ReadFile(filepath.Join(dir, "data", "users.json"))
-	if !strings.Contains(string(b), `"schema": 2`) {
+	if !strings.Contains(string(b), `"schema": 3`) {
 		t.Fatal("not saved in the new format")
 	}
-	// قراءة ثانية: "admin" الجديد يبقى مدير (ما يصير مطلقة مرة ثانية)
-	s.create("mgr", "password9", RoleAdmin, "")
+	// قراءة ثانية: يبقى مخصص (ما يصير مطلقة)
+	s.create("mgr", "password9", "admin", "", nil)
 	again, _ := LoadUsers()
-	if u, _ := again.get("mgr"); u.Role != RoleAdmin {
-		t.Fatalf("new admin became %s after reload", u.Role)
+	if u, _ := again.get("mgr"); u.Role != RoleCustom || !hasPerm(u.Role, u.Perms, "users.employees") || hasPerm(u.Role, u.Perms, "sched.edit") {
+		t.Fatalf("new admin preset after reload: %+v", u)
+	}
+}
+
+// ملف من 2.8 لـ 2.16 (schema 2): المدير والمشرف والأساسي يصيرون «مخصص» بنفس اللي كانوا يگدرونه
+func TestSchema2RolesBecomeCustom(t *testing.T) {
+	dir := t.TempDir()
+	Configure(dir, false)
+	os.MkdirAll(filepath.Join(dir, "data"), 0o755)
+	salt, hash := hashPassword("pass-1234")
+	old, _ := json.Marshal(map[string]any{"schema": 2, "users": []map[string]any{
+		{"username": "boss", "role": "super", "salt": salt, "hash": hash, "iterations": pbkdf2Iter},
+		{"username": "mgr", "role": "admin", "salt": salt, "hash": hash, "iterations": pbkdf2Iter},
+		{"username": "view", "role": "viewer", "salt": salt, "hash": hash, "iterations": pbkdf2Iter},
+		{"username": "emp", "role": "employee", "empId": "3", "salt": salt, "hash": hash, "iterations": pbkdf2Iter},
+	}})
+	os.WriteFile(filepath.Join(dir, "data", "users.json"), old, 0o600)
+	s, err := LoadUsers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"boss": RoleSuper, "mgr": RoleCustom, "view": RoleCustom, "emp": RoleEmployee}
+	for n, r := range want {
+		if u, _ := s.get(n); u.Role != r {
+			t.Fatalf("%s became %s", n, u.Role)
+		}
+	}
+	mgr, _ := s.get("mgr")
+	view, _ := s.get("view")
+	if !hasPerm(mgr.Role, mgr.Perms, "ctl.clearLogs") || hasPerm(view.Role, view.Perms, "ctl.clearLogs") || !hasPerm(view.Role, view.Perms, "conn.fetch") {
+		t.Fatalf("presets: %v / %v", mgr.Perms, view.Perms)
+	}
+	if hasPerm(mgr.Role, mgr.Perms, "danger.clearAll") || hasPerm(mgr.Role, mgr.Perms, "sched.edit") {
+		t.Fatal("old admin got super-only permissions")
+	}
+	// تغيير الصلاحيات، والمجهولة تنشال
+	u, err := s.update("view", "", "", "", []string{"tab.daily", "nope", "tab.daily", "conn.fetch"})
+	if err != nil || strings.Join(u.Perms, ",") != "conn.fetch,tab.daily" {
+		t.Fatalf("perms update: %v %v", u.Perms, err)
+	}
+	// الصلاحيات تنشال إذا صار موظف أو مطلقة
+	if u, _ := s.update("view", RoleEmployee, "", "9", nil); u.Perms != nil {
+		t.Fatal("employee kept permissions")
 	}
 }
 
 func TestResetAll(t *testing.T) {
 	s := newStore(t)
-	s.create("boss", "password1", RoleSuper, "")
-	s.create("emp", "password1", RoleEmployee, "5")
+	s.create("boss", "password1", RoleSuper, "", nil)
+	s.create("emp", "password1", RoleEmployee, "5", nil)
 	backup, n, err := s.ResetAll()
 	if err != nil || n != 2 || s.Count() != 0 {
 		t.Fatalf("reset: %v %d %d", err, n, s.Count())
@@ -144,7 +186,7 @@ func TestEnsureAdmin(t *testing.T) {
 	if _, ok := s.authenticate("admin", "second-pass"); !ok {
 		t.Fatal("new password does not work")
 	}
-	s.create("helper", "helper-pass", RoleEmployee, "3")
+	s.create("helper", "helper-pass", RoleEmployee, "3", nil)
 	if _, _, err = s.EnsureAdmin("helper", "helper-pass"); err != nil {
 		t.Fatal(err)
 	}
@@ -188,45 +230,41 @@ func TestCorruptUsersFileStops(t *testing.T) {
 }
 
 func TestRolesAndActions(t *testing.T) {
+	// كل أمر للجهاز إله صلاحية من القائمة (حتى تبين بالتخصيص)
 	for action := range actions {
-		need := actionNeeds(action)
-		if !validRole(need) {
-			t.Fatalf("%s has no role", action)
+		p, ok := actionPerm[action]
+		if !ok {
+			t.Fatalf("%s has no permission", action)
+		}
+		if !permKeys[p] {
+			t.Fatalf("%s needs unknown permission %s", action, p)
 		}
 	}
-	// وقت الجهاز وخصائصه والمسح الكامل ومدراء الجهاز: للصلاحية المطلقة بس
-	for _, a := range []string{"setTime", "syncTime", "writeOption", "readOption", "setDeviceCommKey", "clearAllData",
-		"clearAdmins", "clearAccess", "clearOplog", "setPrivilege"} {
-		if actionNeeds(a) != RoleSuper {
-			t.Fatalf("%s must be super only", a)
-		}
-	}
-	// المدير: موظفين الجهاز (مو مدراءه) ومسح سجل البصمات
-	for _, a := range []string{"addUser", "deleteUser", "deleteFingers", "setPin", "clearLogs", "restoreUsers"} {
-		if actionNeeds(a) != RoleAdmin {
-			t.Fatalf("%s should need admin", a)
-		}
-	}
-	if actionNeeds("updateUser") != RoleSupervisor {
-		t.Fatal("updateUser must need a supervisor")
-	}
-	for _, a := range []string{"info", "getTime", "refresh", "unlock", "testVoice", "lcdWrite", "lcdClear",
-		"disable", "enable", "restart", "powerOff", "deviceSecurityCheck"} {
-		if actionNeeds(a) != RoleViewer {
-			t.Fatalf("%s should be a basic command", a)
-		}
-	}
-	// أي أمر جديد ما مذكور بالجدول يصير للصلاحية المطلقة تلقائياً
-	if actionNeeds("someFutureCommand") != RoleSuper {
-		t.Fatal("unknown commands must default to super")
-	}
-	// الموظف ما يوصل لولا أمر
+	all := allPerms()
 	for a := range actions {
-		if atLeast(RoleEmployee, actionNeeds(a)) {
-			t.Fatalf("employee can run %s", a)
+		if hasPerm(RoleEmployee, all, actionPerm[a]) || hasPerm("", all, actionPerm[a]) || hasPerm("admin", all, actionPerm[a]) {
+			t.Fatalf("non-custom role can run %s", a)
+		}
+		if !hasPerm(RoleSuper, nil, actionPerm[a]) || hasPerm(RoleCustom, nil, actionPerm[a]) || !hasPerm(RoleCustom, []string{actionPerm[a]}, actionPerm[a]) {
+			t.Fatalf("permission check wrong for %s", a)
 		}
 	}
-	if atLeast("", RoleViewer) || atLeast("root", RoleViewer) || !atLeast(RoleAdmin, RoleSupervisor) || atLeast(RoleViewer, RoleSupervisor) || atLeast("", RoleEmployee) {
-		t.Fatal("role ranking is wrong")
+	seen := map[string]bool{}
+	for _, g := range permCatalog {
+		if seen[g.Key] || len(g.Items) == 0 {
+			t.Fatalf("group %s", g.Key)
+		}
+		seen[g.Key] = true
+		for _, it := range g.Items {
+			if seen["i:"+it.Key] || it.Label == "" {
+				t.Fatalf("item %s", it.Key)
+			}
+			seen["i:"+it.Key] = true
+		}
+	}
+	for n, ps := range legacyPerms {
+		if len(cleanPerms(ps)) != len(ps) {
+			t.Fatalf("preset %s has unknown permissions", n)
+		}
 	}
 }

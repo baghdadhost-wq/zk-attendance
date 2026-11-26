@@ -2,9 +2,9 @@ package server
 
 // مستخدمو البرنامج وصلاحياتهم. كل مستخدم إله اسم وكلمة سر وصلاحية وحدة من ثلاث:
 //
-//	admin       صلاحية مطلقة: كل الأوامر حتى الخطرة والمخفية، وإدارة المستخدمين وسجل العمليات
-//	supervisor  مشرف: أوامر الجهاز العادية وتعديل بيانات الموظفين
-//	viewer      مشاهد: سحب البيانات والتقارير والتصدير بس
+//	super     صلاحية مطلقة: كلشي بدون قيد
+//	custom    مخصص: بس القوائم والأوامر اللي تنفعّله وحده وحده (perms.go)
+//	employee  موظف: يشوف تقريره المحفوظ بس
 //
 // كلمات السر تنحفظ مشفرة (PBKDF2-SHA256) بملف data/users.json، مو نص واضح.
 
@@ -28,22 +28,35 @@ import (
 )
 
 const (
-	RoleSuper      = "super"      // صلاحية مطلقة بدون قيد
-	RoleAdmin      = "admin"      // مدير: كل شي عدا تغيير الأوقات وخصائص الجهاز، ويدير حسابات الموظفين بس
-	RoleSupervisor = "supervisor" // مشرف
-	RoleViewer     = "viewer"     // أساسي
-	RoleEmployee   = "employee"   // موظف: يشوف تقريره المحفوظ بس
+	RoleSuper    = "super"    // صلاحية مطلقة بدون قيد
+	RoleCustom   = "custom"   // مخصص: الصلاحيات اللي تنفعّله بس
+	RoleEmployee = "employee" // موظف: يشوف تقريره المحفوظ بس
 
-	usersSchema = 2 // من 2.8: "admin" صار مدير محدود، والمطلقة اسمها "super"
+	// 2: "admin" صار مدير محدود والمطلقة اسمها "super". 3: المدير والمشرف والأساسي صاروا «مخصص» بنفس صلاحياتهم
+	usersSchema = 3
 
 	pbkdf2Iter = 120000
 	minPassLen = 6
 )
 
 // الموظف ترتيبه صفر: ما يوصل لأي شي بالبرنامج غير تقريره
-var roleRank = map[string]int{RoleEmployee: 0, RoleViewer: 1, RoleSupervisor: 2, RoleAdmin: 3, RoleSuper: 4}
+var roleRank = map[string]int{RoleEmployee: 0, RoleCustom: 1, RoleSuper: 2}
 
-var roleLabels = map[string]string{RoleSuper: "صلاحية مطلقة", RoleAdmin: "مدير", RoleSupervisor: "مشرف", RoleViewer: "أساسي", RoleEmployee: "موظف"}
+var roleLabels = map[string]string{RoleSuper: "صلاحية مطلقة", RoleCustom: "مخصص", RoleEmployee: "موظف"}
+
+// normRole: أسماء الصلاحيات القديمة (admin / supervisor / viewer) تصير «مخصص» ويا صلاحياتها القديمة كقالب
+func normRole(role string, perms []string) (string, []string) {
+	if preset, ok := legacyPerms[role]; ok {
+		if perms == nil {
+			perms = preset
+		}
+		return RoleCustom, cleanPerms(perms)
+	}
+	if role == RoleCustom {
+		return role, cleanPerms(perms)
+	}
+	return role, nil
+}
 
 func validRole(r string) bool { _, ok := roleRank[r]; return ok }
 
@@ -58,7 +71,8 @@ type appUser struct {
 	Salt       string `json:"salt"`
 	Hash       string `json:"hash"`
 	Iterations int    `json:"iterations"`
-	EmpID      string `json:"empId,omitempty"` // حساب موظف: رقم بصمته
+	EmpID      string   `json:"empId,omitempty"` // حساب موظف: رقم بصمته
+	Perms      []string `json:"perms,omitempty"` // حساب مخصص: صلاحياته
 	Created    string `json:"created,omitempty"`
 	Updated    string `json:"updated,omitempty"`
 	LastLogin  string `json:"lastLogin,omitempty"`
@@ -85,9 +99,10 @@ func parseUsers(b []byte) (users []appUser, old bool, err error) {
 	}
 	old = f.Schema < usersSchema
 	for _, u := range f.Users {
-		if old && u.Role == RoleAdmin {
+		if f.Schema < 2 && u.Role == "admin" {
 			u.Role = RoleSuper
 		}
+		u.Role, u.Perms = normRole(u.Role, u.Perms)
 		if u.Role == RoleEmployee && strings.TrimSpace(u.EmpID) == "" {
 			continue
 		}
@@ -130,12 +145,17 @@ func usersFile() string {
 func oldAuthFile() string { return filepath.Join(dataDir, "data", "auth.json") }
 
 // حسابات وضع التجربة (بيانات وهمية بس، وتنحفظ بملف منفصل)
+// preset = قالب صلاحيات الحساب المخصص
 var demoAccounts = []map[string]string{
 	{"username": "owner", "password": "123456", "role": RoleSuper},
-	{"username": "admin", "password": "123456", "role": RoleAdmin},
-	{"username": "supervisor", "password": "123456", "role": RoleSupervisor},
-	{"username": "viewer", "password": "123456", "role": RoleViewer},
+	{"username": "admin", "password": "123456", "role": RoleCustom, "preset": "admin"},
+	{"username": "viewer", "password": "123456", "role": RoleCustom, "preset": "viewer"},
 	{"username": "employee", "password": "123456", "role": RoleEmployee, "empId": "1"},
+}
+
+func demoUser(a map[string]string, now string) appUser {
+	salt, hash := hashPassword(a["password"])
+	return appUser{Username: a["username"], Role: a["role"], EmpID: a["empId"], Perms: legacyPerms[a["preset"]], Salt: salt, Hash: hash, Iterations: pbkdf2Iter, Created: now}
 }
 
 // LoadUsers يقرأ المستخدمين. إذا ما أكو ملف مستخدمين وأكو كلمة سر من النسخة السابقة، تصير كلمة سر حساب admin.
@@ -154,8 +174,7 @@ func LoadUsers() (*UserStore, error) {
 			s.users = nil
 			now := localISO(time.Now())
 			for _, a := range demoAccounts {
-				salt, hash := hashPassword(a["password"])
-				s.users = append(s.users, appUser{Username: a["username"], Role: a["role"], EmpID: a["empId"], Salt: salt, Hash: hash, Iterations: pbkdf2Iter, Created: now})
+				s.users = append(s.users, demoUser(a, now))
 			}
 		}
 		if old {
@@ -167,8 +186,7 @@ func LoadUsers() (*UserStore, error) {
 		now := localISO(time.Now())
 		if demoMode {
 			for _, a := range demoAccounts {
-				salt, hash := hashPassword(a["password"])
-				s.users = append(s.users, appUser{Username: a["username"], Role: a["role"], EmpID: a["empId"], Salt: salt, Hash: hash, Iterations: pbkdf2Iter, Created: now})
+				s.users = append(s.users, demoUser(a, now))
 			}
 			if err := s.saveLocked(); err != nil {
 				return nil, err
@@ -403,11 +421,12 @@ func (s *UserStore) list() []appUser {
 	return out
 }
 
-func (s *UserStore) create(name, pass, role, empID string) (appUser, error) {
+func (s *UserStore) create(name, pass, role, empID string, perms []string) (appUser, error) {
 	name, err := cleanUsername(name)
 	if err != nil {
 		return appUser{}, err
 	}
+	role, perms = normRole(role, perms)
 	if !validRole(role) {
 		return appUser{}, badReq("اختار الصلاحية")
 	}
@@ -433,7 +452,7 @@ func (s *UserStore) create(name, pass, role, empID string) (appUser, error) {
 		}
 	}
 	salt, hash := hashPassword(pass)
-	u := appUser{Username: name, Role: role, EmpID: empID, Salt: salt, Hash: hash, Iterations: pbkdf2Iter, Created: localISO(time.Now())}
+	u := appUser{Username: name, Role: role, EmpID: empID, Perms: perms, Salt: salt, Hash: hash, Iterations: pbkdf2Iter, Created: localISO(time.Now())}
 	s.users = append(s.users, u)
 	if err := s.saveLocked(); err != nil {
 		s.users = s.users[:len(s.users)-1]
@@ -451,7 +470,7 @@ func (s *UserStore) createFirstAdmin(name, pass string) (appUser, error) {
 	if !open {
 		return appUser{}, apiErr{403, "حساب الصلاحية المطلقة موجود من قبل، سجّل الدخول"}
 	}
-	u, err := s.create(name, pass, RoleSuper, "")
+	u, err := s.create(name, pass, RoleSuper, "", nil)
 	if err == nil {
 		s.mu.Lock()
 		if len(s.users) > 1 { // طلبين بنفس اللحظة: نخلي الأول بس
@@ -463,8 +482,16 @@ func (s *UserStore) createFirstAdmin(name, pass string) (appUser, error) {
 	return u, err
 }
 
-// update يغير الصلاحية أو كلمة السر أو رقم بصمة حساب الموظف (الفارغ يبقى مثل ما هو)
-func (s *UserStore) update(name, role, pass, empID string) (appUser, error) {
+// update يغير الصلاحية أو كلمة السر أو رقم بصمة حساب الموظف أو صلاحيات المخصص (الفارغ / nil يبقى مثل ما هو)
+func (s *UserStore) update(name, role, pass, empID string, perms []string) (appUser, error) {
+	var preset []string
+	if role != "" {
+		var p []string
+		role, p = normRole(role, perms)
+		if perms == nil && role == RoleCustom {
+			preset = p // قالب من اسم صلاحية قديم
+		}
+	}
 	if role != "" && !validRole(role) {
 		return appUser{}, badReq("صلاحية غير معروفة")
 	}
@@ -493,6 +520,15 @@ func (s *UserStore) update(name, role, pass, empID string) (appUser, error) {
 			return appUser{}, badReq("هذا آخر حساب بصلاحية مطلقة. أضف حساب ثاني بصلاحية مطلقة قبل ما تغير صلاحيته")
 		}
 		u.Role = role
+	}
+	if u.Role == RoleCustom { // صار مخصص: يبدي بلا صلاحيات، أو بقالب الاسم القديم
+		if perms != nil {
+			u.Perms = cleanPerms(perms)
+		} else if preset != nil {
+			u.Perms = preset
+		}
+	} else {
+		u.Perms = nil
 	}
 	if u.Role == RoleEmployee {
 		if empID != "" {
@@ -563,7 +599,7 @@ func (s *UserStore) EnsureAdmin(name, pass string) (created, changed bool, err e
 	}
 	u, ok := s.get(name)
 	if !ok {
-		_, err := s.create(name, pass, RoleSuper, "")
+		_, err := s.create(name, pass, RoleSuper, "", nil)
 		return err == nil, false, err
 	}
 	samePass := u.check(pass)
@@ -579,9 +615,10 @@ func (s *UserStore) EnsureAdmin(name, pass string) (created, changed bool, err e
 	if i := s.findLocked(name); i >= 0 {
 		s.users[i].Role = RoleSuper // الترقية للمطلقة مسموحة دائماً (ما تقلل عددهم)
 		s.users[i].EmpID = ""
+		s.users[i].Perms = nil
 	}
 	s.mu.Unlock()
-	_, err = s.update(name, "", p, "") // جلساته القديمة تبطل وحدها لأن كل جلسة مربوطة بكلمة السر
+	_, err = s.update(name, "", p, "", nil) // جلساته القديمة تبطل وحدها لأن كل جلسة مربوطة بكلمة السر
 	return false, !samePass, err
 }
 
@@ -620,6 +657,16 @@ func (s *UserStore) ResetAll() (backup string, n int, err error) {
 }
 
 func userInfoJSON(u appUser) map[string]any {
-	return map[string]any{"username": u.Username, "role": u.Role, "roleLabel": roleLabels[u.Role], "empId": u.EmpID,
+	perms := u.Perms
+	switch u.Role {
+	case RoleSuper:
+		perms = allPerms()
+	case RoleEmployee:
+		perms = nil
+	}
+	if perms == nil {
+		perms = []string{}
+	}
+	return map[string]any{"username": u.Username, "role": u.Role, "roleLabel": roleLabels[u.Role], "empId": u.EmpID, "perms": perms,
 		"created": u.Created, "updated": u.Updated, "lastLogin": u.LastLogin}
 }

@@ -9,7 +9,7 @@ import (
 )
 
 // Version رقم نسخة البرنامج
-const Version = "2.16.0"
+const Version = "2.17.0"
 
 //go:embed public
 var publicFS embed.FS
@@ -38,49 +38,49 @@ func DemoMode() bool { return demoMode }
 // users == nil يعني بدون تسجيل دخول وبكل الصلاحيات (تطبيق الموبايل اللي يشتغل على نفس الجهاز بس).
 func NewHandler(users *UserStore) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/data", need(RoleViewer, handleData))
+	mux.HandleFunc("/api/data", needP(handleData, "conn.fetch"))
 	mux.HandleFunc("/api/cmd", handleCmd) // كل أمر يتأكد من صلاحيته
-	mux.HandleFunc("/api/profiles", need(RoleViewer, handleProfiles))
-	mux.HandleFunc("/api/profiles/save", need(RoleSupervisor, handleProfileSave))
-	mux.HandleFunc("/api/profiles/import", need(RoleSupervisor, handleProfileImport))
-	mux.HandleFunc("/api/backups", need(RoleAdmin, handleBackups))
-	mux.HandleFunc("/api/audit", need(RoleAdmin, handleAudit))
-	mux.HandleFunc("/api/leaves", need(RoleViewer, handleLeaves))
-	mux.HandleFunc("/api/leaves/import", need(RoleAdmin, handleLeavesImport))
-	mux.HandleFunc("/api/leaves/clear", need(RoleAdmin, handleLeavesClear))
-	mux.HandleFunc("/api/manual", need(RoleViewer, handleManual))
-	// البصمات اليدوية والنظام العام للدوام = تغيير الأوقات: للصلاحية المطلقة بس
-	mux.HandleFunc("/api/manual/add", need(RoleSuper, handleManualAdd))
-	mux.HandleFunc("/api/manual/delete", need(RoleSuper, handleManualDelete))
-	mux.HandleFunc("/api/manual/replace", need(RoleSuper, handleManualReplace))
-	// الإطفاء التلقائي لجهاز البصمة (الصلاحية المطلقة)
-	mux.HandleFunc("/api/autooff", need(RoleSuper, handleAutoOff))
-	mux.HandleFunc("/api/autooff/save", need(RoleSuper, handleAutoOffSave))
-	mux.HandleFunc("/api/autooff/check", need(RoleSuper, handleAutoOffCheck))
-	mux.HandleFunc("/api/autooff/cancel", need(RoleSuper, handleAutoOffCancel))
+	mux.HandleFunc("/api/profiles", staff(handleProfiles))
+	mux.HandleFunc("/api/profiles/save", needP(handleProfileSave, "emp.edit", "emp.sched"))
+	mux.HandleFunc("/api/profiles/import", needP(handleProfileImport, "emp.edit"))
+	mux.HandleFunc("/api/backups", needP(handleBackups, "danger.restore"))
+	mux.HandleFunc("/api/audit", needP(handleAudit, "audit.view"))
+	mux.HandleFunc("/api/leaves", staff(handleLeaves))
+	mux.HandleFunc("/api/leaves/import", needP(handleLeavesImport, "leaves.upload"))
+	mux.HandleFunc("/api/leaves/clear", needP(handleLeavesClear, "leaves.clear"))
+	mux.HandleFunc("/api/manual", staff(handleManual))
+	// كل مسار يحتاج صلاحية من perms.go (الصلاحية المطلقة عندها كلشي)
+	mux.HandleFunc("/api/manual/add", needP(handleManualAdd, "manual.punch"))
+	mux.HandleFunc("/api/manual/delete", needP(handleManualDelete, "manual.punch"))
+	mux.HandleFunc("/api/manual/replace", needP(handleManualReplace, "manual.punch"))
+	// الإطفاء التلقائي لجهاز البصمة
+	mux.HandleFunc("/api/autooff", needP(handleAutoOff, "autooff.manage"))
+	mux.HandleFunc("/api/autooff/save", needP(handleAutoOffSave, "autooff.manage"))
+	mux.HandleFunc("/api/autooff/check", needP(handleAutoOffCheck, "autooff.manage"))
+	mux.HandleFunc("/api/autooff/cancel", needP(handleAutoOffCancel, "autooff.manage"))
 	startAutoOff()
 	// نسخة الحاسبة: الإخفاء بالخلفية والتشغيل ويا الحاسبة (من نفس الحاسبة بس)
-	mux.HandleFunc("/api/app", need(RoleViewer, handleApp))
-	mux.HandleFunc("/api/app/hide", need(RoleViewer, handleAppHide))
-	mux.HandleFunc("/api/app/autostart", need(RoleSuper, handleAppAutoStart))
+	mux.HandleFunc("/api/app", staff(handleApp))
+	mux.HandleFunc("/api/app/hide", needP(handleAppHide, "app.hide"))
+	mux.HandleFunc("/api/app/autostart", needP(handleAppAutoStart, "app.autostart"))
 	mux.HandleFunc("/api/app/show", handleAppShow)
 	// ملف Excel الشامل: كل التقارير والبيانات بأوراق، وهو نفسه النسخة الاحتياطية
-	mux.HandleFunc("/api/xlsx/write", need(RoleViewer, handleBookWrite))
-	mux.HandleFunc("/api/xlsx/read", need(RoleViewer, handleBookRead))
-	mux.HandleFunc("/api/settings", need(RoleViewer, handleSettings))
-	mux.HandleFunc("/api/share", need(RoleViewer, handleShare))
-	mux.HandleFunc("/api/settings/schedule", need(RoleSuper, handleScheduleSave))
-	mux.HandleFunc("/api/settings/holidays", need(RoleSuper, handleHolidaysSave))
+	mux.HandleFunc("/api/xlsx/write", needP(handleBookWrite, "conn.export"))
+	mux.HandleFunc("/api/xlsx/read", needP(handleBookRead, "conn.import"))
+	mux.HandleFunc("/api/settings", staff(handleSettings))
+	mux.HandleFunc("/api/share", staff(handleShare))
+	mux.HandleFunc("/api/settings/schedule", needP(handleScheduleSave, "sched.edit"))
+	mux.HandleFunc("/api/settings/holidays", needP(handleHolidaysSave, "manual.holidays"))
 	// التقارير المحفوظة للموظفين
-	mux.HandleFunc("/api/reports", need(RoleAdmin, handleReports))
-	mux.HandleFunc("/api/reports/publish", need(RoleAdmin, handleReportPublish))
-	mux.HandleFunc("/api/reports/delete", need(RoleAdmin, handleReportDelete))
+	mux.HandleFunc("/api/reports", needP(handleReports, "reports.list"))
+	mux.HandleFunc("/api/reports/publish", needP(handleReportPublish, "reports.publish"))
+	mux.HandleFunc("/api/reports/delete", needP(handleReportDelete, "reports.list"))
 	mux.HandleFunc("/api/my/reports", onlyEmployee(handleMyReports))
 	mux.HandleFunc("/api/my/report", onlyEmployee(handleMyReport))
-	// نقل كل البيانات لجهاز ثاني: الإرسال والاستلام للصلاحية المطلقة، والدفع محمي بالرمز والتشفير
-	mux.HandleFunc("/api/transfer/receive", need(RoleSuper, handleTransferReceive))
-	mux.HandleFunc("/api/transfer/status", need(RoleSuper, handleTransferStatus))
-	mux.HandleFunc("/api/transfer/send", need(RoleSuper, handleTransferSend))
+	// نقل كل البيانات لجهاز ثاني: الإرسال والاستلام بصلاحية «نقل البيانات»، والدفع محمي بالرمز والتشفير
+	mux.HandleFunc("/api/transfer/receive", needP(handleTransferReceive, "xfer.use"))
+	mux.HandleFunc("/api/transfer/status", needP(handleTransferStatus, "xfer.use"))
+	mux.HandleFunc("/api/transfer/send", needP(handleTransferSend, "xfer.use"))
 	mux.HandleFunc("/api/transfer/push", handleTransferPush)
 	var as *authServer
 	if users != nil {
@@ -93,9 +93,9 @@ func NewHandler(users *UserStore) http.Handler {
 		mux.HandleFunc("/api/session", as.handleSession)
 		mux.HandleFunc("/logout", as.handleLogout)
 		mux.HandleFunc("/api/me/password", as.handleMyPassword)
-		mux.HandleFunc("/api/users", need(RoleAdmin, as.handleUsers))
-		mux.HandleFunc("/api/users/save", need(RoleAdmin, as.handleUserSave))
-		mux.HandleFunc("/api/users/delete", need(RoleAdmin, as.handleUserDelete))
+		mux.HandleFunc("/api/users", needP(as.handleUsers, "users.employees"))
+		mux.HandleFunc("/api/users/save", needP(as.handleUserSave, "users.employees"))
+		mux.HandleFunc("/api/users/delete", needP(as.handleUserDelete, "users.employees"))
 	} else {
 		mux.HandleFunc("/api/session", func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 200, map[string]any{"auth": false, "demo": demoMode, "version": Version,

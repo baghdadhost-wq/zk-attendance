@@ -195,7 +195,8 @@ type ctxKey struct{}
 
 type reqUser struct {
 	Name, Role string
-	EmpID      string // حساب موظف: رقم بصمته
+	EmpID      string   // حساب موظف: رقم بصمته
+	Perms      []string // حساب مخصص: صلاحياته
 	token      string
 }
 
@@ -268,7 +269,7 @@ func (a *authServer) authUser(r *http.Request) (reqUser, bool) {
 	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
 		if e, ok := a.sess.lookup(c.Value); ok {
 			if u, ok := a.store.get(e.User); ok && e.Stamp == u.passStamp() {
-				return reqUser{Name: u.Username, Role: u.Role, EmpID: u.EmpID, token: c.Value}, true
+				return reqUser{Name: u.Username, Role: u.Role, EmpID: u.EmpID, Perms: u.Perms, token: c.Value}, true
 			}
 			a.sess.remove(c.Value) // المستخدم انحذف أو تغيرت كلمة سره
 		}
@@ -280,7 +281,7 @@ func (a *authServer) authUser(r *http.Request) (reqUser, bool) {
 		if v, ok := a.basic.Load(key); ok {
 			hit := v.(basicHit)
 			if u, ok := a.store.get(hit.user); ok && u.Hash == hit.hash {
-				return reqUser{Name: u.Username, Role: u.Role, EmpID: u.EmpID}, true
+				return reqUser{Name: u.Username, Role: u.Role, EmpID: u.EmpID, Perms: u.Perms}, true
 			}
 			a.basic.Delete(key)
 		}
@@ -291,7 +292,7 @@ func (a *authServer) authUser(r *http.Request) (reqUser, bool) {
 			name, pass, _ := strings.Cut(string(raw), ":")
 			if u, ok := a.store.authenticate(name, pass); ok {
 				a.basic.Store(key, basicHit{u.Username, u.Hash})
-				return reqUser{Name: u.Username, Role: u.Role, EmpID: u.EmpID}, true
+				return reqUser{Name: u.Username, Role: u.Role, EmpID: u.EmpID, Perms: u.Perms}, true
 			}
 			a.limiter.fail(clientIP(r))
 		}
@@ -456,7 +457,7 @@ func (a *authServer) handleMyPassword(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, badReq("كلمة السر الجديدة نفس القديمة"), "")
 		return
 	}
-	u, err := a.store.update(me.Name, "", req.New, "")
+	u, err := a.store.update(me.Name, "", req.New, "", nil)
 	if err != nil {
 		writeErr(w, err, "")
 		return
@@ -468,14 +469,14 @@ func (a *authServer) handleMyPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------- إدارة المستخدمين ----------
-// الصلاحية المطلقة تدير كل الحسابات. المدير يدير حسابات الموظفين بس (ينشئها، يغير كلمة سرها، يحذفها).
+// الصلاحية المطلقة تدير كل الحسابات وصلاحياتها. المخصص اللي عنده «حسابات الموظفين» يدير حسابات الموظفين بس.
 
 // manages هل المستخدم الحالي يگدر يدير حساب بهذي الصلاحية
 func manages(me reqUser, role string) bool {
 	if me.Role == RoleSuper {
 		return true
 	}
-	return me.Role == RoleAdmin && role == RoleEmployee
+	return role == RoleEmployee && hasPerm(me.Role, me.Perms, "users.employees")
 }
 
 func (a *authServer) handleUsers(w http.ResponseWriter, r *http.Request) {
@@ -490,10 +491,13 @@ func (a *authServer) handleUsers(w http.ResponseWriter, r *http.Request) {
 		out = append(out, m)
 	}
 	roles := map[string]string{RoleEmployee: roleLabels[RoleEmployee]}
+	res := map[string]any{"users": out, "roles": roles}
 	if me.Role == RoleSuper {
-		roles = roleLabels
+		res["roles"] = roleLabels
+		res["catalog"] = permCatalog
+		res["presets"] = map[string]any{"admin": legacyPerms["admin"], "supervisor": legacyPerms["supervisor"], "viewer": legacyPerms["viewer"]}
 	}
-	writeJSON(w, 200, map[string]any{"users": out, "roles": roles})
+	writeJSON(w, 200, res)
 }
 
 func (a *authServer) handleUserSave(w http.ResponseWriter, r *http.Request) {
@@ -506,10 +510,11 @@ func (a *authServer) handleUserSave(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		Role     string `json:"role"`
-		EmpID    string `json:"empId"`
-		Create   bool   `json:"create"`
+		EmpID    string    `json:"empId"`
+		Create   bool      `json:"create"`
+		Perms    *[]string `json:"perms"` // nil = ما يتغير
 	}
-	if err := readJSONBody(r, 4096, &req); err != nil {
+	if err := readJSONBody(r, 16384, &req); err != nil {
 		writeErr(w, err, "")
 		return
 	}
@@ -519,12 +524,21 @@ func (a *authServer) handleUserSave(w http.ResponseWriter, r *http.Request) {
 	)
 	target := strings.TrimSpace(req.Username)
 	detail := map[string]any{"target": target, "newRole": req.Role, "empId": strings.TrimSpace(req.EmpID)}
+	var perms []string
+	if req.Perms != nil {
+		if me.Role != RoleSuper { // صلاحيات المخصص تغيّرها الصلاحية المطلقة بس
+			deny(w, r, "userPerms")
+			return
+		}
+		perms = cleanPerms(*req.Perms)
+		detail["perms"] = perms
+	}
 	if req.Create {
 		if !manages(me, req.Role) {
 			deny(w, r, "userCreate:"+req.Role)
 			return
 		}
-		u, err = a.store.create(req.Username, req.Password, req.Role, req.EmpID)
+		u, err = a.store.create(req.Username, req.Password, req.Role, req.EmpID, perms)
 		audit(r, "userCreate", detail, err)
 	} else {
 		if strings.EqualFold(target, me.Name) {
@@ -540,7 +554,11 @@ func (a *authServer) handleUserSave(w http.ResponseWriter, r *http.Request) {
 			deny(w, r, "userUpdate:"+cur.Role)
 			return
 		}
-		u, err = a.store.update(target, req.Role, req.Password, req.EmpID)
+		if req.Perms != nil && cur.Role != RoleCustom && req.Role != RoleCustom {
+			writeErr(w, badReq("التخصيص بس للحساب «مخصص»"), "")
+			return
+		}
+		u, err = a.store.update(target, req.Role, req.Password, req.EmpID, perms)
 		detail["passwordChanged"] = req.Password != ""
 		audit(r, "userUpdate", detail, err)
 		if err == nil && req.Password != "" { // الصلاحية ورقم البصمة ينقرون من جديد بكل طلب، فتتطبق فوراً بدون ما يطلع

@@ -102,7 +102,15 @@
   .days > span { color:var(--muted); font-size:12px; }
   .days label.chk input:disabled + span { color:var(--muted); }
   .t-off { background:#eceff1; color:#546e7a; white-space:nowrap; }
-  .chip.super { background:#5b1f78; color:#fff; }
+  .chip.super { background:#5b1f78; color:#fff; } .chip.custom { background:#2d5a8a; color:#fff; }
+  .pgroup { border:1px solid var(--line, #ddd); border-radius:10px; padding:8px 10px; margin:0 0 8px; }
+  .pgroup label { display:flex !important; flex-direction:row !important; align-items:center; justify-content:flex-start; gap:6px; cursor:pointer; margin:0 !important; text-align:right; }
+  .pgroup > label { font-weight:bold; font-size:14px; }
+  .pgroup .pitems { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:4px 14px; margin:6px 24px 0 0; }
+  .pgroup .pitems label { font-size:13px; }
+  .pgroup input[type=checkbox] { width:auto !important; min-width:0 !important; margin:0; flex:none; }
+  .pgroup .tag { font-size:11px; padding:0 5px; }
+  #permTree { max-height:min(60vh, 560px); overflow:auto; }
   /* رابط البرنامج للأعضاء: شريط تحت الرأس، الضغط عليه ينسخ الرابط */
   .sharebar { background:#e8f0fe; border-bottom:1px solid #c9dafc; padding:8px 22px; display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; font-size:13px; }
   .sharebar .lbl { color:#1a3d7c; font-weight:bold; }
@@ -179,42 +187,46 @@
   <section class="card no-print" id="appCard" hidden>
     <div class="row" style="align-items:center;gap:14px">
       <b>البرنامج على هذي الحاسبة</b>
-      <label class="chk" id="autoStartL" data-min="super" hidden><input type="checkbox" id="autoStart"> يشتغل تلقائياً ويا تشغيل الحاسبة (مخفي بالخلفية)</label>
-      <button id="hideAppBtn">إخفاء البرنامج (يبقى يشتغل بالخلفية)</button>
+      <label class="chk" id="autoStartL" data-perm="app.autostart" hidden><input type="checkbox" id="autoStart"> يشتغل تلقائياً ويا تشغيل الحاسبة (مخفي بالخلفية)</label>
+      <button id="hideAppBtn" data-perm="app.hide" hidden>إخفاء البرنامج (يبقى يشتغل بالخلفية)</button>
     </div>
     <div class="hint" id="appMsg" style="margin-top:6px;font-size:12px">الإخفاء يسد نافذة البرنامج ويطلّعك منه حتى يقل استهلاك الذاكرة، والبصمات والأعضاء والإطفاء التلقائي يبقون يشتغلون. حتى ترجعه: افتح البرنامج من جديد من نفس الأيقونة، ويطلب كلمة السر.</div>
   </section>
-  <section class="card no-print">
+  <section class="card no-print" id="noPerms" hidden>
+    <h2>ما عندك صلاحيات بعد</h2>
+    <div class="hint">حسابك «مخصص» وما مفعّلة إله ولا قائمة. اطلب من صاحب الصلاحية المطلقة يفعّل لك اللي تحتاجه من زر «تخصيص» يم اسمك.</div>
+  </section>
+  <section class="card no-print" id="connCard" data-perm="conn.* ctl.* scan.run danger.*" hidden>
     <h2>الاتصال بالجهاز</h2>
     <div class="row">
       <label>عنوان IP للجهاز <input id="ip" value="192.168.1.201"></label>
       <label>المنفذ <input id="port" type="number" value="4370" style="min-width:80px"></label>
       <label>كلمة سر الاتصال <bdi dir="ltr">(Comm Key)</bdi> <input id="commKey" type="password" inputmode="numeric" placeholder="0 = بدون" style="min-width:110px"></label>
-      <button class="primary" id="fetchBtn">سحب البيانات من الجهاز</button>
-      <button id="bookExportBtn">تصدير Excel شامل</button>
-      <button id="bookImportBtn" data-min="supervisor" hidden>استيراد النسخة الشاملة</button>
+      <button class="primary" id="fetchBtn" data-perm="conn.fetch" hidden>سحب البيانات من الجهاز</button>
+      <button id="bookExportBtn" data-perm="conn.export" hidden>تصدير Excel شامل</button>
+      <button id="bookImportBtn" data-perm="conn.import" hidden>استيراد النسخة الشاملة</button>
       <input type="file" id="bookFile" accept=".xlsx" hidden>
     </div>
     <div id="status"></div>
   </section>
 
-  <section class="card no-print">
+  <section class="card no-print" id="ctlCard" data-perm="ctl.*" hidden>
     <h2>التحكم بالجهاز</h2>
     <div class="ctl">
       <div class="ctl-label">المعلومات والوقت</div>
       <div class="row">
         <button data-cmd="info">معلومات الجهاز والذاكرة</button>
         <button data-cmd="getTime">قراءة وقت الجهاز</button>
-        <button data-cmd="syncTime" data-min="super" hidden>مزامنة الوقت مع الحاسبة</button>
+        <button data-cmd="syncTime">مزامنة الوقت مع الحاسبة</button>
         <button data-cmd="refresh">تحديث بيانات الجهاز</button>
       </div>
     </div>
     <div class="ctl">
       <div class="ctl-label">الباب والصوت</div>
       <div class="row">
-        <label>مدة فتح الباب (ثانية) <input type="number" id="unlockSec" value="5" min="1" max="60" style="min-width:70px"></label>
+        <label data-perm="ctl.door">مدة فتح الباب (ثانية) <input type="number" id="unlockSec" value="5" min="1" max="60" style="min-width:70px"></label>
         <button data-cmd="unlock">فتح الباب</button>
-        <label>الصوت
+        <label data-perm="ctl.voice">الصوت
           <select id="voiceIdx">
             <option value="0">0 - شكراً (Thank you)</option>
             <option value="1">1 - كلمة السر غير صحيحة</option>
@@ -242,12 +254,12 @@
         </label>
         <button data-cmd="testVoice">تشغيل الصوت</button>
       </div>
-      <div class="hint">أسماء الأصوات من توثيق مكتبة pyzk، وقد تختلف حسب إصدار الجهاز.</div>
+      <div class="hint" data-perm="ctl.voice">أسماء الأصوات من توثيق مكتبة pyzk، وقد تختلف حسب إصدار الجهاز.</div>
     </div>
     <div class="ctl">
       <div class="ctl-label">رسالة على الشاشة</div>
       <div class="row">
-        <label>النص <input id="lcdText" maxlength="40" placeholder="مثال: اجتماع الساعة 10" style="min-width:220px"></label>
+        <label data-perm="ctl.lcd">النص <input id="lcdText" maxlength="40" placeholder="مثال: اجتماع الساعة 10" style="min-width:220px"></label>
         <button data-cmd="lcdWrite">عرض على الشاشة</button>
         <button data-cmd="lcdClear">مسح الشاشة</button>
       </div>
@@ -265,14 +277,14 @@
       <div class="row">
         <button data-cmd="restart" class="danger">إعادة تشغيل الجهاز</button>
         <button data-cmd="powerOff" class="danger">إطفاء الجهاز</button>
-        <button data-cmd="clearLogs" class="danger" data-min="admin" hidden>مسح سجل البصمات (بعد حفظ نسخة)</button>
+        <button data-cmd="clearLogs" class="danger">مسح سجل البصمات (بعد حفظ نسخة)</button>
       </div>
     </div>
     <div id="cmdStatus" style="margin-top:12px;font-size:13px"></div>
     <div id="infoPanel"></div>
   </section>
 
-  <details class="card no-print" id="scanCard">
+  <details class="card no-print" id="scanCard" data-perm="scan.run" hidden>
     <summary>فحص أمان الجهاز <small>هل بيانات الجهاز محمية من التعديل غير المصرّح به؟</small></summary>
     <div class="hint" style="margin:-4px 0 10px">
       فحص قراءة فقط — ما يغيّر ولا شي بالجهاز. يتأكد هل الجهاز محمي بكلمة سر اتصال، وهل عليه مدير، ويبيّن مخاطر الشبكة والبرنامج الثابت.
@@ -286,22 +298,22 @@
     <div id="scanResult" style="margin-top:12px"></div>
   </details>
 
-  <details class="card no-print danger-zone" id="adminCard" data-min="admin" hidden>
-    <summary>الأوامر الخطرة والمخفية <small>إضافة وحذف الموظفين للمدير، والوقت وخصائص الجهاز والمسح للصلاحية المطلقة بس</small></summary>
+  <details class="card no-print danger-zone" id="adminCard" data-perm="danger.*" hidden>
+    <summary>الأوامر الخطرة والمخفية <small>إضافة وحذف الموظفين، والوقت وخصائص الجهاز والمسح</small></summary>
     <div class="hint" style="margin:-4px 0 10px">كل أمر يمسح أو يغير شي يحفظ نسخة احتياطية بمجلد backups قبله، وكل شي ينسجل بسجل العمليات باسمك.</div>
-    <div class="ctl">
+    <div class="ctl" data-perm="danger.addUser">
       <div class="ctl-label">إضافة موظف جديد للجهاز</div>
       <div class="row">
         <label>رقم الموظف <input id="nuId" inputmode="numeric" autocomplete="off" style="min-width:90px"></label>
         <label>الاسم بالجهاز <input id="nuName" maxlength="40" autocomplete="off"></label>
         <label>رقم البطاقة <input id="nuCard" inputmode="numeric" placeholder="اختياري" autocomplete="off" style="min-width:110px"></label>
-        <label data-min="super" hidden>الصلاحية بالجهاز <select id="nuPriv"><option value="0">مستخدم عادي</option><option value="14">مدير</option></select></label>
+        <label data-perm="danger.devAdmins" hidden>الصلاحية بالجهاز <select id="nuPriv"><option value="0">مستخدم عادي</option><option value="14">مدير</option></select></label>
         <label>الرقم السري <input id="nuPin" type="password" inputmode="numeric" placeholder="اختياري" autocomplete="new-password" style="min-width:100px"></label>
         <button id="nuBtn" class="primary">إضافة للجهاز</button>
       </div>
       <div class="hint">بعد الإضافة، الموظف يسجل بصمته أو وجهه من قائمة الجهاز نفسه. ترميز الاسم يتحدد حسب الأسماء الموجودة بالجهاز.</div>
     </div>
-    <div class="ctl" data-min="super" hidden>
+    <div class="ctl" data-perm="danger.setTime" hidden>
       <div class="ctl-label">وقت محدد</div>
       <div class="row">
         <label>التاريخ والوقت <input type="datetime-local" id="customTime" step="1"></label>
@@ -309,7 +321,7 @@
       </div>
       <div class="hint">للوقت الصحيح استخدم "مزامنة الوقت مع الحاسبة". هذا للحالات الخاصة، والبصمات الجديدة تنسجل بالوقت اللي تختاره.</div>
     </div>
-    <div class="ctl" data-min="super" hidden>
+    <div class="ctl" data-perm="danger.options" hidden>
       <div class="ctl-label">إعدادات الجهاز المخفية</div>
       <div class="row">
         <label>اسم الإعداد <input id="optKey" list="optKeys" dir="ltr" placeholder="~DeviceName" autocomplete="off" autocapitalize="none" spellcheck="false" style="min-width:170px"></label>
@@ -327,7 +339,7 @@
       <div class="hint">أسماء الإعدادات بالقائمة من مكتبة pyzk، وتگدر تكتب أي اسم ثاني يعرفه جهازك. القراءة آمنة، أما الكتابة فتغير الإعداد بالجهاز مباشرة:
         إذا غيرت IPAddress أو NetMask أو GATEIPAddress ممكن ينقطع الاتصال، وإذا غيرت COMKey لازم تكتب كلمة سر الاتصال الجديدة بالبرنامج.</div>
     </div>
-    <div class="ctl" id="comkeyCtl" data-min="super" hidden>
+    <div class="ctl" id="comkeyCtl" data-perm="danger.commKey" hidden>
       <div class="ctl-label">كلمة سر اتصال الجهاز (Comm Key)</div>
       <div class="row">
         <label>كلمة سر جديدة (رقم 1–999999) <input id="comkeyVal" inputmode="numeric" autocomplete="off" style="min-width:150px"></label>
@@ -335,13 +347,13 @@
         <button id="comkeyBtn" class="primary">ضبط / تغيير</button>
       </div>
       <div class="hint">
-        للصلاحية المطلقة فقط. يضبط كلمة سر اتصال للجهاز <b>إذا ما كانت موجودة</b>، فيمنع أي جهاز ثاني على الشبكة من التحكم بالجهاز.<br>
+        يضبط كلمة سر اتصال للجهاز <b>إذا ما كانت موجودة</b>، فيمنع أي جهاز ثاني على الشبكة من التحكم بالجهاز.<br>
         <b>لتغييرها لاحقاً:</b> فعّل «بدّل كلمة السر الموجودة» — البرنامج يستخدم المكتوبة بخانة «كلمة سر الاتصال» كالحالية ويبدّلها للجديدة. (خليها 0 ويا «بدّل» حتى تعطّلها — ينقص الأمان).<br>
         بعد العملية البرنامج يحفظ المفتاح ويكمل الاتصال — اكتبه بمكان آمن لأنك تحتاجه لو غيّرت الحاسبة.
       </div>
       <div id="comkeyStatus" style="margin-top:8px;font-size:13px"></div>
     </div>
-    <div class="ctl" data-min="super" hidden>
+    <div class="ctl" data-perm="danger.clearOplog danger.devAdmins danger.clearAccess danger.clearAll" hidden>
       <div class="ctl-label">مسح وتصفير</div>
       <div class="row">
         <button data-admin="clearOplog" class="danger">مسح سجل عمليات الجهاز</button>
@@ -356,7 +368,7 @@
         مسح كل البيانات: يمسح الموظفين وبصماتهم ووجوههم وسجل الحضور، بعد حفظ نسخة من الموظفين والسجل (البصمات والوجوه نفسها ما تنحفظ).
       </div>
     </div>
-    <div class="ctl">
+    <div class="ctl" data-perm="danger.restore">
       <div class="ctl-label">استرجاع الموظفين من نسخة احتياطية</div>
       <div class="row"><button id="backupsBtn">عرض النسخ</button></div>
       <div class="hint">يرجّع للجهاز الموظفين اللي مو موجودين بيه (الاسم والبطاقة والصلاحية والرقم السري)، بدون البصمات والوجوه.</div>
@@ -365,7 +377,7 @@
     <div id="adminStatus" style="margin-top:12px;font-size:13px"></div>
   </details>
 
-  <details class="card no-print" id="autoOffCard" data-min="super" hidden>
+  <details class="card no-print" id="autoOffCard" data-perm="autooff.manage" hidden>
     <summary>الإطفاء التلقائي لجهاز البصمة <small id="aoSum"></small></summary>
     <div class="hint" style="margin:-4px 0 10px">تگدر تختار أكثر من طريقة سوه: <b>كشف ثم إطفاء</b> (يكشف إذا الجهاز مشتغل، وإذا مشتغل يطفيه بعد المدة) أو <b>إطفاء مباشر</b> (يطفيه أول ما يجي الوقت)، وكل وحدة بوقت معيّن كل يوم أو كل فترة. يشتغل طول ما البرنامج مفتوح على هذا الجهاز. <b>انتبه: الجهاز المطفي يحتاج أحد يشغّله بإيده.</b></div>
     <div class="row">
@@ -390,8 +402,9 @@
     <div class="tablewrap" id="aoEvents" style="margin-top:8px"></div>
   </details>
 
-  <details class="card no-print" id="manualCard" data-min="super" hidden>
+  <details class="card no-print" id="manualCard" data-perm="manual.punch manual.holidays" hidden>
     <summary>البصمات اليدوية <small>لموظف نسى يبصم أو كان بواجب</small></summary>
+    <div data-perm="manual.punch">
     <div class="hint" style="margin:-4px 0 10px">تنحفظ بالبرنامج مو بالجهاز، وتدخل بالتقارير مكتوب يمها «يدوية» ويا السبب واسم اللي ضافها، وتنسجل بسجل العمليات.</div>
     <div class="row">
       <label>الموظف <input id="mpEmp" list="mpEmps" inputmode="numeric" placeholder="رقم الموظف" autocomplete="off" style="min-width:150px"></label>
@@ -420,6 +433,8 @@
     <div id="mpStatus" style="margin-top:8px;font-size:13px"></div>
     <div class="sec-title">البصمات اليدوية المضافة</div>
     <div class="tablewrap" id="mpTable"><div class="empty">ما أكو بصمات يدوية</div></div>
+    </div>
+    <div data-perm="manual.holidays">
     <div class="sec-title">العطل الرسمية <small class="hint">يوم كامل ما تنحسب بيه بصمة ولا غياب لكل الموظفين</small></div>
     <div class="row">
       <label>التاريخ <input type="date" id="holDate"></label>
@@ -428,9 +443,10 @@
     </div>
     <div id="holStatus" style="margin-top:8px;font-size:13px"></div>
     <div class="tablewrap" id="holTable"><div class="empty">ما أكو عطل رسمية</div></div>
+    </div>
   </details>
 
-  <details class="card no-print" id="usersCard" data-min="admin" hidden>
+  <details class="card no-print" id="usersCard" data-perm="users.employees" hidden>
     <summary>مستخدمو البرنامج وصلاحياتهم</summary>
     <div class="tablewrap" id="usersTable"><div class="empty">جارِ التحميل...</div></div>
     <div class="sec-title">إضافة مستخدم</div>
@@ -445,24 +461,22 @@
       <button id="auBtn" class="primary">إضافة</button>
     </div>
     <div class="hint" id="rolesHint">
-      <span data-min="super" hidden>صلاحية مطلقة: كل شي بدون قيد، ويضيف كل أنواع المستخدمين. وحده يغيّر الأوقات (وقت الجهاز، النظام العام للدوام، دوام كل موظف، البصمات اليدوية) وخصائص الجهاز (كلمة سر الاتصال، الإعدادات المخفية واسم الجهاز)، ويمسح كل بيانات الجهاز ويدير مدراء الجهاز.<br>
-      مدير: كل شي عدا اللي فوق: التقارير ورفع تقارير الإجازات لدمجها وحفظ التقرير للموظفين، إضافة وحذف موظفين بالجهاز (مو مدراءه)، أرقامهم السرية وبصماتهم ومسح سجل البصمات، وإنشاء حسابات الموظفين.<br>
-      مشرف: الأساسية، ويا تعديل أسماء الموظفين وبطاقاتهم وبياناتهم الإضافية.<br>
-      أساسي: سحب البيانات والتقارير وتصديرها وطباعتها والتصفية، وأوامر الجهاز العادية (فتح الباب، الصوت، رسالة الشاشة، إيقاف وتفعيل البصمة، إعادة التشغيل والإطفاء)، وفحص أمان الجهاز.<br></span>
-      موظف: يدخل ويشوف تقريره المحفوظ بس، وما يشوف أي شي عن غيره.
+      <span data-perm="super" hidden><b>صلاحية مطلقة:</b> كل شي بدون قيد، ويضيف كل أنواع المستخدمين ويخصص صلاحياتهم.<br>
+      <b>مخصص:</b> يبدي بدون صلاحيات، وبزر «تخصيص» يمّه تفعّل إله كل قائمة لوحدها وكل شي داخلها لوحده (مثلاً سحب وتصدير بدون استيراد، أو التقرير اليومي بس). التغيير يتطبق فوراً.<br></span>
+      <b>موظف:</b> يدخل ويشوف تقريره المحفوظ بس، وما يشوف أي شي عن غيره.
     </div>
 
     <div id="usersStatus" style="margin-top:10px;font-size:13px"></div>
   </details>
 
-  <details class="card no-print" id="reportsCard" data-min="admin" hidden>
+  <details class="card no-print" id="reportsCard" data-perm="reports.list" hidden>
     <summary>التقارير المحفوظة للموظفين <small>كل موظف عنده حساب يشوف تقريره منها بس</small></summary>
     <div class="hint" style="margin:-4px 0 10px">حتى تحفظ تقرير: اسحب البيانات، اختار الفترة، ارفع تقرير الإجازات إذا عندك، وبعدها اضغط «حفظ التقرير للموظفين» فوق الجداول.</div>
     <div class="tablewrap" id="reportsTable"><div class="empty">جارِ التحميل...</div></div>
     <div id="reportsStatus" style="margin-top:8px;font-size:13px"></div>
   </details>
 
-  <details class="card no-print" id="xferCard" data-min="super" hidden>
+  <details class="card no-print" id="xferCard" data-perm="xfer.use" hidden>
     <summary>نقل البيانات لجهاز ثاني <small>الحسابات، الموظفين ودوامهم، الإعدادات، التقارير المحفوظة</small></summary>
     <div class="hint" style="margin:-4px 0 10px">الجهازين على نفس الواي فاي. بالجهاز الجديد اضغط «استلام» ويطلع رابطه ورمز، وبهذا الجهاز اكتبهن واضغط «إرسال». البيانات تنتقل مشفّرة بالرمز، فإذا أحد سحبها بالطريق ما يگدر يقراها. بيانات الجهاز المستلم تنحفظ نسخة منها بـ backups وبعدين تنستبدل، وسجل العمليات ما ينتقل.</div>
     <div class="row" style="align-items:flex-start;gap:24px;flex-wrap:wrap">
@@ -489,7 +503,7 @@
     </div>
   </details>
 
-  <details class="card no-print" id="auditCard" data-min="admin" hidden>
+  <details class="card no-print" id="auditCard" data-perm="audit.view" hidden>
     <summary>سجل العمليات <small>منو سوّى شنو ومتى</small></summary>
     <div class="row" style="margin-bottom:10px">
       <button id="auditBtn">تحديث</button>
@@ -498,7 +512,7 @@
     <div class="tablewrap" id="auditTable"></div>
   </details>
 
-  <section class="card no-print">
+  <section class="card no-print" id="periodCard" data-perm="tab.*" hidden>
     <h2>الفترة والتصفية</h2>
     <div class="row">
       <label>من تاريخ <input type="date" id="from"></label>
@@ -508,7 +522,7 @@
     </div>
   </section>
 
-  <section class="card no-print" id="schedCard">
+  <section class="card no-print" id="schedCard" data-perm="tab.* sched.edit" hidden>
     <h2>النظام العام للدوام <small style="font-weight:normal;color:var(--muted);font-size:12px">لكل الموظفين، إلا اللي إلهم نظام خاص بقائمة الموظفين</small></h2>
     <div class="row">
       <label>بداية الدوام <input type="time" id="start" value="08:00" data-gen></label>
@@ -526,7 +540,7 @@
       <div class="hint" style="font-size:12px">اليوم الفارغ يتبع بداية ونهاية الدوام فوق.</div>
       <div class="dayTimes" id="genDays"></div>
     </details>
-    <div class="row" style="margin-top:12px" data-min="super" hidden>
+    <div class="row" style="margin-top:12px" data-perm="sched.edit" hidden>
       <button class="primary" id="schedSaveBtn">حفظ النظام العام</button>
       <button id="schedResetBtn" hidden>رجّع المحفوظ</button>
     </div>
@@ -536,20 +550,20 @@
   <!-- اسم التقرير: يطلع بالشاشة وبأول الصفحة بالطباعة وبـ PDF -->
   <div id="printTitle"><h2 id="printTitleText"></h2><div id="printSub"></div></div>
 
-  <section class="stats" id="stats"></section>
+  <section class="stats" id="stats" data-perm="tab.*" hidden></section>
 
-  <section class="card" style="margin-top:14px">
+  <section class="card" style="margin-top:14px" id="reportCard" data-perm="tab.*" hidden>
     <div class="tabs">
-      <button data-tab="daily" class="active">التقرير اليومي</button>
-      <button data-tab="summary">ملخص الموظفين</button>
-      <button data-tab="raw">سجل البصمات</button>
-      <button data-tab="users">الموظفون</button>
-      <button data-tab="leaves">التصفية والإجازات</button>
-      <button data-tab="person">تقرير موظف</button>
+      <button data-tab="daily" class="active" data-perm="tab.daily">التقرير اليومي</button>
+      <button data-tab="summary" data-perm="tab.summary">ملخص الموظفين</button>
+      <button data-tab="raw" data-perm="tab.raw">سجل البصمات</button>
+      <button data-tab="users" data-perm="tab.users">الموظفون</button>
+      <button data-tab="leaves" data-perm="tab.leaves">التصفية والإجازات</button>
+      <button data-tab="person" data-perm="tab.person">تقرير موظف</button>
     </div>
     <div class="row no-print" style="margin-bottom:10px">
-      <button id="printBtn">طباعة / PDF</button>
-      <button id="publishBtn" class="primary" data-min="admin" hidden>حفظ التقرير للموظفين</button>
+      <button id="printBtn" data-perm="tab.print" hidden>طباعة / PDF</button>
+      <button id="publishBtn" class="primary" data-perm="reports.publish" hidden>حفظ التقرير للموظفين</button>
       <div class="tools" id="usersTools" style="display:none">
         <span class="hint" style="font-size:12px">لتعديل بيانات الموظفين بالجملة: «تصدير Excel شامل» ← عدّل ورقة «الموظفين» ← «استيراد النسخة الشاملة».</span>
       </div>
@@ -557,8 +571,8 @@
         <label>الموظف <select id="personSel"></select></label>
       </div>
       <div class="tools" id="leavesTools" style="display:none">
-        <button id="lvUploadBtn" class="primary" data-min="admin" hidden>رفع تقرير الإجازات (Excel / CSV)</button>
-        <button id="lvClearBtn" class="danger" data-min="admin" hidden>مسح بيانات الإجازات</button>
+        <button id="lvUploadBtn" class="primary" data-perm="leaves.upload" hidden>رفع تقرير الإجازات (Excel / CSV)</button>
+        <button id="lvClearBtn" class="danger" data-perm="leaves.clear" hidden>مسح بيانات الإجازات</button>
         <label>العرض <select id="lvView"><option value="days">حسب الأيام</option><option value="emp">حسب الموظفين</option></select></label>
         <label class="chk"><input type="checkbox" id="lvOnlyBad"> غير المبرّر فقط</label>
         <label class="chk"><input type="checkbox" id="lvHourAbs"> احذف الغياب إذا عنده زمنية بنفس اليوم</label>
@@ -589,26 +603,26 @@
     </label>
     <div class="hint">رقم الموظف والصلاحية وكلمة السر والبصمات والوجه ما تتغير. البرنامج يحفظ نسخة من كل الموظفين قبل التعديل، ويتأكد من الحفظ بعده.</div>
     </div>
-    <div id="adminSection" data-min="admin" hidden>
+    <div id="adminSection" data-perm="danger.pin danger.fingers danger.deleteUser danger.devAdmins" hidden>
       <div class="sec-title">أوامر خطرة على هذا الموظف</div>
-      <div class="row" data-min="super" hidden>
+      <div class="row" data-perm="danger.devAdmins" hidden>
         <label>الصلاحية بالجهاز <select id="edPriv"><option value="0">مستخدم عادي</option><option value="14">مدير</option></select></label>
         <button id="edPrivBtn">حفظ الصلاحية</button>
       </div>
-      <div class="row" style="margin-top:8px">
+      <div class="row" style="margin-top:8px" data-perm="danger.pin">
         <label>رقم سري جديد <input id="edPin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="أرقام لحد 8"></label>
         <button id="edPinBtn">تغيير الرقم السري</button>
         <button id="edPinClear" class="danger">مسح الرقم السري</button>
       </div>
-      <div class="row" style="margin-top:8px">
-        <label>بصمات الأصابع
+      <div class="row" style="margin-top:8px" data-perm="danger.fingers danger.deleteUser">
+        <label data-perm="danger.fingers">بصمات الأصابع
           <select id="edFinger"><option value="-1">كل الأصابع</option>
             <option value="0">إصبع 0</option><option value="1">إصبع 1</option><option value="2">إصبع 2</option><option value="3">إصبع 3</option><option value="4">إصبع 4</option>
             <option value="5">إصبع 5</option><option value="6">إصبع 6</option><option value="7">إصبع 7</option><option value="8">إصبع 8</option><option value="9">إصبع 9</option>
           </select>
         </label>
-        <button id="edFingerBtn" class="danger">حذف البصمات</button>
-        <button id="edDeleteBtn" class="danger">حذف الموظف من الجهاز</button>
+        <button id="edFingerBtn" class="danger" data-perm="danger.fingers">حذف البصمات</button>
+        <button id="edDeleteBtn" class="danger" data-perm="danger.deleteUser">حذف الموظف من الجهاز</button>
       </div>
       <div class="hint">الرقم السري الحالي ما يظهر أبداً. حذف الموظف يحذف بصماته ووجهه من الجهاز، وسجل حضوره القديم وبياناته الإضافية تبقى. كل أمر يحفظ نسخة من الموظفين قبله.</div>
       <div id="edAdminStatus" style="font-size:13px;margin-top:8px;min-height:18px"></div>
@@ -665,6 +679,28 @@
   </div>
 </div>
 
+<div class="overlay no-print" id="permOverlay">
+  <div class="modal" role="dialog" aria-labelledby="permTitle" style="width:min(760px,96vw)">
+    <h3 id="permTitle">تخصيص الصلاحيات</h3>
+    <div class="sub" id="permSub">علّم القائمة كلها، أو بس اللي تريده من داخلها. التغيير يتطبق فوراً بعد الحفظ.</div>
+    <div class="row" style="margin-bottom:8px;gap:6px">
+      <button class="small" data-pset="all">تفعيل الكل</button>
+      <button class="small" data-pset="none">إلغاء الكل</button>
+      <span class="hint" style="font-size:12px">قوالب جاهزة:</span>
+      <button class="small" data-pset="viewer">أساسي</button>
+      <button class="small" data-pset="supervisor">مشرف</button>
+      <button class="small" data-pset="admin">مدير</button>
+      <span class="hint" id="permCount" style="font-size:12px"></span>
+    </div>
+    <div id="permTree"></div>
+    <div id="permStatus" style="font-size:13px;min-height:18px"></div>
+    <div class="actions">
+      <button class="primary" id="permSave">حفظ</button>
+      <button id="permCancel">إلغاء</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay no-print" id="passOverlay">
   <div class="modal" role="dialog" aria-labelledby="passTitle" style="width:min(420px,94vw)">
     <h3 id="passTitle">تغيير كلمة السر</h3>
@@ -696,11 +732,29 @@ window.fetch = async (...args) => { const r = await _fetch(...args); if (r.statu
 
 // ---------- المستخدم وصلاحيته ----------
 // الخادم يتأكد من الصلاحية بكل طلب، وهنا بس نخفي اللي ما يخصه
-const RANK = { employee: 0, viewer: 1, supervisor: 2, admin: 3, super: 4 };
-const ROLE_LABELS = { super: 'صلاحية مطلقة', admin: 'مدير', supervisor: 'مشرف', viewer: 'أساسي', employee: 'موظف' };
-let ME = { username: '', role: 'viewer' }, APP_VERSION = '';
-const can = (min) => (RANK[ME.role] || 0) >= RANK[min];
-function applyRole() { document.querySelectorAll('[data-min]').forEach(el => { el.hidden = !can(el.dataset.min); }); }
+// الصلاحية المطلقة عندها كلشي، والمخصص بس اللي مفعّل إله (القائمة كاملة بـ perms.go بالخادم)
+const ROLE_LABELS = { super: 'صلاحية مطلقة', custom: 'مخصص', employee: 'موظف', admin: 'مدير (قديم)', supervisor: 'مشرف (قديم)', viewer: 'أساسي (قديم)' };
+let ME = { username: '', role: '', perms: [] }, APP_VERSION = ''; // بدون صلاحيات لحد ما تجي الجلسة
+// can('ctl.door') صلاحية وحدة، can('ctl.*') أي وحدة بالقائمة، can('super') الصلاحية المطلقة بس
+const can = (p) => ME.role === 'super' || (p !== 'super' && (ME.perms || []).some(x => p.endsWith('.*') ? x.startsWith(p.slice(0, -1)) : x === p));
+const canAny = (list) => String(list).split(/\s+/).filter(Boolean).some(can);
+const CMD_PERM = { info: 'ctl.info', getTime: 'ctl.info', refresh: 'ctl.info', syncTime: 'ctl.syncTime', unlock: 'ctl.door', testVoice: 'ctl.voice',
+  lcdWrite: 'ctl.lcd', lcdClear: 'ctl.lcd', disable: 'ctl.disable', enable: 'ctl.disable', restart: 'ctl.restart', powerOff: 'ctl.powerOff', clearLogs: 'ctl.clearLogs',
+  setTime: 'danger.setTime', readOption: 'danger.options', writeOption: 'danger.options', clearOplog: 'danger.clearOplog', clearAdmins: 'danger.devAdmins',
+  clearAccess: 'danger.clearAccess', clearAllData: 'danger.clearAll' };
+function applyRole() {
+  document.querySelectorAll('[data-cmd], [data-admin]').forEach(b => { const p = CMD_PERM[b.dataset.cmd || b.dataset.admin]; if (p) b.dataset.perm = p; });
+  document.querySelectorAll('[data-perm]').forEach(el => { el.hidden = !canAny(el.dataset.perm); });
+  // قسم ما بقى بيه ولا زر يختفي كله
+  document.querySelectorAll('.ctl').forEach(c => { if (!c.hidden && ![...c.querySelectorAll('button')].some(b => !b.closest('[hidden]'))) c.hidden = true; });
+  const tabs = [...document.querySelectorAll('.tabs button')].filter(b => !b.hidden);
+  if (tabs.length && !tabs.some(b => b.dataset.tab === currentTab)) {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
+    tabs[0].classList.add('active'); currentTab = tabs[0].dataset.tab;
+  }
+  $('noPerms').hidden = !(ME.role === 'custom' && !(ME.perms || []).length);
+  applyGenLock();
+}
 async function initSession() {
   try {
     const j = await (await fetch('/api/session')).json();
@@ -708,7 +762,7 @@ async function initSession() {
     if (j.user) ME = j.user;
     APP_VERSION = j.version || '';
     if (j.auth && j.user) loadApp();
-    if (!j.auth) { ['usersCard', 'myPassLink', 'reportsCard', 'publishBtn'].forEach(id => $(id).remove()); } // بدون نظام دخول (تطبيق الموبايل): ما أكو حسابات موظفين
+    if (!j.auth) { ['usersCard', 'myPassLink', 'reportsCard', 'publishBtn'].forEach(id => $(id).remove()); ME.role = 'super'; } // بدون نظام دخول (تطبيق الموبايل): ما أكو حسابات موظفين
     if (j.auth) {
       if (ME.role === 'employee') { location.replace('/me'); return; } // الموظف يشوف تقريره بس
       $('whoName').textContent = ME.username;
@@ -719,6 +773,7 @@ async function initSession() {
   } catch (_) {}
   applyRole();
   applyGenLock();
+  renderManualList();
   loadShare();
   await loadGeneral();
   if (DATA) render();
@@ -915,13 +970,14 @@ async function loadProfiles() {
   fillDeptSelect();
   if (DATA) { fillEmpSelect(); render(); }
 }
-// تغيير الأوقات (النظام العام ودوام كل موظف) للصلاحية المطلقة بس
+// النظام العام يحتاج «تعديل النظام العام»، ودوام كل موظف «دوام الموظف»
 function applyGenLock() {
-  const ed = can('super');
-  document.querySelectorAll('[data-gen], [data-goff], #edAtt, #edMode, #edStart, #edEnd, [data-eoff], #genDays input, #edDays input').forEach(el => { el.disabled = !ed; });
+  const ed = can('sched.edit'), es = can('emp.sched');
+  document.querySelectorAll('[data-gen], [data-goff], #genDays input').forEach(el => { el.disabled = !ed; });
+  document.querySelectorAll('#edAtt, #edMode, #edStart, #edEnd, [data-eoff], #edDays input').forEach(el => { el.disabled = !es; });
 }
 function genStatus() {
-  const box = $('schedStatus'), dirty = can('super') && !sameGen(genForm(), GEN);
+  const box = $('schedStatus'), dirty = can('sched.edit') && !sameGen(genForm(), GEN);
   $('schedResetBtn').hidden = !dirty;
   if (box.dataset.keep && !dirty) return; // رسالة حفظ أو نقل ظاهرة
   delete box.dataset.keep;
@@ -932,7 +988,7 @@ function genStatus() {
   }
   const who = GEN_META.scheduleSaved && GEN_META.scheduleBy ? `آخر حفظ: ${GEN_META.scheduleBy}، ${fmtWhen(GEN_META.scheduleAt)}` : '';
   box.className = 'hint';
-  box.textContent = (can('super') ? '' : 'يتعدل بالصلاحية المطلقة بس. ') + who;
+  box.textContent = (can('sched.edit') ? '' : 'ما عندك صلاحية تعديله. ') + who;
 }
 function genMsg(msg, cls) { const box = $('schedStatus'); box.className = 'hint ' + cls; box.textContent = msg; box.dataset.keep = '1'; }
 async function loadGeneral() {
@@ -940,7 +996,7 @@ async function loadGeneral() {
     const r = await fetch('/api/settings'); const j = await r.json();
     if (!r.ok) throw new Error(j.error || 'خطأ');
     GEN = j.schedule; GEN_META = j; fillGen(GEN); setHolidays(j.holidays);
-    if (!j.scheduleSaved && can('super')) await migrateLocalSchedule();
+    if (!j.scheduleSaved && can('sched.edit')) await migrateLocalSchedule();
   } catch (e) { genMsg('ما گدرت أقرا النظام العام: ' + e.message, 'err'); }
   genStatus();
 }
@@ -1223,7 +1279,7 @@ function renderLeavesInfo(recon) {
   const last = LEAVE_IMPORTS[LEAVE_IMPORTS.length - 1];
   let h = '';
   if (!hasLeaves()) {
-    h += `<div class="lv-box">ما مرفوع تقرير إجازات بعد${can('admin') ? '. ارفعه من زر «رفع تقرير الإجازات» فوق' : '. يرفعه المدير'}.
+    h += `<div class="lv-box">ما مرفوع تقرير إجازات بعد${can('leaves.upload') ? '. ارفعه من زر «رفع تقرير الإجازات» فوق' : '. يرفعه اللي عنده صلاحية رفع الإجازات'}.
       الجدول يبيّن الغياب ونقص البصمة كلها «غير مبرّر» لحد ما ينرفع التقرير.</div>`;
   } else if (last) {
     h += `<div class="lv-box">آخر تقرير: <b>${esc(last.file || '—')}</b> · رفعه ${esc(last.by || '—')} · ${esc(fmtWhen(last.at))}
@@ -1365,7 +1421,7 @@ function render() {
     const rows = daily.map(r => { const x = recOf(r);
       return [r.day, r.dow, r.userId, r.name, mark(hhmm(r.first), r.manualIn), mark(hhmm(r.last), r.manualOut), fmtDur(r.worked), fmtDur(r.late||null), fmtDur(r.early||null),
         baseSt(r) + (x ? ' — ' + RECON[x.code].label : '')]; });
-    const quick = can('super');
+    const quick = can('manual.punch');
     const timeCell = (t, p) => `<td class="num">${esc(t)}${p ? ` <span class="tag t-man" title="${esc(manualText(p))}">يدوية</span>` : ''}</td>`;
     html = table(H, rows, daily.map((r,i) => {
       const x = recOf(r);
@@ -1418,7 +1474,7 @@ function render() {
     const logs = filteredLogs();
     const H = ['التاريخ','اليوم','الوقت','الرقم','الاسم','المصدر'];
     const rows = logs.map(l => [dateKey(l.d), DAYS[l.d.getDay()], `${hhmm(l.d)}:${pad(l.d.getSeconds())}`, l.userId, userName(l.userId), l.manual ? manualText(l.manual) : 'الجهاز']);
-    const del = can('super');
+    const del = can('manual.punch');
     html = table(H, rows, rows.map((r, i) => `<tr>${r.slice(0,5).map(c=>`<td>${esc(c)}</td>`).join('')}<td style="white-space:normal">` +
       (logs[i].manual ? `<span class="tag t-man">يدوية</span> ${esc(r[5].slice(7))}` + (del ? ` <button class="small danger no-print" data-mpdel="${esc(logs[i].manual.id)}">حذف</button>` : '') : 'الجهاز') + '</td></tr>'));
   } else {
@@ -1429,7 +1485,7 @@ function render() {
     const pinText = (u) => !u.onDevice || u.hasPassword == null ? '' : u.hasPassword ? 'موجود' : 'لا يوجد';
     const rows = list.map(u => { const p = prof(u.userId); return [u.userId, u.onDevice ? u.name : 'غير موجود بالجهاز',
       p.fullName || '', p.department || '', schedText(u.userId), p.title || '', p.mobile || '', u.cardHidden ? 'مخفي' : u.cardno || '', u.onDevice ? roleName(u.role) : '', pinText(u)]; });
-    const editable = can('supervisor');
+    const editable = can('emp.edit') || can('emp.sched');
     const schedCell = (id, t) => { const sc = schedOf(id); return sc.exempt || sc.custom ? `<span class="tag ${sc.exempt ? 't-off' : 't-info'}">${esc(t)}</span>` : esc(t); };
     html = table(H, rows, rows.map((r, i) =>
       `<tr>${r.map((c,j)=> j === 4 ? `<td>${schedCell(list[i].userId, c)}</td>`
@@ -1555,7 +1611,7 @@ function renderScan(j) {
       ${f.fix ? `<div style="font-size:13px;margin-top:4px;white-space:normal"><b>المعالجة:</b> ${esc(f.fix)}</div>` : ''}</td></tr>`;
   }).join('');
   $('scanResult').innerHTML = banner + `<div class="tablewrap"><table><thead><tr><th>الخطورة</th><th>النقطة والمعالجة</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  if (can('super') && (j.findings || []).some(f => f.id === 'commkey' && f.severity === 'critical')) {
+  if (can('danger.commKey') && (j.findings || []).some(f => f.id === 'commkey' && f.severity === 'critical')) {
     const b = document.createElement('button');
     b.className = 'primary no-print'; b.style.marginTop = '10px'; b.textContent = 'اضبط كلمة سر اتصال الجهاز الآن';
     b.onclick = () => { $('adminCard').open = true; $('comkeyCtl').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('comkeyVal').focus(); };
@@ -1600,7 +1656,7 @@ function syncEdSched() {
   $('edExOut').value = custom ? checkedDays('eday', 'xo').join(',') : '';
   for (const d of WEEK) dtEl('eday', 'name', d).className = off.includes(d) ? 'off' : '';
   $('edSchedHint').textContent = (exempt ? 'غير مشمول: ما ينحسب عليه غياب ولا تأخير ولا نقص بصمة، وبصماته (إذا بصم) تبقى بالسجل. ' : '') +
-    (custom ? '' : 'النظام العام: ' + genText(GEN) + '. ') + (can('super') ? '' : 'الدوام يتعدل بالصلاحية المطلقة بس.');
+    (custom ? '' : 'النظام العام: ' + genText(GEN) + '. ') + (can('emp.sched') ? '' : 'ما عندك صلاحية تعديل دوامه.');
 }
 function profileFromForm() {
   syncEdSched();
@@ -1617,13 +1673,14 @@ function openEdit(userId) {
   $('editTitle').textContent = 'تعديل الموظف: ' + userName(userId);
   $('editSub').textContent = editSubText(userId, dev);
   setEdAdminStatus('');
-  const canDev = !!(dev && dev.uid != null);
+  const canDev = !!(dev && dev.uid != null) && can('emp.edit');
   $('devSection').style.display = canDev ? '' : 'none';
   $('devNote').style.display = canDev ? 'none' : '';
-  $('devNote').textContent = dev ? 'حتى تعدل الاسم أو البطاقة بالجهاز، اسحب البيانات من الجهاز أولاً (هذه نسخة محفوظة).' : 'هذا الموظف موجود ببيانات الحاسبة فقط، مو مسجل بجهاز البصمة.';
+  $('devNote').textContent = dev && !can('emp.edit') ? 'تعديل الاسم والبطاقة يحتاج صلاحية «تعديل الموظفين».' : dev ? 'حتى تعدل الاسم أو البطاقة بالجهاز، اسحب البيانات من الجهاز أولاً (هذه نسخة محفوظة).' : 'هذا الموظف موجود ببيانات الحاسبة فقط، مو مسجل بجهاز البصمة.';
   if (canDev) { $('editName').value = dev.name || ''; $('editCard').value = dev.cardHidden ? '' : dev.cardno || 0; $('editEnc').value = 'auto'; updateBytes(); }
-  $('adminSection').style.display = canDev ? '' : 'none';
-  if (canDev) {
+  const onDev = !!(dev && dev.uid != null);
+  $('adminSection').style.display = onDev ? '' : 'none';
+  if (onDev) {
     const sel = $('edPriv');
     sel.querySelectorAll('option[data-extra]').forEach(o => o.remove());
     if (dev.role !== 0 && dev.role !== 14) sel.insertAdjacentHTML('beforeend', `<option data-extra value="${dev.role}" disabled>${esc(roleName(dev.role))} (الحالية)</option>`);
@@ -1631,6 +1688,8 @@ function openEdit(userId) {
     $('edPin').value = ''; $('edFinger').value = '-1';
   }
   document.querySelectorAll('[data-pf]').forEach(el => { el.value = p[el.dataset.pf] || ''; });
+  const SCHED_PF = ['attendance', 'schedMode', 'workStart', 'workEnd', 'offDays', 'dayTimes', 'exemptIn', 'exemptOut'];
+  document.querySelectorAll('[data-pf]').forEach(el => { if (!SCHED_PF.includes(el.dataset.pf)) el.disabled = !can('emp.edit'); });
   const ep = effProf(p);
   $('edAtt').value = ep.attendance; $('edMode').value = ep.schedMode;
   $('edStart').value = ep.workStart || GEN.start; $('edEnd').value = ep.workEnd || GEN.end;
@@ -1642,7 +1701,7 @@ function openEdit(userId) {
   syncEdSched();
   $('editStatus').textContent = ''; $('editStatus').className = '';
   $('editOverlay').classList.add('open');
-  (canDev ? $('editName') : document.querySelector('[data-pf="fullName"]')).focus();
+  (canDev ? $('editName') : can('emp.edit') ? document.querySelector('[data-pf="fullName"]') : $('edAtt')).focus();
 }
 function editSubText(userId, dev) {
   return `رقم الموظف ${userId}` + (dev ? ` · ${roleName(dev.role)}` + (dev.hasPassword ? ' · عنده رقم سري' : dev.hasPassword === false ? ' · بدون رقم سري' : '') : ' · غير موجود بالجهاز');
@@ -1659,7 +1718,7 @@ async function saveEdit() {
   const { userId, dev } = editing;
   const err = (m) => { $('editStatus').className = 'err'; $('editStatus').textContent = m; };
   // بيانات الجهاز
-  const canDev = !!(dev && dev.uid != null);
+  const canDev = !!(dev && dev.uid != null) && can('emp.edit');
   let devChange = null;
   if (canDev) {
     const name = $('editName').value.trim(), card = $('editCard').value.trim();
@@ -1972,7 +2031,7 @@ async function loadManual() {
   if (DATA) { fillEmpSelect(); render(); }
 }
 function renderManualList() {
-  if (!$('mpTable') || !can('admin')) return;
+  if (!$('mpTable') || !can('manual.punch')) return;
   if (!MANUAL.length) { $('mpTable').innerHTML = '<div class="empty">ما أكو بصمات يدوية</div>'; return; }
   const list = [...MANUAL].sort((a, b) => b.time.localeCompare(a.time));
   $('mpTable').innerHTML = '<table><thead><tr><th>الرقم</th><th>الاسم</th><th>التاريخ</th><th>الوقت</th><th>النوع</th><th>السبب</th><th>أضافها</th><th>وقت الإضافة</th><th></th></tr></thead><tbody>' +
@@ -2044,7 +2103,7 @@ const empLabel = (id) => id ? `${id} - ${userName(String(id).replace(/^0+(?=.)/,
 let USER_ROLES = {};
 function fillRoleSelect(roles) {
   USER_ROLES = roles || {};
-  const order = ['employee', 'viewer', 'supervisor', 'admin', 'super'].filter(k => USER_ROLES[k]);
+  const order = ['employee', 'custom', 'super'].filter(k => USER_ROLES[k]);
   const cur = $('auRole').value;
   $('auRole').innerHTML = order.map(k => `<option value="${k}">${esc(ROLE_LABELS[k] || USER_ROLES[k])}</option>`).join('');
   if (order.includes(cur)) $('auRole').value = cur;
@@ -2060,9 +2119,13 @@ async function loadUsers() {
     const r = await fetch('/api/users'); const j = await r.json();
     if (!r.ok) throw new Error(j.error || 'خطأ');
     fillRoleSelect(j.roles);
+    PERM_CAT = j.catalog || PERM_CAT; PERM_PRESETS = j.presets || PERM_PRESETS; USERS_LIST = j.users;
     const isSuper = can('super');
-    const roleCell = (u) => !isSuper || u.me ? esc(u.roleLabel || ROLE_LABELS[u.role] || u.role)
-      : `<select data-urole="${esc(u.username)}">` + Object.entries(ROLE_LABELS).map(([k, v]) => `<option value="${k}"${k === u.role ? ' selected' : ''}>${v}</option>`).join('') + '</select>';
+    const nPerm = PERM_CAT ? PERM_CAT.reduce((n, g) => n + g.items.length, 0) : 0;
+    const roleCell = (u) => (!isSuper || u.me ? esc(u.roleLabel || ROLE_LABELS[u.role] || u.role)
+      : `<select data-urole="${esc(u.username)}">` + ['super', 'custom', 'employee'].map(k => `<option value="${k}"${k === u.role ? ' selected' : ''}>${ROLE_LABELS[k]}</option>`).join('') + '</select>') +
+      (u.role === 'custom' ? ` <span class="hint" style="font-size:12px">${(u.perms || []).length} من ${nPerm}</span>` +
+        (isSuper && !u.me ? ` <button class="small primary" data-uperm="${esc(u.username)}">تخصيص</button>` : '') : '');
     $('usersTable').innerHTML = '<table><thead><tr><th>اسم المستخدم</th><th>الصلاحية</th><th>الموظف</th><th>آخر دخول</th><th>تاريخ الإضافة</th><th></th></tr></thead><tbody>' +
       j.users.map(u => `<tr><td>${esc(u.username)}${u.me ? ' <span class="tag t-ok">أنت</span>' : ''}</td><td>${roleCell(u)}</td><td>${esc(empLabel(u.empId))}</td>
         <td dir="ltr" style="text-align:right">${fmtWhen(u.lastLogin)}</td><td dir="ltr" style="text-align:right">${fmtWhen(u.created)}</td>
@@ -2078,13 +2141,15 @@ $('usersTable').addEventListener('change', async (e) => {
     empId = await askText({ title: 'رقم بصمة الموظف', text: `حساب ${name} راح يصير حساب موظف، يشوف تقريره بس.`, label: 'رقم البصمة', okText: 'حفظ',
       validate: (v) => v.trim() ? '' : 'اكتب رقم البصمة' });
     if (empId == null) return loadUsers();
-  } else if (!confirm(`راح تصير صلاحية ${name}: ${ROLE_LABELS[role]}. متأكد؟`)) return loadUsers();
+  } else if (!confirm(`راح تصير صلاحية ${name}: ${ROLE_LABELS[role]}.` + (role === 'custom' ? ' يبدي بدون صلاحيات، وبعدها تختارها من «تخصيص».' : '') + ' متأكد؟')) return loadUsers();
   try { await postJSON('/api/users/save', { username: name, role, empId: empId.trim() }); setUsersStatus(`تغيرت صلاحية ${name} إلى: ${ROLE_LABELS[role]}`, 'okc'); }
-  catch (x) { setUsersStatus(x.message, 'err'); }
-  loadUsers();
+  catch (x) { setUsersStatus(x.message, 'err'); return loadUsers(); }
+  await loadUsers();
+  if (role === 'custom') openPerms(name);
 });
 $('usersTable').addEventListener('click', async (e) => {
-  const pb = e.target.closest('[data-upass]'), db = e.target.closest('[data-udel]');
+  const pb = e.target.closest('[data-upass]'), db = e.target.closest('[data-udel]'), cb = e.target.closest('[data-uperm]');
+  if (cb) return openPerms(cb.dataset.uperm);
   if (pb) {
     const name = pb.dataset.upass;
     const pass = await askText({ title: 'كلمة سر جديدة', text: `كلمة سر جديدة للمستخدم ${name}. راح ينطلع من كل الأجهزة المسجل بيها.`,
@@ -2110,12 +2175,68 @@ $('auBtn').onclick = async () => {
   if (role === 'super' && !confirm(`${username} راح يصير بصلاحية مطلقة: كل شي بدون قيد، ويضيف ويحذف كل المستخدمين. متأكد؟`)) return;
   $('auBtn').disabled = true;
   try {
-    await postJSON('/api/users/save', { create: true, username, password, role, empId });
-    setUsersStatus(`انضاف المستخدم ${username} بصلاحية: ${ROLE_LABELS[role]}` + (empId ? ` (الموظف ${empLabel(empId)})` : ''), 'okc');
+    const j = await postJSON('/api/users/save', { create: true, username, password, role, empId, perms: role === 'custom' ? [] : undefined });
+    setUsersStatus(`انضاف المستخدم ${username} بصلاحية: ${ROLE_LABELS[role]}` + (empId ? ` (الموظف ${empLabel(empId)})` : '') +
+      (role === 'custom' ? '. هسه اختار صلاحياته' : ''), 'okc');
     $('auName').value = ''; $('auPass').value = ''; $('auEmp').value = '';
-    loadUsers();
+    await loadUsers();
+    if (role === 'custom') openPerms(j.user.username);
   } catch (x) { setUsersStatus(x.message, 'err'); }
   finally { $('auBtn').disabled = false; }
+};
+
+// ---------- تخصيص صلاحيات الحساب المخصص ----------
+let PERM_CAT = null, PERM_PRESETS = {}, USERS_LIST = [], PERM_USER = '';
+function permTree(selected) {
+  const on = new Set(selected);
+  $('permTree').innerHTML = PERM_CAT.map(g => `<div class="pgroup" data-group="${esc(g.key)}">
+    <label><input type="checkbox" data-pg="${esc(g.key)}"> ${esc(g.label)} <small class="hint" data-pgn></small></label>
+    <div class="pitems">${g.items.map(it => `<label><input type="checkbox" data-pk="${esc(it.key)}"${on.has(it.key) ? ' checked' : ''}> ${esc(it.label)}` +
+      (it.danger ? ' <span class="tag t-bad">خطرة</span>' : '') + '</label>').join('')}</div></div>`).join('');
+  permSync();
+}
+function permSync() {
+  let total = 0, n = 0;
+  $('permTree').querySelectorAll('.pgroup').forEach(g => {
+    const items = [...g.querySelectorAll('[data-pk]')], k = items.filter(x => x.checked).length;
+    const gb = g.querySelector('[data-pg]'); gb.checked = k === items.length; gb.indeterminate = k > 0 && k < items.length;
+    g.querySelector('[data-pgn]').textContent = `${k} من ${items.length}`; total += items.length; n += k;
+  });
+  $('permCount').textContent = `مفعّل ${n} من ${total}`;
+}
+const permChecked = () => [...$('permTree').querySelectorAll('[data-pk]:checked')].map(x => x.dataset.pk);
+function openPerms(name) {
+  const u = USERS_LIST.find(x => x.username.toLowerCase() === String(name).toLowerCase());
+  if (!u || !PERM_CAT) return;
+  PERM_USER = u.username;
+  $('permTitle').textContent = 'تخصيص صلاحيات: ' + u.username;
+  $('permStatus').textContent = ''; $('permStatus').className = '';
+  permTree(u.perms || []);
+  $('permOverlay').classList.add('open');
+}
+$('permTree').addEventListener('change', (e) => {
+  const g = e.target.closest('[data-pg]');
+  if (g) g.closest('.pgroup').querySelectorAll('[data-pk]').forEach(x => { x.checked = g.checked; });
+  permSync();
+});
+document.querySelectorAll('[data-pset]').forEach(b => b.onclick = () => {
+  const k = b.dataset.pset;
+  const set = k === 'all' ? PERM_CAT.flatMap(g => g.items.map(i => i.key)) : k === 'none' ? [] : (PERM_PRESETS[k] || []);
+  permTree(set);
+});
+$('permCancel').onclick = () => $('permOverlay').classList.remove('open');
+$('permSave').onclick = async () => {
+  const perms = permChecked();
+  const risky = PERM_CAT.flatMap(g => g.items).filter(i => i.danger && perms.includes(i.key)).map(i => i.label);
+  if (risky.length && !confirm(`${PERM_USER} راح يگدر يسوي أشياء خطرة:\n• ${risky.join('\n• ')}\nتكمل؟`)) return;
+  $('permSave').disabled = true;
+  try {
+    const j = await postJSON('/api/users/save', { username: PERM_USER, perms });
+    $('permOverlay').classList.remove('open');
+    setUsersStatus(`انحفظت صلاحيات ${PERM_USER} (${j.user.perms.length})، وتتطبق عليه فوراً`, 'okc');
+    loadUsers();
+  } catch (x) { $('permStatus').className = 'err'; $('permStatus').textContent = x.message; }
+  finally { $('permSave').disabled = false; }
 };
 
 // ---------- حفظ التقرير للموظفين ----------
@@ -2151,7 +2272,7 @@ $('publishBtn').onclick = async () => {
   if (!DATA) return setTabStatus('اسحب البيانات من الجهاز أولاً', 'err');
   const f = $('from').value, t = $('to').value;
   if (!f || !t) return setTabStatus('اختار الفترة (من تاريخ وإلى تاريخ)', 'err');
-  if (can('super') && !sameGen(genForm(), GEN)) return setTabStatus('النظام العام بيه تغييرات ما محفوظة. احفظه أو رجّعه قبل ما تحفظ التقرير', 'err');
+  if (can('sched.edit') && !sameGen(genForm(), GEN)) return setTabStatus('النظام العام بيه تغييرات ما محفوظة. احفظه أو رجّعه قبل ما تحفظ التقرير', 'err');
   const rep = buildPublished(), n = Object.keys(rep.employees).length;
   if (!confirm(`راح أحفظ تقرير الفترة من ${f} إلى ${t} لـ ${n} موظف` + (rep.leaves ? ' (ويا تصفية الإجازات)' : '') +
     `.\nكل موظف عنده حساب يشوف تقريره هو بس. إذا أكو تقرير محفوظ لنفس الفترة يتبدّل.\nتكمل؟`)) return;
@@ -2239,6 +2360,7 @@ function auditDetail(e) {
   const p = [];
   if (e.target) p.push('المستخدم: ' + e.target);
   if (e.newRole) p.push('الصلاحية: ' + (ROLE_LABELS[e.newRole] || e.newRole));
+  if (Array.isArray(e.perms)) p.push(`الصلاحيات: ${e.perms.length} مفعّلة`);
   if (e.passwordChanged) p.push('كلمة سر جديدة');
   if (e.sched) p.push('الدوام: ' + e.sched);
   if (e.action === 'scheduleSave') p.push(`من: ${e.old || '—'} ← إلى: ${e.new || '—'}`);
@@ -2344,7 +2466,7 @@ async function loadApp() {
   try {
     const j = await (await fetch('/api/app')).json();
     if (!j.desktop) return;
-    $('appCard').hidden = false; $('autoStart').checked = !!j.autostart;
+    $('appCard').hidden = !canAny('app.hide app.autostart'); $('autoStart').checked = !!j.autostart;
   } catch (_) {}
 }
 $('autoStart').onchange = async () => {
@@ -2561,6 +2683,7 @@ async function buildBook() {
     for (const [tab, view, name] of [['daily', null, 'التقرير اليومي'], ['summary', null, 'ملخص الموظفين'], ['leaves', 'days', 'التصفية حسب الأيام'],
       ['leaves', 'emp', 'التصفية حسب الموظفين'], ['person', null, 'تقرير الموظف']]) {
       if (tab === 'person' && !$('emp').value) continue;
+      if (!can('tab.' + tab)) continue;
       const t = captureTab(tab, view); if (t && t.length > 1) sheets.push({ name, rows: t });
     }
   }
@@ -2575,7 +2698,7 @@ async function buildBook() {
       : k === 'exemptIn' || k === 'exemptOut' ? (e.schedMode === MODE_CUSTOM && e[k] ? offText(parseOff(e[k])).replace(/ و/g, '، ') : '') : p[k];
     emps.push([id, dev ? dev.name : '', ...PF.map(k => bookStr(val(k)))]);
   }
-  sheets.push({ name: BOOK.emps, rows: emps });
+  if (can('tab.users')) sheets.push({ name: BOOK.emps, rows: emps });
   const dt = parseDayTimes(g.days);
   sheets.push({ name: BOOK.gen, rows: [['الإعداد', 'القيمة'], ['بداية الدوام', g.start], ['نهاية الدوام', g.end], ['السماحية (دقيقة)', bookStr(g.grace)],
     ['تجاهل البصمة المكررة (دقيقة)', bookStr(g.dedup)], ['العطلة الأسبوعية', g.off.length ? offText(g.off).replace(/ و/g, '، ') : NO_OFF],
@@ -2584,12 +2707,12 @@ async function buildBook() {
   sheets.push({ name: BOOK.hol, rows: [['التاريخ', 'اليوم', 'اسم العطلة'], ...[...HOLI].sort((a, b) => a[0].localeCompare(b[0])).map(([d, n]) => [d, DAYS[dowOf(d)], n])] });
   let manual = [];
   try { const r = await fetch('/api/manual'); if (r.ok) manual = (await r.json()).punches || []; } catch (_) {}
-  sheets.push({ name: BOOK.manual, rows: [['رقم الموظف', 'الاسم', 'التاريخ', 'الوقت', 'النوع', 'السبب', 'ملاحظة', 'أضافها', 'وقت الإضافة', 'المعرّف'],
+  if (can('tab.raw') || can('manual.punch')) sheets.push({ name: BOOK.manual, rows: [['رقم الموظف', 'الاسم', 'التاريخ', 'الوقت', 'النوع', 'السبب', 'ملاحظة', 'أضافها', 'وقت الإضافة', 'المعرّف'],
     ...manual.map(m => [m.userId, userName(m.userId), m.time.slice(0, 10), m.time.slice(11, 16), m.type === 'in' ? 'دخول' : 'خروج', m.reason, m.note || '', m.by, (m.created || '').replace('T', ' ').slice(0, 16), m.id])] });
-  sheets.push({ name: BOOK.leaves, rows: [['رقم البصمة', 'الاسم', 'القسم', 'النوع', 'من', 'إلى', 'من ساعة إلى ساعة', 'الساعات', 'الأيام', 'الحالة'],
+  if (can('tab.leaves')) sheets.push({ name: BOOK.leaves, rows: [['رقم البصمة', 'الاسم', 'القسم', 'النوع', 'من', 'إلى', 'من ساعة إلى ساعة', 'الساعات', 'الأيام', 'الحالة'],
     ...LEAVES.map(l => [l.userId, l.name || '', l.dept || '', l.type || (l.kind === 'hour' ? 'إجازة زمنية' : 'إجازة'), l.from, l.to, l.kind === 'hour' ? (l.start || '') : '',
       l.kind === 'hour' ? fmtDur(l.minutes || 0) : '', l.kind === 'hour' ? '' : bookStr(l.days || ''), l.statusText || LV_STATUS[l.status] || ''])] });
-  if (DATA) {
+  if (DATA && can('tab.raw')) {
     sheets.push({ name: BOOK.devUsers, rows: [['الرقم', 'الاسم', 'الصلاحية', 'رقم البطاقة', 'uid'], ...DATA.users.map(u => [u.userId, u.name || '', bookStr(u.role ?? ''), bookStr(u.cardno || ''), bookStr(u.uid ?? '')])] });
     sheets.push({ name: BOOK.logs, rows: [['رقم الموظف', 'الوقت'], ...DATA.logs.map(l => [l.userId, l.time.replace('T', ' ')])] });
   }
@@ -2650,13 +2773,13 @@ async function importBook(file) {
   if (!sh.has(BOOK.info) || ![BOOK.emps, BOOK.gen, BOOK.logs].some(n => sh.has(n))) throw new Error('هذا مو ملف Excel الشامل اللي يطلّعه البرنامج (زر «تصدير Excel شامل»)');
   const rowsOf = (n) => (sh.get(n) || []).filter(r => r.some(v => bookStr(v).trim()));
   const plan = [], skip = [];
-  const want = (name, role, what) => { if (!sh.has(name)) return false; if (!can(role)) { skip.push(`${what} (تحتاج صلاحية أعلى)`); return false; } plan.push(what); return true; };
+  const want = (name, perm, what) => { if (!sh.has(name)) return false; if (!can(perm)) { skip.push(`${what} (ما عندك صلاحيته)`); return false; } plan.push(what); return true; };
   const doLogs = sh.has(BOOK.logs) && (plan.push('البصمات وموظفي الجهاز (للعرض بالتقارير)'), true);
-  const doEmps = want(BOOK.emps, 'supervisor', 'بيانات الموظفين ودوامهم');
-  const doGen = want(BOOK.gen, 'super', 'النظام العام');
-  const doHol = want(BOOK.hol, 'super', 'العطل الرسمية');
-  const doMan = want(BOOK.manual, 'super', 'البصمات اليدوية');
-  const doLv = want(BOOK.leaves, 'admin', 'الإجازات');
+  const doEmps = want(BOOK.emps, 'emp.edit', can('emp.sched') ? 'بيانات الموظفين ودوامهم' : 'بيانات الموظفين (بدون الدوام)');
+  const doGen = want(BOOK.gen, 'sched.edit', 'النظام العام');
+  const doHol = want(BOOK.hol, 'manual.holidays', 'العطل الرسمية');
+  const doMan = want(BOOK.manual, 'manual.punch', 'البصمات اليدوية');
+  const doLv = want(BOOK.leaves, 'leaves.upload', 'الإجازات');
   if (!plan.length) throw new Error('ما أكو شي تگدر تستورده بصلاحيتك: ' + skip.join('، '));
   if (!confirm(`راح ترجع من الملف:\n• ${plan.join('\n• ')}\n\nالعطل والبصمات اليدوية والإجازات تنستبدل بالموجود بالملف، وبيانات الموظفين تنكتب فوق القديمة (الخانة الفارغة ما تمسح شي).` +
     (skip.length ? `\n\nما راح يرجع: ${skip.join('، ')}` : '') + '\nتكمل؟')) return setStatus('تم إلغاء الاستيراد');

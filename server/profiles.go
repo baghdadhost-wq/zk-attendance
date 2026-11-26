@@ -415,8 +415,14 @@ func handleProfileSave(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err, "")
 		return
 	}
-	// الدوام و«مشمول بالبصمة» (تغيير الأوقات) للصلاحية المطلقة بس. غيره: يبقى دوام الموظف مثل ما هو
-	if !allowed(r, RoleSuper) {
+	// الدوام و«مشمول بالبصمة» يحتاج صلاحية «دوام الموظف»، والباقي «تعديل الموظفين». اللي ما يحق إله يبقى مثل ما هو
+	if !can(r, "emp.edit") {
+		if !sameExceptSched(clean, all[id]) {
+			deny(w, r, "profileEdit")
+			return
+		}
+	}
+	if !can(r, "emp.sched") {
 		if schedSummary(clean) != schedSummary(all[id]) {
 			deny(w, r, "profileSchedule")
 			return
@@ -455,7 +461,7 @@ func handleProfileImport(w http.ResponseWriter, r *http.Request) {
 		mode = "merge"
 	}
 	schedIgnored := 0
-	if !allowed(r, RoleSuper) { // أعمدة الدوام بالملف تنهمل (تغيير الأوقات للصلاحية المطلقة بس)
+	if !can(r, "emp.sched") { // أعمدة الدوام بالملف تنهمل (تحتاج صلاحية «دوام الموظف»)
 		for _, p := range req.Profiles {
 			had := false
 			for _, k := range schedKeys {
@@ -505,4 +511,23 @@ func handleImportMdb(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"profiles": profiles, "count": len(profiles)})
+}
+
+// sameExceptSched هل البيانات نفسها بغض النظر عن حقول الدوام (لصاحب «دوام الموظف» بدون «تعديل الموظفين»)
+func sameExceptSched(a, b profile) bool {
+	isSched := map[string]bool{}
+	for _, k := range schedKeys {
+		isSched[k] = true
+	}
+	for k, v := range a {
+		if !isSched[k] && b[k] != v {
+			return false
+		}
+	}
+	for k, v := range b {
+		if !isSched[k] && a[k] != v {
+			return false
+		}
+	}
+	return true
 }

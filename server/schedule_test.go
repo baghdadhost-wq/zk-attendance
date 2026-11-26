@@ -228,6 +228,28 @@ func TestAccountsAndReports(t *testing.T) {
 	if code, _, _ := sup.do("POST", "/api/settings/schedule", sched); code != 200 {
 		t.Fatal("super could not change the general schedule")
 	}
+	// التخصيص: الصلاحية المطلقة تفعّل «تعديل النظام العام» للمخصص وتتطبق فوراً بدون ما يطلع
+	if code, _, _ := adm.do("POST", "/api/users/save", `{"username":"sup1","perms":["sched.edit"]}`); code != 403 {
+		t.Fatal("a custom account changed permissions")
+	}
+	if code, j, _ := sup.do("POST", "/api/users/save", `{"username":"admin","perms":["sched.edit","users.employees","bogus"]}`); code != 200 {
+		t.Fatalf("super could not set permissions: %d %v", code, j)
+	} else if ps := j["user"].(map[string]any)["perms"].([]any); len(ps) != 2 {
+		t.Fatalf("unknown permission kept: %v", ps)
+	}
+	if code, _, _ := adm.do("POST", "/api/settings/schedule", sched); code != 200 {
+		t.Fatal("permission did not apply right away")
+	}
+	if code, _, _ := adm.do("GET", "/api/audit", ""); code != 403 {
+		t.Fatal("removed permission still works")
+	}
+	if code, _, _ := sup.do("POST", "/api/users/save", `{"username":"zainab","perms":["tab.daily"]}`); code != 400 {
+		t.Fatal("permissions set on an employee account")
+	}
+	// اسم الصلاحية القديم يرجّع القالب
+	if code, j, _ := sup.do("POST", "/api/users/save", `{"username":"admin","role":"admin"}`); code != 200 || len(j["user"].(map[string]any)["perms"].([]any)) != len(legacyPerms["admin"]) {
+		t.Fatalf("preset: %d %v", code, j)
+	}
 	sup.do("POST", "/api/profiles/save", `{"userId":"2","profile":{"fullName":"زينب","schedMode":"خاص","workStart":"07:00","workEnd":"13:00","offDays":"4,5"}}`)
 	if code, _, _ := adm.do("POST", "/api/profiles/save", `{"userId":"2","profile":{"fullName":"زينب","schedMode":"عام"}}`); code != 403 {
 		t.Fatal("admin changed an employee schedule")
@@ -317,8 +339,8 @@ func TestSessionPrune(t *testing.T) {
 
 func TestShareLinks(t *testing.T) {
 	store := newStore(t)
-	store.create("owner1", "Owner#2026x", RoleSuper, "")
-	store.create("emp", "emp12345", RoleEmployee, "4")
+	store.create("owner1", "Owner#2026x", RoleSuper, "", nil)
+	store.create("emp", "emp12345", RoleEmployee, "4", nil)
 	store.AllowWebSetup()
 	h := NewHandler(store)
 	SetShareInfo("", "", 0)

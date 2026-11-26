@@ -620,14 +620,14 @@ func handleCmd(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, badReq("أمر غير معروف"), "")
 		return
 	}
-	if !allowed(r, actionNeeds(req.Action)) {
+	if !canAction(r, req.Action) {
 		deny(w, r, req.Action)
 		return
 	}
 	if req.Params == nil {
 		req.Params = map[string]any{}
 	}
-	req.Params[callerSuperKey] = allowed(r, RoleSuper)
+	req.Params[callerSuperKey] = can(r, "danger.devAdmins")
 	if phrase, ok := confirmPhrase[req.Action]; ok {
 		if got, _ := anyStr(req.Params["confirm"]); strings.TrimSpace(got) != phrase {
 			writeErr(w, badReq("حتى تأكد، اكتب العبارة: "+phrase), "")
@@ -685,33 +685,13 @@ func handleCmd(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, res)
 }
 
-// الصلاحية اللي يحتاجها كل أمر. أي أمر مو مذكور هنا للصلاحية المطلقة بس: وقت الجهاز (ضبط ومزامنة)،
-// خصائص الجهاز (كلمة سر الاتصال والإعدادات المخفية واسم الجهاز)، مسح كل البيانات، مدراء الجهاز وإعدادات الأبواب وسجل عملياته.
-// الأساسية: السحب وأوامر الجهاز العادية. المشرف يعدّل أسماء الموظفين وبطاقاتهم.
-// المدير: إضافة وحذف الموظفين بالجهاز وأرقامهم السرية وبصماتهم ومسح سجل البصمات (بس مو على مدراء الجهاز).
-var actionRole = map[string]string{
-	"info": RoleViewer, "getTime": RoleViewer, "refresh": RoleViewer, "testVoice": RoleViewer, "unlock": RoleViewer,
-	"lcdWrite": RoleViewer, "lcdClear": RoleViewer, "disable": RoleViewer, "enable": RoleViewer,
-	"restart": RoleViewer, "powerOff": RoleViewer, "deviceSecurityCheck": RoleViewer,
-	"updateUser": RoleSupervisor,
-	"addUser":    RoleAdmin, "deleteUser": RoleAdmin, "deleteFingers": RoleAdmin, "setPin": RoleAdmin,
-	"clearLogs": RoleAdmin, "restoreUsers": RoleAdmin,
-}
-
-func actionNeeds(action string) string {
-	if r, ok := actionRole[action]; ok {
-		return r
-	}
-	return RoleSuper
-}
-
 // مفتاح داخلي يحطه الخادم نفسه بالـ params (يكتب فوق أي قيمة جاية من المتصفح):
-// هل اللي طلب الأمر بصلاحية مطلقة. مدراء الجهاز ما يعدلهم غيره، حتى المدير ما يگدر يوصل لقائمة الجهاز ويغير وقته.
+// هل اللي طلب الأمر عنده صلاحية «مدراء الجهاز». مدراء الجهاز ما يعدلهم غيره، حتى ما أحد يوصل لقائمة الجهاز ويغير وقته بدونها.
 const callerSuperKey = "\x00super"
 
 func callerIsSuper(p map[string]any) bool { v, _ := p[callerSuperKey].(bool); return v }
 
-var errDeviceAdmin = apiErr{403, "هذا الموظف مدير بالجهاز، وتعديله أو حذفه يحتاج الصلاحية المطلقة"}
+var errDeviceAdmin = apiErr{403, "هذا الموظف مدير بالجهاز، وتعديله أو حذفه يحتاج صلاحية «مدراء الجهاز»"}
 
 // أوامر ما تتنفذ إلا إذا انكتبت عبارة التأكيد حرفياً
 var confirmPhrase = map[string]string{"clearAllData": "امسح الكل"}

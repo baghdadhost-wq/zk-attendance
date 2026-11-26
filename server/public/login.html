@@ -60,7 +60,7 @@ try { $('user').value = localStorage.getItem('zkLastUser') || ''; } catch (_) {}
       $('btn').textContent = 'إنشاء الحساب والدخول';
     }
     if (j.demo && j.demoAccounts) {
-      const labels = { super: 'صلاحية مطلقة', admin: 'مدير', supervisor: 'مشرف', viewer: 'أساسي', employee: 'موظف' };
+      const labels = { super: 'صلاحية مطلقة', custom: 'مخصص', employee: 'موظف' };
       $('demo').innerHTML = 'وضع التجربة: اختار حساب حتى تجرب صلاحيته' +
         j.demoAccounts.map(a => `<button type="button" data-u="${a.username}" data-p="${a.password}">${labels[a.role] || a.role}: ${a.username} / ${a.password}</button>`).join('');
       $('demo').hidden = false;
