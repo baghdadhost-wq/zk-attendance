@@ -31,7 +31,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 22 / 255, green: 33 / 255, blue: 46 / 255, alpha: 1)
+        view.backgroundColor = UIColor(red: 13 / 255, green: 59 / 255, blue: 60 / 255, alpha: 1) // حبر الرأس
 
         let config = WKWebViewConfiguration()
         let controller = config.userContentController
@@ -45,7 +45,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.isOpaque = false
-        webView.backgroundColor = UIColor(red: 0.957, green: 0.965, blue: 0.973, alpha: 1)
+        webView.backgroundColor = UIColor(red: 238 / 255, green: 242 / 255, blue: 239 / 255, alpha: 1) // لون الصفحة
         view.addSubview(webView)
         // الصفحة تبدي تحت شريط الساعة، حتى ما تمر الكتابة من وراه
         NSLayoutConstraint.activate([
