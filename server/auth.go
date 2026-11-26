@@ -250,6 +250,8 @@ var publicPaths = map[string]bool{
 	"/api/app/show":         true, // من نفس الحاسبة بس، يرجّع نافذة البرنامج
 	"/manifest.webmanifest": true, "/sw.js": true,
 	"/icon-192.png": true, "/icon-512.png": true, "/apple-touch-icon.png": true, "/favicon.ico": true,
+	"/theme.css": true, "/fonts/plex-regular.woff": true, "/fonts/plex-medium.woff": true, "/fonts/plex-semibold.woff": true,
+	"/fonts/plex-bold.woff": true, "/fonts/reemkufi.woff": true,
 }
 
 type authServer struct {
@@ -507,9 +509,9 @@ func (a *authServer) handleUserSave(w http.ResponseWriter, r *http.Request) {
 	}
 	me, _ := userOf(r)
 	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Role     string `json:"role"`
+		Username string    `json:"username"`
+		Password string    `json:"password"`
+		Role     string    `json:"role"`
 		EmpID    string    `json:"empId"`
 		Create   bool      `json:"create"`
 		Perms    *[]string `json:"perms"` // nil = ما يتغير

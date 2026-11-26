@@ -66,16 +66,16 @@ func atLeast(role, need string) bool {
 }
 
 type appUser struct {
-	Username   string `json:"username"`
-	Role       string `json:"role"`
-	Salt       string `json:"salt"`
-	Hash       string `json:"hash"`
-	Iterations int    `json:"iterations"`
+	Username   string   `json:"username"`
+	Role       string   `json:"role"`
+	Salt       string   `json:"salt"`
+	Hash       string   `json:"hash"`
+	Iterations int      `json:"iterations"`
 	EmpID      string   `json:"empId,omitempty"` // حساب موظف: رقم بصمته
 	Perms      []string `json:"perms,omitempty"` // حساب مخصص: صلاحياته
-	Created    string `json:"created,omitempty"`
-	Updated    string `json:"updated,omitempty"`
-	LastLogin  string `json:"lastLogin,omitempty"`
+	Created    string   `json:"created,omitempty"`
+	Updated    string   `json:"updated,omitempty"`
+	LastLogin  string   `json:"lastLogin,omitempty"`
 }
 
 // UserStore كل مستخدمي البرنامج

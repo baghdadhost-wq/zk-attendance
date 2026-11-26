@@ -9,7 +9,7 @@ import (
 )
 
 // Version رقم نسخة البرنامج
-const Version = "2.17.0"
+const Version = "2.18.0"
 
 //go:embed public
 var publicFS embed.FS
@@ -132,7 +132,13 @@ func NewHandler(users *UserStore) http.Handler {
 			file, ctype = "icon-192.png", "image/png"
 		case "/icon-512.png", "/apple-touch-icon.png":
 			file, ctype = r.URL.Path[1:], "image/png"
+		case "/theme.css":
+			file, ctype = "theme.css", "text/css; charset=utf-8"
 		default:
+			if f, ok := fontFiles[r.URL.Path]; ok { // خطوط البرنامج (مضمّنة، تشتغل بدون إنترنت)
+				file, ctype = "fonts/"+f, "font/woff"
+				break
+			}
 			http.NotFound(w, r)
 			return
 		}
@@ -142,7 +148,7 @@ func NewHandler(users *UserStore) http.Handler {
 			return
 		}
 		w.Header().Set("Content-Type", ctype)
-		if strings.HasSuffix(file, ".png") {
+		if strings.HasSuffix(file, ".png") || strings.HasSuffix(file, ".woff") {
 			w.Header().Set("Cache-Control", "public, max-age=86400")
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")
@@ -153,4 +159,11 @@ func NewHandler(users *UserStore) http.Handler {
 		return as.middleware(mux)
 	}
 	return localOnly(mux)
+}
+
+// الخطوط المضمّنة (رخصة SIL OFL، ملفاتها بمجلد public/fonts)
+var fontFiles = map[string]string{
+	"/fonts/plex-regular.woff": "plex-regular.woff", "/fonts/plex-medium.woff": "plex-medium.woff",
+	"/fonts/plex-semibold.woff": "plex-semibold.woff", "/fonts/plex-bold.woff": "plex-bold.woff",
+	"/fonts/reemkufi.woff": "reemkufi.woff",
 }
