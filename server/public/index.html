@@ -183,9 +183,9 @@
       <label>المنفذ <input id="port" type="number" value="4370" style="min-width:80px"></label>
       <label>كلمة سر الاتصال <bdi dir="ltr">(Comm Key)</bdi> <input id="commKey" type="password" inputmode="numeric" placeholder="0 = بدون" style="min-width:110px"></label>
       <button class="primary" id="fetchBtn">سحب البيانات من الجهاز</button>
-      <button id="loadFileBtn">فتح نسخة محفوظة</button>
-      <button id="saveFileBtn">حفظ نسخة</button>
-      <input type="file" id="fileInput" accept=".json" hidden>
+      <button id="bookExportBtn">تصدير Excel شامل</button>
+      <button id="bookImportBtn" data-min="supervisor" hidden>استيراد النسخة الشاملة</button>
+      <input type="file" id="bookFile" accept=".xlsx" hidden>
     </div>
     <div id="status"></div>
   </section>
@@ -515,15 +515,10 @@
       <button data-tab="person">تقرير موظف</button>
     </div>
     <div class="row no-print" style="margin-bottom:10px">
-      <button id="csvBtn">تصدير Excel (CSV)</button>
       <button id="printBtn">طباعة / PDF</button>
       <button id="publishBtn" class="primary" data-min="admin" hidden>حفظ التقرير للموظفين</button>
       <div class="tools" id="usersTools" style="display:none">
-        <button id="profExportBtn">تصدير قابل للتعديل</button>
-        <button id="profImportBtn" data-min="supervisor" hidden>استيراد البيانات المعدلة</button>
-        <button id="mdbImportBtn" data-min="supervisor" hidden>استيراد من برنامج ZKTeco القديم (att2000.mdb)</button>
-        <input type="file" id="profFile" accept=".csv,.txt" hidden>
-        <input type="file" id="mdbFile" accept=".mdb" hidden>
+        <span class="hint" style="font-size:12px">لتعديل بيانات الموظفين بالجملة: «تصدير Excel شامل» ← عدّل ورقة «الموظفين» ← «استيراد النسخة الشاملة».</span>
       </div>
       <div class="tools" id="personTools" style="display:none">
         <label>الموظف <select id="personSel"></select></label>
@@ -670,7 +665,7 @@ window.fetch = async (...args) => { const r = await _fetch(...args); if (r.statu
 // الخادم يتأكد من الصلاحية بكل طلب، وهنا بس نخفي اللي ما يخصه
 const RANK = { employee: 0, viewer: 1, supervisor: 2, admin: 3, super: 4 };
 const ROLE_LABELS = { super: 'صلاحية مطلقة', admin: 'مدير', supervisor: 'مشرف', viewer: 'أساسي', employee: 'موظف' };
-let ME = { username: '', role: 'viewer' };
+let ME = { username: '', role: 'viewer' }, APP_VERSION = '';
 const can = (min) => (RANK[ME.role] || 0) >= RANK[min];
 function applyRole() { document.querySelectorAll('[data-min]').forEach(el => { el.hidden = !can(el.dataset.min); }); }
 async function initSession() {
@@ -678,6 +673,7 @@ async function initSession() {
     const j = await (await fetch('/api/session')).json();
     if (j.auth && !j.user) { location.href = '/login'; return; }
     if (j.user) ME = j.user;
+    APP_VERSION = j.version || '';
     if (!j.auth) { ['usersCard', 'myPassLink', 'reportsCard', 'publishBtn'].forEach(id => $(id).remove()); } // بدون نظام دخول (تطبيق الموبايل): ما أكو حسابات موظفين
     if (j.auth) {
       if (ME.role === 'employee') { location.replace('/me'); return; } // الموظف يشوف تقريره بس
@@ -1420,24 +1416,6 @@ function employeeList() {
     .sort((a, b) => (Number(a.userId) - Number(b.userId)) || a.userId.localeCompare(b.userId));
 }
 
-// ---------- تصدير ----------
-function exportCSV() {
-  if (!lastTable || !lastTable.rows.length) return;
-  const q = (v) => `"${String(v ?? '').replace(/"/g,'""')}"`;
-  const csv = '﻿' + [lastTable.headers, ...lastTable.rows].map(r => r.map(q).join(',')).join('\r\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = `تقرير_${currentTab}_${$('from').value}_${$('to').value}.csv`;
-  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-function saveBackup() {
-  if (!DATA) return;
-  const clean = { info: DATA.info, users: DATA.users, logs: DATA.logs.map(l => ({ userId: l.userId, time: l.time })) };
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(clean)], { type: 'application/json' }));
-  a.download = `نسخة_البصمة_${dateKey(new Date())}.json`; a.click();
-}
-
 // ---------- أوامر الجهاز ----------
 const CONFIRM = {
   disable: 'راح يتوقف الجهاز عن استقبال البصمات لحد ما تضغط "إعادة تفعيل البصمة". متأكد؟',
@@ -1701,26 +1679,6 @@ async function saveEdit() {
 
 // ---------- استيراد وتصدير بيانات الموظفين ----------
 const PHONE_FIELDS = ['mobile', 'officePhone', 'homePhone', 'nationalId'];
-function exportProfiles() {
-  if (!DATA) return setTabStatus('اسحب البيانات من الجهاز أولاً', 'err');
-  const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  // ="..." يخلي Excel يحافظ على الصفر بأول رقم الهاتف
-  const keep0 = (v) => v ? `="${String(v).replace(/"/g, '')}"` : '';
-  const head = ['رقم الموظف', 'الاسم بالجهاز', ...PF.map(k => PF_LABELS[k])];
-  const lines = [head.map(q).join(',')];
-  for (const u of employeeList()) {
-    const p = prof(u.userId);
-    const e = effProf(p);
-    const val = (k) => k === 'attendance' || k === 'schedMode' ? e[k] : k === 'offDays' ? (e.schedMode === MODE_CUSTOM ? (parseOff(e.offDays).length ? offText(parseOff(e.offDays)) : NO_OFF) : '')
-      : k === 'workStart' || k === 'workEnd' ? (e[k] || '')
-      : k === 'dayTimes' ? (e.schedMode === MODE_CUSTOM ? dayTimesText(parseDayTimes(e.dayTimes)).replace(/ و/g, '، ') : '')
-      : k === 'exemptIn' || k === 'exemptOut' ? (e.schedMode === MODE_CUSTOM && e[k] ? offText(parseOff(e[k])).replace(/ و/g, '، ') : '') : p[k];
-    lines.push([q(u.userId), q(u.onDevice ? u.name : ''), ...PF.map(k => PHONE_FIELDS.includes(k) ? keep0(p[k]) : q(val(k)))].join(','));
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
-  a.download = 'بيانات_الموظفين.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
 function parseCSV(text) {
   text = text.replace(/^﻿/, '');
   const first = text.split(/\r?\n/, 1)[0];
@@ -1791,27 +1749,6 @@ async function readTextFile(file) {
   const buf = await file.arrayBuffer();
   try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (_) { return new TextDecoder('windows-1256').decode(buf); }
 }
-async function importCSVFile(file) {
-  const rows = parseCSV(await readTextFile(file));
-  if (rows.length < 2) throw new Error('الملف فارغ أو ما بيه غير العناوين');
-  const norm = (h) => h.replace(/^﻿/, '').trim().toLowerCase().replace(/\s+/g, ' ');
-  const cols = {};
-  rows[0].forEach((h, i) => { for (const [k, al] of Object.entries(HEADER_ALIASES)) if (cols[k] == null && al.includes(norm(h))) cols[k] = i; });
-  if (cols.userId == null) throw new Error('ما لقيت عمود "رقم الموظف" بالملف. صدّر الملف من زر "تصدير قابل للتعديل" وعدّل عليه');
-  const incoming = {};
-  for (const r of rows.slice(1)) {
-    const id = normValue('userId', r[cols.userId] || '');
-    if (!id) continue;
-    const p = {};
-    for (const k of PF) if (cols[k] != null) { const v = normValue(k, r[cols[k]] || ''); if (v) p[k] = v; }
-    incoming[id] = p;
-  }
-  const n = Object.keys(incoming).length;
-  if (!n) throw new Error('ما لقيت موظفين بالملف');
-  const found = PF.filter(k => cols[k] != null).map(k => PF_LABELS[k]).join('، ');
-  if (!confirm(`لقيت ${n} موظف بالملف، والأعمدة: ${found}.\nالقيم اللي بالملف راح تنكتب فوق القديمة (الخانات الفارغة بالملف ما تمسح شي).\nتكمل؟`)) return setTabStatus('تم إلغاء الاستيراد');
-  return finishImport(incoming, 'merge');
-}
 async function finishImport(incoming, mode) {
   const j = await postJSON('/api/profiles/import', { profiles: incoming, mode });
   PROFILES = j.profiles || {};
@@ -1819,22 +1756,6 @@ async function finishImport(incoming, mode) {
   setTabStatus(`تم الاستيراد: ${j.added} موظف جديد، ${j.updated} تحدثت بياناتهم، ${j.unchanged} بدون تغيير` +
     (j.schedErrors ? ` · ${j.schedErrors} موظف دوامه بالملف غلط (أوقات أو أيام)، فبقى دوامه القديم` : ''), j.schedErrors ? 'err' : 'okc');
 }
-async function importMdbFile(file) {
-  setTabStatus(`جارِ قراءة ${file.name} (${(file.size / 1048576).toFixed(1)} ميگا)...`);
-  const r = await fetch('/api/import-mdb', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.error || 'خطأ');
-  if (!j.count) throw new Error('ما لقيت موظفين بالملف');
-  const ps = Object.values(j.profiles);
-  const phones = ps.filter(p => p.mobile || p.officePhone || p.homePhone).length, depts = ps.filter(p => p.department).length;
-  if (!confirm(`لقيت ${j.count} موظف ببرنامج ZKTeco القديم (${phones} عندهم رقم هاتف، ${depts} عندهم قسم).\nبياناتهم راح تنضاف. اللي كتبته أنت بالبرنامج ما يتغير، بس الخانات الفارغة تنملي.\nتكمل؟`)) return setTabStatus('تم إلغاء الاستيراد');
-  return finishImport(j.profiles, 'fill');
-}
-$('profExportBtn').onclick = exportProfiles;
-$('profImportBtn').onclick = () => $('profFile').click();
-$('mdbImportBtn').onclick = () => $('mdbFile').click();
-$('profFile').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { await importCSVFile(f); } catch (x) { setTabStatus(x.message, 'err'); } };
-$('mdbFile').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { await importMdbFile(f); } catch (x) { setTabStatus(x.message, 'err'); } };
 $('tableArea').addEventListener('click', (e) => { const b = e.target.closest('[data-edit]'); if (b) { e.preventDefault(); openEdit(b.dataset.edit); } });
 $('editName').addEventListener('input', updateBytes);
 $('editEnc').addEventListener('change', updateBytes);
@@ -2416,7 +2337,6 @@ $('lvHourAbs').onchange = () => { try { localStorage.setItem('zkHourAbs', $('lvH
 
 // ---------- الأحداث ----------
 $('fetchBtn').onclick = fetchData;
-$('csvBtn').onclick = exportCSV;
 // ---------- الطباعة و PDF ----------
 // قبل الطباعة: اسم التقرير يصير اسم الملف ووقت الطباعة تحته، الحقول الفارغة كلها تنشال،
 // والجدول ينقسم على صفحات A4 بالعرض وكل صفحة تبدي بأسماء الحقول. بعد الطباعة يرجع مثل ما چان.
@@ -2481,14 +2401,181 @@ function afterPrint() {
 window.addEventListener('beforeprint', beforePrint); window.addEventListener('afterprint', afterPrint);
 // بالآيفون التطبيق يرجّعه بعد ما تخلص الطباعة أو تحفظ الـ PDF
 $('printBtn').onclick = () => { beforePrint(); window.print(); };
-$('saveFileBtn').onclick = saveBackup;
-$('loadFileBtn').onclick = () => $('fileInput').click();
-$('fileInput').onchange = async (e) => {
-  const f = e.target.files[0]; if (!f) return;
-  try { setData(JSON.parse(await f.text())); setStatus('تم فتح النسخة المحفوظة: ' + f.name, 'okc'); }
-  catch (_) { setStatus('الملف غير صالح', 'err'); }
-  e.target.value = '';
-};
+// ---------- ملف Excel الشامل: كل التقارير والبيانات، وهو نفسه النسخة الاحتياطية ----------
+// أوراق التقارير للقراءة بس. الأوراق اللي ترجع بالاستيراد (وتتعدل بالإكسل):
+const BOOK = { info: 'معلومات', emps: 'الموظفين', gen: 'النظام العام', hol: 'العطل الرسمية', manual: 'البصمات اليدوية',
+  leaves: 'الإجازات', devUsers: 'موظفي الجهاز', logs: 'البصمات' };
+const bookStr = (v) => v == null ? '' : String(v);
+// خلية تاريخ أو وقت رجعت من الإكسل (ممكن تصير رقم إذا انعدلت)
+function cellDate(v) {
+  v = bookStr(v).trim(); if (!v) return '';
+  if (/^\d{5}(\.\d+)?$/.test(v)) { const d = new Date(Math.round((parseFloat(v) - 25569) * 86400000)); return d.toISOString().slice(0, 10); }
+  return normDate(v);
+}
+function cellTime(v) {
+  v = bookStr(v).trim(); if (!v) return '';
+  if (/^\d*\.\d+$/.test(v) && parseFloat(v) < 1) return normTime(v.startsWith('.') ? '0' + v : v);
+  return normTime(v);
+}
+function bookDateTime(v) { // "2026-10-04 08:05" أو رقم إكسل
+  v = bookStr(v).trim();
+  if (/^\d{5}\.\d+$/.test(v)) { const ms = Math.round((parseFloat(v) - 25569) * 86400000); return new Date(ms).toISOString().slice(0, 16); }
+  const m = v.replace('T', ' ').match(/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})(:\d{2})?/);
+  return m ? `${m[1]}T${normTime(m[2])}${m[3] || ':00'}` : '';
+}
+function captureTab(tab, view) {
+  const keep = { tab: currentTab, view: $('lvView').value };
+  currentTab = tab; if (view) $('lvView').value = view;
+  lastTable = null; render();
+  const t = lastTable ? [lastTable.headers.map(bookStr), ...lastTable.rows.map(r => r.map(bookStr))] : null;
+  currentTab = keep.tab; $('lvView').value = keep.view; render();
+  return t;
+}
+async function buildBook() {
+  const sheets = [], g = GEN, now = new Date(), p2 = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
+  sheets.push({ name: BOOK.info, rows: [['البند', 'القيمة'], ['البرنامج', 'نظام الحضور ' + (APP_VERSION || '')], ['وقت التصدير', stamp],
+    ['الفترة', `${$('from').value} إلى ${$('to').value}`], ['طلّعه', (ME && ME.username) || ''],
+    ['ملاحظة', `أوراق التقارير للقراءة بس. الأوراق اللي ترجع بزر «استيراد النسخة الشاملة» وتگدر تعدّلها: ${[BOOK.emps, BOOK.gen, BOOK.hol, BOOK.manual, BOOK.leaves, BOOK.devUsers, BOOK.logs].join('، ')}. لا تغيّر أسماء الأوراق ولا عناوين الأعمدة.`],
+    ['معلومات الجهاز', DATA ? JSON.stringify(DATA.info || {}) : '']] });
+  // التقارير حسب الفترة والفلاتر الحالية
+  if (DATA) {
+    for (const [tab, view, name] of [['daily', null, 'التقرير اليومي'], ['summary', null, 'ملخص الموظفين'], ['leaves', 'days', 'التصفية حسب الأيام'],
+      ['leaves', 'emp', 'التصفية حسب الموظفين'], ['person', null, 'تقرير الموظف']]) {
+      if (tab === 'person' && !$('emp').value) continue;
+      const t = captureTab(tab, view); if (t && t.length > 1) sheets.push({ name, rows: t });
+    }
+  }
+  // الموظفين (قابلة للتعديل)
+  const ids = [...new Set([...(DATA ? DATA.users.map(u => u.userId) : []), ...Object.keys(PROFILES)])].sort((a, b) => (Number(a) - Number(b)) || a.localeCompare(b));
+  const emps = [['رقم الموظف', 'الاسم بالجهاز', ...PF.map(k => PF_LABELS[k])]];
+  for (const id of ids) {
+    const p = prof(id), e = effProf(p), dev = DATA && deviceUser(id);
+    const val = (k) => k === 'attendance' || k === 'schedMode' ? e[k] : k === 'offDays' ? (e.schedMode === MODE_CUSTOM ? (parseOff(e.offDays).length ? offText(parseOff(e.offDays)) : NO_OFF) : '')
+      : k === 'workStart' || k === 'workEnd' ? (e[k] || '')
+      : k === 'dayTimes' ? (e.schedMode === MODE_CUSTOM ? dayTimesText(parseDayTimes(e.dayTimes)).replace(/ و/g, '، ') : '')
+      : k === 'exemptIn' || k === 'exemptOut' ? (e.schedMode === MODE_CUSTOM && e[k] ? offText(parseOff(e[k])).replace(/ و/g, '، ') : '') : p[k];
+    emps.push([id, dev ? dev.name : '', ...PF.map(k => bookStr(val(k)))]);
+  }
+  sheets.push({ name: BOOK.emps, rows: emps });
+  const dt = parseDayTimes(g.days);
+  sheets.push({ name: BOOK.gen, rows: [['الإعداد', 'القيمة'], ['بداية الدوام', g.start], ['نهاية الدوام', g.end], ['السماحية (دقيقة)', bookStr(g.grace)],
+    ['تجاهل البصمة المكررة (دقيقة)', bookStr(g.dedup)], ['العطلة الأسبوعية', g.off.length ? offText(g.off).replace(/ و/g, '، ') : NO_OFF],
+    ['أوقات أيام خاصة', dayTimesText(dt).replace(/ و/g, '، ')], ['الزمنية الصباحية قبل', g.hourSplit || '10:00'],
+    ['البصمة خارج الوقت = عدم التزام', g.strict ? 'نعم' : 'لا']] });
+  sheets.push({ name: BOOK.hol, rows: [['التاريخ', 'اليوم', 'اسم العطلة'], ...[...HOLI].sort((a, b) => a[0].localeCompare(b[0])).map(([d, n]) => [d, DAYS[dowOf(d)], n])] });
+  let manual = [];
+  try { const r = await fetch('/api/manual'); if (r.ok) manual = (await r.json()).punches || []; } catch (_) {}
+  sheets.push({ name: BOOK.manual, rows: [['رقم الموظف', 'الاسم', 'التاريخ', 'الوقت', 'النوع', 'السبب', 'ملاحظة', 'أضافها', 'وقت الإضافة', 'المعرّف'],
+    ...manual.map(m => [m.userId, userName(m.userId), m.time.slice(0, 10), m.time.slice(11, 16), m.type === 'in' ? 'دخول' : 'خروج', m.reason, m.note || '', m.by, (m.created || '').replace('T', ' ').slice(0, 16), m.id])] });
+  sheets.push({ name: BOOK.leaves, rows: [['رقم البصمة', 'الاسم', 'القسم', 'النوع', 'من', 'إلى', 'من ساعة إلى ساعة', 'الساعات', 'الأيام', 'الحالة'],
+    ...LEAVES.map(l => [l.userId, l.name || '', l.dept || '', l.type || (l.kind === 'hour' ? 'إجازة زمنية' : 'إجازة'), l.from, l.to, l.kind === 'hour' ? (l.start || '') : '',
+      l.kind === 'hour' ? fmtDur(l.minutes || 0) : '', l.kind === 'hour' ? '' : bookStr(l.days || ''), l.statusText || LV_STATUS[l.status] || ''])] });
+  if (DATA) {
+    sheets.push({ name: BOOK.devUsers, rows: [['الرقم', 'الاسم', 'الصلاحية', 'رقم البطاقة', 'uid'], ...DATA.users.map(u => [u.userId, u.name || '', bookStr(u.role ?? ''), bookStr(u.cardno || ''), bookStr(u.uid ?? '')])] });
+    sheets.push({ name: BOOK.logs, rows: [['رقم الموظف', 'الوقت'], ...DATA.logs.map(l => [l.userId, l.time.replace('T', ' ')])] });
+  }
+  return { sheets, stamp };
+}
+async function exportBook() {
+  const btn = $('bookExportBtn'); btn.disabled = true; setStatus('دا يتجهّز ملف Excel...');
+  try {
+    const { sheets, stamp } = await buildBook();
+    const name = `الحضور_${stamp.replace(' ', '_').replace(':', '-')}.xlsx`;
+    const r = await fetch('/api/xlsx/write', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, sheets }) });
+    if (!r.ok) { let m = 'خطأ'; try { m = (await r.json()).error || m; } catch (_) {} throw new Error(m); }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    setStatus(`انصدّر ملف Excel (${sheets.length} ورقة)`, 'okc');
+  } catch (e) { setStatus('ما گدرت أصدّر: ' + e.message, 'err'); }
+  btn.disabled = false;
+}
+// صفوف ورقة الموظفين ← بيانات الموظفين (نفس قواعد الاستيراد: الخانة الفارغة ما تمسح شي)
+function profilesFromRows(rows) {
+  const norm = (h) => bookStr(h).replace(/^﻿/, '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const cols = {};
+  (rows[0] || []).forEach((h, i) => { for (const [k, al] of Object.entries(HEADER_ALIASES)) if (cols[k] == null && al.includes(norm(h))) cols[k] = i; });
+  if (cols.userId == null) throw new Error(`ورقة «${BOOK.emps}» ما بيها عمود «رقم الموظف»`);
+  const out = {};
+  for (const r of rows.slice(1)) {
+    const id = normValue('userId', bookStr(r[cols.userId]));
+    if (!id) continue;
+    const p = {};
+    for (const k of PF) if (cols[k] != null) {
+      let v = bookStr(r[cols[k]]);
+      if (k === 'workStart' || k === 'workEnd') v = cellTime(v); else if (k === 'birthday' || k === 'hireDate') v = cellDate(v);
+      v = normValue(k, v); if (v) p[k] = v;
+    }
+    out[id] = p;
+  }
+  return out;
+}
+function genFromRows(rows) {
+  const kv = new Map(rows.slice(1).map(r => [bookStr(r[0]).trim(), bookStr(r[1]).trim()]));
+  const get = (k) => kv.get(k) || '';
+  const offTxt = get('العطلة الأسبوعية');
+  const off = !offTxt || offTxt === NO_OFF ? [] : offTxt.split(/[،,]\s*|\s+و/).map(x => DAYS.findIndex(d => d.replace(/^ال/, '') === x.trim().replace(/^و?ال/, ''))).filter(d => d >= 0);
+  const days = {};
+  for (const it of get('أوقات أيام خاصة').split(/[،,]/)) {
+    const m = it.trim().match(/^(\S+)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/); if (!m) continue;
+    const d = DAYS.findIndex(x => x.replace(/^ال/, '') === m[1].replace(/^ال/, '')); if (d >= 0) days[d] = { start: normTime(m[2]), end: normTime(m[3]) };
+  }
+  return { start: cellTime(get('بداية الدوام')), end: cellTime(get('نهاية الدوام')), grace: +get('السماحية (دقيقة)') || 0, dedup: +get('تجاهل البصمة المكررة (دقيقة)') || 0,
+    off: [...new Set(off)].sort(), days, hourSplit: cellTime(get('الزمنية الصباحية قبل')) || '10:00', strict: get('البصمة خارج الوقت = عدم التزام') === 'نعم' };
+}
+const toCSV = (rows) => '﻿' + rows.map(r => r.map(v => `"${bookStr(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+async function importBook(file) {
+  setStatus(`دا ينقرا ${file.name}...`);
+  const r = await fetch('/api/xlsx/read', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+  const j = await r.json(); if (!r.ok) throw new Error(j.error || 'خطأ');
+  const sh = new Map(j.sheets.map(s => [s.name, s.rows || []]));
+  if (!sh.has(BOOK.info) || ![BOOK.emps, BOOK.gen, BOOK.logs].some(n => sh.has(n))) throw new Error('هذا مو ملف Excel الشامل اللي يطلّعه البرنامج (زر «تصدير Excel شامل»)');
+  const rowsOf = (n) => (sh.get(n) || []).filter(r => r.some(v => bookStr(v).trim()));
+  const plan = [], skip = [];
+  const want = (name, role, what) => { if (!sh.has(name)) return false; if (!can(role)) { skip.push(`${what} (تحتاج صلاحية أعلى)`); return false; } plan.push(what); return true; };
+  const doLogs = sh.has(BOOK.logs) && (plan.push('البصمات وموظفي الجهاز (للعرض بالتقارير)'), true);
+  const doEmps = want(BOOK.emps, 'supervisor', 'بيانات الموظفين ودوامهم');
+  const doGen = want(BOOK.gen, 'super', 'النظام العام');
+  const doHol = want(BOOK.hol, 'super', 'العطل الرسمية');
+  const doMan = want(BOOK.manual, 'super', 'البصمات اليدوية');
+  const doLv = want(BOOK.leaves, 'admin', 'الإجازات');
+  if (!plan.length) throw new Error('ما أكو شي تگدر تستورده بصلاحيتك: ' + skip.join('، '));
+  if (!confirm(`راح ترجع من الملف:\n• ${plan.join('\n• ')}\n\nالعطل والبصمات اليدوية والإجازات تنستبدل بالموجود بالملف، وبيانات الموظفين تنكتب فوق القديمة (الخانة الفارغة ما تمسح شي).` +
+    (skip.length ? `\n\nما راح يرجع: ${skip.join('، ')}` : '') + '\nتكمل؟')) return setStatus('تم إلغاء الاستيراد');
+  const done = [], fail = [];
+  const step = async (what, fn) => { try { const m = await fn(); done.push(m || what); } catch (e) { fail.push(`${what}: ${e.message}`); } };
+  if (doLogs) await step('البصمات', async () => {
+    const ur = rowsOf(BOOK.devUsers).slice(1), lr = rowsOf(BOOK.logs).slice(1);
+    let info = {}; try { info = JSON.parse((rowsOf(BOOK.info).find(r => r[0] === 'معلومات الجهاز') || [])[1] || '{}'); } catch (_) {}
+    const users = ur.map(r => ({ userId: normValue('userId', bookStr(r[0])), name: bookStr(r[1]), role: r[2] === '' ? 0 : +r[2] || 0, cardno: bookStr(r[3]), uid: r[4] === '' ? null : +r[4] }))
+      .filter(u => u.userId);
+    const logs = lr.map(r => ({ userId: normValue('userId', bookStr(r[0])), time: bookDateTime(r[1]) })).filter(l => l.userId && l.time);
+    if (!logs.length && !users.length) throw new Error('فارغة');
+    setData({ info, users, logs }); return `${logs.length} بصمة`;
+  });
+  if (doEmps) await step('الموظفين', async () => { const inc = profilesFromRows(rowsOf(BOOK.emps)); const j = await postJSON('/api/profiles/import', { profiles: inc, mode: 'merge' });
+    PROFILES = j.profiles || {}; fillDeptSelect(); if (DATA) fillEmpSelect();
+    return `الموظفين: ${j.added} جديد، ${j.updated} تحدّث` + (j.schedErrors ? `، ${j.schedErrors} دوامه غلط فبقى القديم` : ''); });
+  if (doGen) await step('النظام العام', async () => { const j = await postJSON('/api/settings/schedule', { schedule: genFromRows(rowsOf(BOOK.gen)) });
+    GEN = j.settings.schedule; GEN_META = j.settings; fillGen(GEN); return 'النظام العام'; });
+  if (doHol) await step('العطل الرسمية', async () => { const hol = rowsOf(BOOK.hol).slice(1).map(r => ({ date: cellDate(r[0]), name: bookStr(r[2]).trim() })).filter(h => h.date);
+    const j = await postJSON('/api/settings/holidays', { holidays: hol }); GEN_META = j.settings; setHolidays(j.settings.holidays); return `${hol.length} عطلة رسمية`; });
+  if (doMan) await step('البصمات اليدوية', async () => {
+    const punches = rowsOf(BOOK.manual).slice(1).map(r => ({ userId: normValue('userId', bookStr(r[0])), time: `${cellDate(r[2])}T${cellTime(r[3])}`,
+      type: bookStr(r[4]).trim() === 'خروج' ? 'out' : bookStr(r[4]).trim() === 'دخول' ? 'in' : '', reason: bookStr(r[5]).trim(), note: bookStr(r[6]).trim(),
+      by: bookStr(r[7]).trim(), created: bookStr(r[8]).trim().replace(' ', 'T'), id: bookStr(r[9]).trim() }));
+    const j = await postJSON('/api/manual/replace', { punches }); if (typeof loadManual === 'function') await loadManual(); return `${j.count} بصمة يدوية`; });
+  if (doLv) await step('الإجازات', async () => { const rows = rowsOf(BOOK.leaves);
+    if (rows.length < 2) { await postJSON('/api/leaves/clear', {}); await loadLeaves(); return 'الإجازات (فارغة)'; }
+    const r2 = await fetch('/api/leaves/import?name=' + encodeURIComponent(file.name + ' (ورقة الإجازات)'), { method: 'POST', headers: { 'Content-Type': 'text/csv' }, body: toCSV(rows) });
+    const j2 = await r2.json(); if (!r2.ok) throw new Error(j2.error || 'خطأ'); await loadLeaves(); return `${rows.length - 1} إجازة`; });
+  render();
+  setStatus((done.length ? 'رجعت من الملف: ' + done.join('، ') : '') + (fail.length ? (done.length ? ' · ' : '') + 'ما رجعت: ' + fail.join('، ') : ''), fail.length ? 'err' : 'okc');
+}
+$('bookExportBtn').onclick = exportBook;
+$('bookImportBtn').onclick = () => $('bookFile').click();
+$('bookFile').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { await importBook(f); } catch (x) { setStatus(x.message, 'err'); } };
+
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
   b.classList.add('active'); currentTab = b.dataset.tab; render();

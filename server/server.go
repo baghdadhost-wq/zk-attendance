@@ -9,7 +9,7 @@ import (
 )
 
 // Version رقم نسخة البرنامج
-const Version = "2.12.0"
+const Version = "2.13.0"
 
 //go:embed public
 var publicFS embed.FS
@@ -43,7 +43,6 @@ func NewHandler(users *UserStore) http.Handler {
 	mux.HandleFunc("/api/profiles", need(RoleViewer, handleProfiles))
 	mux.HandleFunc("/api/profiles/save", need(RoleSupervisor, handleProfileSave))
 	mux.HandleFunc("/api/profiles/import", need(RoleSupervisor, handleProfileImport))
-	mux.HandleFunc("/api/import-mdb", need(RoleSupervisor, handleImportMdb))
 	mux.HandleFunc("/api/backups", need(RoleAdmin, handleBackups))
 	mux.HandleFunc("/api/audit", need(RoleAdmin, handleAudit))
 	mux.HandleFunc("/api/leaves", need(RoleViewer, handleLeaves))
@@ -53,6 +52,10 @@ func NewHandler(users *UserStore) http.Handler {
 	// البصمات اليدوية والنظام العام للدوام = تغيير الأوقات: للصلاحية المطلقة بس
 	mux.HandleFunc("/api/manual/add", need(RoleSuper, handleManualAdd))
 	mux.HandleFunc("/api/manual/delete", need(RoleSuper, handleManualDelete))
+	mux.HandleFunc("/api/manual/replace", need(RoleSuper, handleManualReplace))
+	// ملف Excel الشامل: كل التقارير والبيانات بأوراق، وهو نفسه النسخة الاحتياطية
+	mux.HandleFunc("/api/xlsx/write", need(RoleViewer, handleBookWrite))
+	mux.HandleFunc("/api/xlsx/read", need(RoleViewer, handleBookRead))
 	mux.HandleFunc("/api/settings", need(RoleViewer, handleSettings))
 	mux.HandleFunc("/api/share", need(RoleViewer, handleShare))
 	mux.HandleFunc("/api/settings/schedule", need(RoleSuper, handleScheduleSave))

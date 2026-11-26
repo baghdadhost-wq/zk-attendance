@@ -252,3 +252,85 @@ func handleManualDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
+
+// POST /api/manual/replace {punches:[{userId,time,type,reason,note,by,created}]}
+// يستبدل كل البصمات اليدوية بالقائمة (من ملف Excel الشامل). الصلاحية المطلقة بس.
+func handleManualReplace(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, apiErr{405, "طريقة غير مسموحة"}, "")
+		return
+	}
+	var req struct {
+		Punches []manualPunch `json:"punches"`
+	}
+	if err := readJSONBody(r, 8<<20, &req); err != nil {
+		writeErr(w, err, "")
+		return
+	}
+	if len(req.Punches) > 50000 {
+		writeErr(w, badReq("البصمات اليدوية هواية"), "")
+		return
+	}
+	u, _ := userOf(r)
+	now := localISO(time.Now())
+	reasonOK := map[string]bool{}
+	for _, v := range manualReasons {
+		reasonOK[v] = true
+	}
+	seen := map[string]bool{}
+	list := make([]manualPunch, 0, len(req.Punches))
+	for i, p := range req.Punches {
+		row := fmt.Sprintf("السطر %d: ", i+2)
+		p.UserID = strings.TrimSpace(toASCIIDigits(p.UserID))
+		if !isDigits(p.UserID) || len(p.UserID) > 24 {
+			writeErr(w, badReq(row+"رقم الموظف لازم يكون أرقام"), "")
+			return
+		}
+		t, err := time.ParseInLocation("2006-01-02T15:04", strings.TrimSpace(p.Time)[:min(16, len(strings.TrimSpace(p.Time)))], time.Local)
+		if err != nil || t.Year() < 2000 || t.Year() > 2099 {
+			writeErr(w, badReq(row+"التاريخ أو الوقت غلط"), "")
+			return
+		}
+		p.Time = localISO(t)
+		if p.Type != "in" && p.Type != "out" {
+			writeErr(w, badReq(row+"النوع لازم يكون دخول أو خروج"), "")
+			return
+		}
+		p.Reason, p.Note = strings.TrimSpace(p.Reason), strings.TrimSpace(p.Note)
+		if !reasonOK[p.Reason] {
+			p.Reason = manualReasons["other"]
+		}
+		if utf8.RuneCountInString(p.Note) > 200 {
+			p.Note = string([]rune(p.Note)[:200])
+		}
+		if key := p.UserID + "|" + p.Time; seen[key] {
+			continue
+		} else {
+			seen[key] = true
+		}
+		if len(p.ID) != 16 || strings.Trim(p.ID, "0123456789abcdef") != "" {
+			b := make([]byte, 8)
+			rand.Read(b)
+			p.ID = hex.EncodeToString(b)
+		}
+		if strings.TrimSpace(p.By) == "" {
+			p.By = u.Name
+		}
+		if strings.TrimSpace(p.Created) == "" {
+			p.Created = now
+		}
+		list = append(list, p)
+	}
+	manualMu.Lock()
+	old, err := loadManual()
+	if err == nil {
+		err = saveManual(list)
+	}
+	manualMu.Unlock()
+	audit(r, "manualReplace", map[string]any{"what": fmt.Sprintf("%d ← %d بصمة يدوية", len(list), len(old))}, err)
+	if err != nil {
+		writeErr(w, err, "")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"ok": true, "count": len(list)})
+}

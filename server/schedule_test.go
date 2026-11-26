@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestParseOffDays(t *testing.T) {
@@ -467,5 +468,29 @@ func TestTransferUnpackRejects(t *testing.T) {
 	}
 	if _, err := unpackData(mk(map[string]string{"settings.json": "{}"})); err == nil {
 		t.Error("no accounts accepted")
+	}
+}
+
+func TestBookRoundTrip(t *testing.T) {
+	in := []bookSheet{{Name: "معلومات", Rows: [][]string{{"البند", "القيمة"}, {"ملاحظة", "سطر\nثاني & <رمز>"}}},
+		{Name: "الموظفين", Rows: [][]string{{"رقم الموظف", "الهاتف"}, {"001", "07701234567"}, {"", ""}, {"5", "=1+1"}}},
+		{Name: "اسم/غلط:طويل جداً جداً جداً جداً جداً جداً", Rows: [][]string{{"x"}}}}
+	b, err := writeBook(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := readBook(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 3 || out[0].Name != "معلومات" || out[1].Name != "الموظفين" || utf8.RuneCountInString(out[2].Name) > 31 || strings.ContainsAny(out[2].Name, "/:") {
+		t.Fatalf("names: %v", []string{out[0].Name, out[1].Name, out[2].Name})
+	}
+	if out[0].Rows[1][1] != "سطر\nثاني & <رمز>" || out[1].Rows[1][0] != "001" || out[1].Rows[1][1] != "07701234567" || out[1].Rows[3][1] != "=1+1" {
+		t.Errorf("cells: %q", out[1].Rows)
+	}
+	// ورقة الإجازات أول ورقة؟ لا: readSheet (رفع الإجازات) يقرا الورقة الأولى بس
+	if rows, err := readXLSX(b); err != nil || rows[0][0].s != "البند" {
+		t.Errorf("first sheet: %v %v", rows, err)
 	}
 }

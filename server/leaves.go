@@ -252,6 +252,11 @@ func readXLSX(buf []byte) ([][]sheetCell, error) {
 	if err != nil {
 		return nil, badReq("ما لگيت ورقة بيانات داخل ملف Excel")
 	}
+	return parseSheetXML(sheetXML, sst)
+}
+
+// parseSheetXML أسطر ورقة Excel (الأسطر الفارغة تبقى حتى الترقيم يطابق الإكسل)
+func parseSheetXML(sheetXML []byte, sst []string) ([][]sheetCell, error) {
 	var ws struct {
 		Rows []xRow `xml:"sheetData>row"`
 	}

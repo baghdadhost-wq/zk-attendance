@@ -351,7 +351,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             window.scrollTo(0, document.querySelector('.tabs').getBoundingClientRect().top + window.scrollY - 20);
             await wait(5000);
             post({ done: true });
-            el('csvBtn').click();
+            el('bookExportBtn').click();
           } catch (e) { post({ error: String(e) }); }
         })(); 0;
         """

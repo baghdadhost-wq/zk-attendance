@@ -13,7 +13,7 @@ for path in sys.argv[1:]:
         'confirm dialog handled': 'متأكد' in r.get('confirm', ''),
         'disable + enable commands': 'تم إيقاف' in r.get('disable', '') and 'تم تفعيل' in r.get('enable', ''),
         'report rows': r.get('summaryRows', 0) >= 1,
-        'excel export reached the share sheet': r.get('download', {}).get('bytes', 0) > 0,
+        'excel export (one .xlsx workbook) reached the share sheet': r.get('download', {}).get('bytes', 0) > 0 and str(r.get('download', {}).get('name', '')).endswith('.xlsx'),
         'no script error': 'error' not in r,
     }
     def side(name):
