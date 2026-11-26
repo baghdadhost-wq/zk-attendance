@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 )
 
@@ -492,5 +493,45 @@ func TestBookRoundTrip(t *testing.T) {
 	// ورقة الإجازات أول ورقة؟ لا: readSheet (رفع الإجازات) يقرا الورقة الأولى بس
 	if rows, err := readXLSX(b); err != nil || rows[0][0].s != "البند" {
 		t.Errorf("first sheet: %v %v", rows, err)
+	}
+}
+
+func TestAutoOffSchedule(t *testing.T) {
+	Configure(t.TempDir(), false)
+	autoOff.Lock()
+	autoOff.cfg = &autoOffCfg{Enabled: true, IP: "127.0.0.1", Port: 1, Mode: "time", Time: "16:00", Every: 60, Delay: 5}
+	autoOff.lastDay, autoOff.events, autoOff.pending = "", nil, time.Time{}
+	autoOff.Unlock()
+	day := func(hm string) time.Time { return atClock(time.Date(2026, 11, 26, 0, 0, 0, 0, time.Local), hm) }
+	events := func() int { autoOff.Lock(); defer autoOff.Unlock(); return len(autoOff.events) }
+	autoOffTick(day("15:59"))
+	if events() != 0 {
+		t.Fatal("checked before its time")
+	}
+	autoOffTick(day("16:00"))
+	if events() != 1 {
+		t.Fatal("no check at 16:00")
+	}
+	autoOffTick(day("16:01"))
+	if events() != 1 {
+		t.Fatal("checked twice the same day")
+	}
+	autoOff.Lock()
+	autoOff.lastDay = ""
+	autoOff.Unlock()
+	autoOffTick(day("18:00")) // البرنامج انفتح بعد الوقت بساعتين: ما يكشف متأخر
+	if events() != 1 {
+		t.Fatal("late check long after the time")
+	}
+	autoOff.Lock()
+	autoOff.cfg.Mode, autoOff.cfg.Every, autoOff.lastCheck = "interval", 60, day("10:00")
+	autoOff.Unlock()
+	autoOffTick(day("10:30"))
+	if events() != 1 {
+		t.Fatal("interval fired early")
+	}
+	autoOffTick(day("11:00"))
+	if events() != 2 {
+		t.Fatal("interval did not fire after an hour")
 	}
 }

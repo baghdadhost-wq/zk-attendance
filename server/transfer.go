@@ -297,6 +297,9 @@ func applyData(files []xferFile) (string, error) {
 	setMu.Lock()
 	setCache = nil
 	setMu.Unlock()
+	autoOff.Lock()
+	autoOff.cfg, autoOff.pending = nil, time.Time{}
+	autoOff.Unlock()
 	activeMu.Lock()
 	a := activeAuth
 	activeMu.Unlock()

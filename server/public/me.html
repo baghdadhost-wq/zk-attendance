@@ -138,17 +138,17 @@ async function show(id) {
     $('printTitle').textContent = `تقرير حضور ${me.name} (رقم ${j.empId}) من ${ltr(j.from)} إلى ${ltr(j.to)}`;
     $('sched').textContent = (s.exempt ? 'غير مشمول بالبصمة. ' : '') + 'دوامك: ' +
       (me.sched === 'النظام العام' ? 'النظام العام ' + (j.general || '') : me.sched) + ` · انحفظ التقرير ${ltr(String(j.savedAt || '').replace('T', ' ').slice(0, 16))}`;
-    const cards = [['أيام الحضور', s.present], ['أيام الغياب', s.exempt ? '—' : s.absent, s.absent ? 'bad' : ''], ['مرات التأخير', s.lateCount, s.lateCount ? 'bad' : ''],
-      ['مجموع التأخير', dur(s.lateMin)], ['الخروج المبكر', dur(s.earlyMin)], ['الإضافي', dur(s.overtime), 'ok'],
+    const cards = [['أيام الحضور', s.present], ['أيام الغياب غير المبرّر', s.exempt ? '—' : s.absent, s.absent ? 'bad' : ''], ['مرات التأخير', s.lateCount, s.lateCount ? 'bad' : ''],
+      ['مجموع التأخير', dur(s.lateMin)], ['الخروج المبكر', dur(s.earlyMin)],
       ['بدون دخول', s.missingIn], ['بدون خروج', s.missingOut], ['ساعات العمل', dur(s.worked)]];
     if (j.leaves) cards.push(['مبرّر بإجازة', s.excLeave, 'ok'], ['مبرّر بزمنية', s.excHour, 'ok'], ['بانتظار الموافقة', s.pend],
-      ['غياب غير مبرّر', s.badAbsent, s.badAbsent ? 'bad' : ''], ['نقص بصمة غير مبرّر', s.badMissing, s.badMissing ? 'bad' : '']);
+      ['نقص بصمة غير مبرّر', s.badMissing, s.badMissing ? 'bad' : '']);
     $('stats').innerHTML = cards.map(([k, v, c]) => `<div class="stat ${c || ''}">${k}<b>${esc(v)}</b></div>`).join('');
     const time = (t, m) => t ? esc(t) + (m ? ` <span class="tag t-man" title="${esc(m)}">يدوية</span>` : '') : '';
     $('days').innerHTML = me.days.length ? '<table><thead><tr><th>التاريخ</th><th>اليوم</th><th>الدخول</th><th>الخروج</th><th>ساعات العمل</th><th>التأخير</th>' +
-      '<th>خروج مبكر</th><th>إضافي</th><th>الحالة</th>' + (j.leaves ? '<th>التصفية</th>' : '') + '</tr></thead><tbody>' +
+      '<th>خروج مبكر</th><th>الحالة</th>' + (j.leaves ? '<th>التصفية</th>' : '') + '</tr></thead><tbody>' +
       me.days.map(d => `<tr><td>${esc(d.day)}</td><td>${esc(d.dow)}</td><td>${time(d.in, d.inManual)}</td><td>${time(d.out, d.outManual)}</td>
-        <td>${d.worked ? dur(d.worked) : ''}</td><td>${d.late ? dur(d.late) : ''}</td><td>${d.early ? dur(d.early) : ''}</td><td>${d.overtime ? dur(d.overtime) : ''}</td>
+        <td>${d.worked ? dur(d.worked) : ''}</td><td>${d.late ? dur(d.late) : ''}</td><td>${d.early ? dur(d.early) : ''}</td>
         <td>${tag(d.status, STATUS_CLS[d.status])}</td>` +
         (j.leaves ? `<td style="white-space:normal;min-width:160px">${tag(d.result, RESULT_CLS[d.result])}${d.leave ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(d.leave)}</div>` : ''}${d.note ? `<div style="font-size:12px;color:var(--muted)">${esc(d.note)}</div>` : ''}</td>` : '') +
         '</tr>').join('') + '</tbody></table>' : '<div class="empty">ما أكو أيام بهذي الفترة</div>';

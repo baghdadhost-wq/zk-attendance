@@ -357,6 +357,33 @@
     <div id="adminStatus" style="margin-top:12px;font-size:13px"></div>
   </details>
 
+  <details class="card no-print" id="autoOffCard" data-min="super" hidden>
+    <summary>الإطفاء التلقائي لجهاز البصمة <small id="aoSum"></small></summary>
+    <div class="hint" style="margin:-4px 0 10px">البرنامج يكشف إذا جهاز البصمة مشتغل، وإذا مشتغل يرسله أمر إطفاء بعد المدة اللي تحددها. الكشف يدوي، أو بوقت معيّن كل يوم، أو كل فترة. يشتغل طول ما البرنامج مفتوح على هذا الجهاز. <b>انتبه: الجهاز المطفي يحتاج أحد يشغّله بإيده.</b></div>
+    <div class="row">
+      <label>IP جهاز البصمة <input id="aoIp" dir="ltr" placeholder="192.168.1.201" style="min-width:140px"></label>
+      <label>المنفذ <input id="aoPort" type="number" value="4370" style="min-width:80px"></label>
+      <label>كلمة سر الاتصال <input id="aoKey" type="password" inputmode="numeric" placeholder="0 = بدون" style="min-width:110px"></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="chk"><input type="checkbox" id="aoOn"> الكشف التلقائي شغّال</label>
+      <label>الكشف <select id="aoMode"><option value="time">بوقت معيّن كل يوم</option><option value="interval">كل فترة</option></select></label>
+      <label id="aoTimeL">الساعة <input type="time" id="aoTime" value="16:00"></label>
+      <label id="aoEveryL">كل <select id="aoEvery">
+        <option value="15">ربع ساعة</option><option value="30">نص ساعة</option><option value="60" selected>ساعة</option><option value="120">ساعتين</option>
+        <option value="180">3 ساعات</option><option value="240">4 ساعات</option><option value="360">6 ساعات</option><option value="720">12 ساعة</option></select></label>
+      <label>الإطفاء بعد الكشف بـ <input type="number" id="aoDelay" min="0" max="1440" value="5" style="min-width:70px;width:80px"> دقيقة</label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="aoSave" class="primary">حفظ</button>
+      <button id="aoCheck">كشف الآن</button>
+      <button id="aoCancel" class="danger" hidden>إلغاء الإطفاء المحدد</button>
+    </div>
+    <div id="aoStatus" style="margin-top:8px;font-size:13px"></div>
+    <div id="aoState" style="margin-top:6px;font-size:13px"></div>
+    <div class="tablewrap" id="aoEvents" style="margin-top:8px"></div>
+  </details>
+
   <details class="card no-print" id="manualCard" data-min="super" hidden>
     <summary>البصمات اليدوية <small>لموظف نسى يبصم أو كان بواجب</small></summary>
     <div class="hint" style="margin:-4px 0 10px">تنحفظ بالبرنامج مو بالجهاز، وتدخل بالتقارير مكتوب يمها «يدوية» ويا السبب واسم اللي ضافها، وتنسجل بسجل العمليات.</div>
@@ -1072,7 +1099,8 @@ function summaryRows(daily, recon) {
     const rc = recon ? recon.filter(x => x.userId === id) : [];
     const present = new Set(rs.filter(r => !r.noncomp).map(r => r.day)), tm = tr.filter(r => !r.noncomp);
     return { userId: id, name: userName(id), sched: schedText(id), exempt: sc.exempt, present: present.size,
-      absent: sc.exempt ? null : workingDaysFor(id).filter(d => !present.has(d)).length,
+      // أيام الغياب: الغير مبرّر بس (الغياب اللي برّرته إجازة أو زمنية ما ينحسب، واللي بانتظار الموافقة بعموده)
+      absent: sc.exempt ? null : rc.filter(x => x.absent && x.code === 'bad').length,
       lateCount: tr.filter(r => r.late).length, lateMin: rs.reduce((s,r)=>s+r.late,0),
       earlyMin: rs.reduce((s,r)=>s+r.early,0), overtime: rs.reduce((s,r)=>s+r.overtime,0),
       missingOut: tm.filter(r => r.missingOut).length, missingIn: tm.filter(r => r.missingIn).length,
@@ -1266,8 +1294,8 @@ function personReport(id, daily, recon, summ) {
     .filter(([, v]) => v);
   let html = `<div class="pinfo">${info.map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>`;
   if (!sc.exempt && sm) {
-    const st = [['أيام الحضور', sm.present], ['أيام الغياب', sm.absent ?? '—'], ['مرات التأخير', sm.lateCount], ['مجموع التأخير', fmtDur(sm.lateMin)],
-      ['مجموع الخروج المبكر', fmtDur(sm.earlyMin)], ['الإضافي', fmtDur(sm.overtime)], ['بدون دخول', sm.missingIn], ['بدون خروج', sm.missingOut],
+    const st = [['أيام الحضور', sm.present], ['أيام الغياب غير المبرّر', sm.absent ?? '—'], ['مرات التأخير', sm.lateCount], ['مجموع التأخير', fmtDur(sm.lateMin)],
+      ['مجموع الخروج المبكر', fmtDur(sm.earlyMin)], ['بدون دخول', sm.missingIn], ['بدون خروج', sm.missingOut],
       ['ساعات العمل', fmtDur(sm.worked)], ['بصمات يدوية', sm.manual]];
     html += `<div class="stats" style="margin:10px 0">${st.map(([k, v]) => `<div class="stat">${k}<b>${esc(v)}</b></div>`).join('')}</div>`;
     const g = digestOf([...rc.values()]);
@@ -1275,7 +1303,7 @@ function personReport(id, daily, recon, summ) {
     if (lines.length) html += `<table style="margin-bottom:12px"><thead><tr><th>البند</th><th>العدد</th><th>التواريخ</th></tr></thead><tbody>` +
       lines.map(([k, l]) => `<tr><td>${l}</td><td class="num">${g[k].length}</td><td style="white-space:normal">${esc(g[k].map(shortDay).join('، '))}</td></tr>`).join('') + '</tbody></table>';
   } else if (sc.exempt) html += '<div class="hint" style="margin:8px 0">غير مشمول بالبصمة: ما ينحسب عليه غياب ولا تأخير.</div>';
-  const H = ['التاريخ', 'اليوم', 'الدوام', 'الدخول', 'الخروج', 'ساعات العمل', 'التأخير', 'خروج مبكر', 'إضافي', 'الحالة', 'الإجازة / الزمنية', 'التصفية'];
+  const H = ['التاريخ', 'اليوم', 'الدوام', 'الدخول', 'الخروج', 'ساعات العمل', 'التأخير', 'خروج مبكر', 'الحالة', 'الإجازة / الزمنية', 'التصفية'];
   const rows = [], cls = [];
   for (const day of daysInRange()) {
     const r = rs.get(day), x = rc.get(day), dow = dowOf(day), dt = sc.at(dow), off = isOff(sc, day);
@@ -1289,12 +1317,12 @@ function personReport(id, daily, recon, summ) {
     else { state = 'منتظم'; c = 't-ok'; }
     const ex = [dt.exIn && !dt.exAll ? 'بدون بصمة صباحية' : '', dt.exOut && !dt.exAll ? 'بدون بصمة مسائية' : ''].filter(Boolean).join('، ');
     rows.push([day, DAYS[dow], off || sc.exempt ? '—' : `${dt.start}-${dt.end}` + (ex ? ` (${ex})` : ''), r ? hhmm(r.first) : '', r ? hhmm(r.last) : '',
-      r ? fmtDur(r.worked) : '', r ? fmtDur(r.late || null) : '', r ? fmtDur(r.early || null) : '', r ? fmtDur(r.overtime || null) : '',
+      r ? fmtDur(r.worked) : '', r ? fmtDur(r.late || null) : '', r ? fmtDur(r.early || null) : '',
       state, x ? x.leaveText : '', x ? RECON[x.code].label + (x.note ? ' — ' + x.note : '') : '']);
     cls.push([c, x ? RECON[x.code].cls : '']);
   }
-  html += table(H, rows, rows.map((r, i) => '<tr>' + r.map((v, j) => j === 9 ? `<td>${cls[i][0] ? `<span class="tag ${cls[i][0]}">${esc(v)}</span>` : esc(v)}</td>`
-    : j === 11 && v ? `<td style="white-space:normal"><span class="tag ${cls[i][1]}">${esc(v)}</span></td>` : `<td${j === 10 ? ' style="white-space:normal"' : ''}>${esc(v)}</td>`).join('') + '</tr>'));
+  html += table(H, rows, rows.map((r, i) => '<tr>' + r.map((v, j) => j === 8 ? `<td>${cls[i][0] ? `<span class="tag ${cls[i][0]}">${esc(v)}</span>` : esc(v)}</td>`
+    : j === 10 && v ? `<td style="white-space:normal"><span class="tag ${cls[i][1]}">${esc(v)}</span></td>` : `<td${j === 9 ? ' style="white-space:normal"' : ''}>${esc(v)}</td>`).join('') + '</tr>'));
   return html;
 }
 function render() {
@@ -1311,8 +1339,7 @@ function render() {
   const exemptN = summ.filter(r => r.exempt).length, oneEmp = $('emp').value;
   const s = { emp: summ.length - exemptN, days: (oneEmp ? workingDaysFor(oneEmp) : workingDays()).length,
     late: daily.filter(r => r.late).length, miss: daily.filter(r => r.tracked && (r.missingIn || r.missingOut)).length };
-  const cards = [[exemptN ? `الموظفين المشمولين (و${exemptN} غير مشمول)` : 'عدد الموظفين', s.emp],
-    [oneEmp ? 'أيام دوامه بالفترة' : 'أيام العمل بالفترة (النظام العام)', s.days], ['حالات التأخير', s.late], ['نقص بصمة (دخول أو خروج)', s.miss]];
+  const cards = [[oneEmp ? 'أيام دوامه بالفترة' : 'أيام العمل بالفترة (النظام العام)', s.days], ['حالات التأخير', s.late], ['نقص بصمة (دخول أو خروج)', s.miss]];
   if (hasLeaves()) cards.push(['غير مبرّر بعد التصفية', recon.filter(x => x.code === 'bad' || x.code === 'partial').length]);
   $('stats').innerHTML = cards.map(([k,v]) => `<div class="stat">${k}<b>${v}</b></div>`).join('');
 
@@ -1323,13 +1350,13 @@ function render() {
     currentTab === 'leaves' ? 'العرض: ' + selText('lvView') + ($('lvOnlyBad').checked ? '، غير المبرّر فقط' : '') : ''].filter(Boolean).join(' · ');
   if (currentTab === 'daily') {
     $('printTitleText').textContent = 'التقرير اليومي للحضور: ' + period;
-    const H = ['التاريخ','اليوم','الرقم','الاسم','الدخول','الخروج','ساعات العمل','التأخير','خروج مبكر','إضافي','الحالة'];
+    const H = ['التاريخ','اليوم','الرقم','الاسم','الدخول','الخروج','ساعات العمل','التأخير','خروج مبكر','الحالة'];
     const mark = (t, p) => p ? `${t} (يدوية)` : t;
     const baseSt = (r) => r.exempt ? 'غير مشمول' : r.offDay ? offLabel(r.day) + (r.count === 1 ? ' (بصمة وحدة)' : '') : r.exDay ? 'مستثنى من البصمة'
       : r.missingIn || r.missingOut ? missLabel(r) : r.late ? 'متأخر' : 'منتظم';
     const recOf = (r) => recIdx.get(r.userId + '|' + r.day);
     const rows = daily.map(r => { const x = recOf(r);
-      return [r.day, r.dow, r.userId, r.name, mark(hhmm(r.first), r.manualIn), mark(hhmm(r.last), r.manualOut), fmtDur(r.worked), fmtDur(r.late||null), fmtDur(r.early||null), fmtDur(r.overtime||null),
+      return [r.day, r.dow, r.userId, r.name, mark(hhmm(r.first), r.manualIn), mark(hhmm(r.last), r.manualOut), fmtDur(r.worked), fmtDur(r.late||null), fmtDur(r.early||null),
         baseSt(r) + (x ? ' — ' + RECON[x.code].label : '')]; });
     const quick = can('super');
     const timeCell = (t, p) => `<td class="num">${esc(t)}${p ? ` <span class="tag t-man" title="${esc(manualText(p))}">يدوية</span>` : ''}</td>`;
@@ -1344,15 +1371,15 @@ function render() {
         : (r.late ? '<span class="tag t-late">متأخر</span>' : '<span class="tag t-ok">منتظم</span>') + recTag;
       const c = rows[i];
       return `<tr>${c.slice(0,4).map(x=>`<td>${esc(x)}</td>`).join('')}${timeCell(hhmm(r.first), r.manualIn)}${timeCell(hhmm(r.last), r.manualOut)}` +
-        `${c.slice(6,10).map(x=>`<td class="num">${esc(x)}</td>`).join('')}<td>${st}</td></tr>`;
+        `${c.slice(6,9).map(x=>`<td class="num">${esc(x)}</td>`).join('')}<td>${st}</td></tr>`;
     }));
   } else if (currentTab === 'summary') {
     $('printTitleText').textContent = 'ملخص حضور الموظفين: ' + period;
-    const H = ['الرقم','الاسم','القسم','الدوام','أيام الحضور','أيام الغياب','مرات التأخير','مجموع التأخير','مجموع الخروج المبكر','مجموع الإضافي','بدون خروج','بدون دخول','مجموع ساعات العمل','بصمات يدوية'];
+    const H = ['الرقم','الاسم','القسم','الدوام','أيام الحضور','أيام الغياب غير المبرّر','مرات التأخير','مجموع التأخير','مجموع الخروج المبكر','بدون خروج','بدون دخول','مجموع ساعات العمل','بصمات يدوية'];
     const lvCols = hasLeaves();
-    if (lvCols) H.push('مبرّر بإجازة','مبرّر بزمنية','بانتظار الموافقة','غياب غير مبرّر','نقص بصمة غير مبرّر');
-    const rows = summ.map(r => [r.userId, r.name, deptOf(r.userId), r.sched, r.present, r.absent ?? '—', r.lateCount, fmtDur(r.lateMin), fmtDur(r.earlyMin), fmtDur(r.overtime), r.missingOut, r.missingIn, fmtDur(r.worked), r.manual,
-      ...(lvCols ? [r.excLeave, r.excHour, r.pend, r.badAbsent, r.badMissing] : [])]);
+    if (lvCols) H.push('مبرّر بإجازة','مبرّر بزمنية','بانتظار الموافقة','نقص بصمة غير مبرّر');
+    const rows = summ.map(r => [r.userId, r.name, deptOf(r.userId), r.sched, r.present, r.absent ?? '—', r.lateCount, fmtDur(r.lateMin), fmtDur(r.earlyMin), r.missingOut, r.missingIn, fmtDur(r.worked), r.manual,
+      ...(lvCols ? [r.excLeave, r.excHour, r.pend, r.badMissing] : [])]);
     html = table(H, rows, rows.map((r, i) => `<tr>${r.map((c,j)=> j === 3
       ? `<td>${summ[i].exempt || summ[i].sched !== 'النظام العام' ? `<span class="tag ${summ[i].exempt ? 't-off' : 't-info'}">${esc(c)}</span>` : esc(c)}</td>`
       : `<td class="${j>=4?'num':''}">${esc(c)}</td>`).join('')}</tr>`));
@@ -2196,7 +2223,7 @@ const ACTION_LABELS = {
   clearLogs: 'مسح سجل البصمات', updateUser: 'تعديل موظف بالجهاز', addUser: 'إضافة موظف للجهاز', setPrivilege: 'تغيير صلاحية موظف',
   setPin: 'تغيير رقم سري', deleteUser: 'حذف موظف من الجهاز', deleteFingers: 'حذف بصمات أصابع', clearAdmins: 'إلغاء مدراء الجهاز',
   clearOplog: 'مسح سجل عمليات الجهاز', clearAccess: 'تصفير إعدادات الأبواب', clearAllData: 'مسح كل بيانات الجهاز',
-  readOption: 'قراءة إعداد مخفي', writeOption: 'كتابة إعداد مخفي', setTime: 'ضبط وقت محدد', restoreUsers: 'استرجاع موظفين',
+  readOption: 'قراءة إعداد مخفي', writeOption: 'كتابة إعداد مخفي', setTime: 'ضبط وقت محدد', restoreUsers: 'استرجاع موظفين', autoOffSave: 'إعداد الإطفاء التلقائي', autoOffCheck: 'كشف جهاز البصمة', autoOffPowerOff: 'إطفاء تلقائي لجهاز البصمة', autoOffCancel: 'إلغاء الإطفاء التلقائي', holidaysSave: 'العطل الرسمية', manualReplace: 'استبدال البصمات اليدوية', bookExport: 'تصدير Excel شامل',
   manualAdd: 'إضافة بصمة يدوية', manualDelete: 'حذف بصمة يدوية', leavesImport: 'رفع تقرير الإجازات', leavesClear: 'مسح بيانات الإجازات', deviceSecurityCheck: 'فحص أمان الجهاز', setDeviceCommKey: 'ضبط كلمة سر اتصال الجهاز',
   scheduleSave: 'تعديل النظام العام للدوام', reportPublish: 'حفظ تقرير للموظفين', reportDelete: 'حذف تقرير محفوظ',
 };
@@ -2305,6 +2332,45 @@ $('lvClearBtn').onclick = async () => {
   catch (x) { setTabStatus(x.message, 'err'); }
 };
 $('lvOnlyBad').onchange = render;
+// ---------- الإطفاء التلقائي ----------
+let AO = null, aoTimer = null;
+const aoMsg = (t, cls) => { $('aoStatus').className = cls || ''; $('aoStatus').textContent = t; };
+const hm = (iso) => iso ? iso.slice(11, 16) : '';
+function aoSync() { const iv = $('aoMode').value === 'interval'; $('aoTimeL').hidden = iv; $('aoEveryL').hidden = !iv; }
+function aoShow(j, fill) {
+  AO = j;
+  if (fill) {
+    $('aoIp').value = j.ip || $('ip').value; $('aoPort').value = j.port || $('port').value || 4370; $('aoKey').value = '';
+    $('aoKey').placeholder = j.hasKey ? 'محفوظة (اتركها فارغة)' : '0 = بدون';
+    $('aoOn').checked = j.enabled; $('aoMode').value = j.mode || 'time'; $('aoTime').value = j.time || '16:00';
+    $('aoEvery').value = String(j.every || 60); if (!$('aoEvery').value) $('aoEvery').value = '60'; $('aoDelay').value = j.delay ?? 5; aoSync();
+  }
+  const when = j.enabled ? (j.mode === 'time' ? `كل يوم الساعة ${j.time}` : `كل ${$('aoEvery').selectedOptions[0]?.text || j.every + ' دقيقة'}`) : 'الكشف التلقائي مطفي';
+  $('aoSum').textContent = j.pending ? `— الإطفاء الساعة ${hm(j.pending)}` : j.enabled ? '— ' + when : '';
+  $('aoState').innerHTML = [j.pending ? `<b>الجهاز راح ينطفي الساعة ${hm(j.pending)}</b>` : '', when + (j.next ? ` · الكشف الجاي ${hm(j.next)}` : ''), j.checking ? 'دا يكشف...' : ''].filter(Boolean).join(' · ');
+  $('aoCancel').hidden = !j.pending;
+  $('aoEvents').innerHTML = (j.events || []).length ? '<table><thead><tr><th>الوقت</th><th>اللي صار</th></tr></thead><tbody>' +
+    j.events.map(e => `<tr><td dir="ltr" style="text-align:right">${esc(e.t.replace('T', ' ').slice(0, 16))}</td><td${e.ok ? '' : ' class="err"'}>${esc(e.what)}</td></tr>`).join('') + '</tbody></table>' : '';
+}
+async function aoLoad(fill) { try { const r = await fetch('/api/autooff'); if (r.ok) aoShow(await r.json(), fill); } catch (_) {} }
+$('autoOffCard').addEventListener('toggle', () => {
+  if ($('autoOffCard').open) { aoLoad(true); aoTimer = setInterval(() => aoLoad(false), 15000); } else if (aoTimer) { clearInterval(aoTimer); aoTimer = null; }
+});
+$('aoMode').onchange = aoSync;
+async function aoSaveNow() {
+  const keyTyped = $('aoKey').value.trim() !== '';
+  const j = await postJSON('/api/autooff/save', { enabled: $('aoOn').checked, ip: $('aoIp').value.trim(), port: +$('aoPort').value || 4370,
+    key: keyTyped ? +$('aoKey').value || 0 : 0, keySet: keyTyped || !AO || !AO.hasKey, mode: $('aoMode').value, time: $('aoTime').value, every: +$('aoEvery').value, delay: +$('aoDelay').value });
+  aoShow(j, true); return j;
+}
+$('aoSave').onclick = async () => { try { await aoSaveNow(); aoMsg('انحفظ ✓', 'ok'); } catch (e) { aoMsg(e.message, 'err'); } };
+$('aoCheck').onclick = async () => {
+  if (!confirm('راح يكشف الجهاز هسه، وإذا مشتغل ينطفي بعد ' + $('aoDelay').value + ' دقيقة. تكمل؟')) return;
+  $('aoCheck').disabled = true; aoMsg('دا يكشف...');
+  try { await aoSaveNow(); const j = await postJSON('/api/autooff/check', {}); aoShow(j, false); aoMsg(j.message, 'ok'); } catch (e) { aoMsg(e.message, 'err'); }
+  $('aoCheck').disabled = false;
+};
+$('aoCancel').onclick = async () => { try { aoShow(await postJSON('/api/autooff/cancel', {}), false); aoMsg('انلغى الإطفاء', 'ok'); } catch (e) { aoMsg(e.message, 'err'); } };
 // ---------- العطل الرسمية ----------
 function setHolidays(list) {
   HOLI = new Map((list || []).map(h => [h.date, h.name || ''])); RANGE_CACHE = null;

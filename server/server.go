@@ -9,7 +9,7 @@ import (
 )
 
 // Version رقم نسخة البرنامج
-const Version = "2.13.0"
+const Version = "2.14.0"
 
 //go:embed public
 var publicFS embed.FS
@@ -53,6 +53,12 @@ func NewHandler(users *UserStore) http.Handler {
 	mux.HandleFunc("/api/manual/add", need(RoleSuper, handleManualAdd))
 	mux.HandleFunc("/api/manual/delete", need(RoleSuper, handleManualDelete))
 	mux.HandleFunc("/api/manual/replace", need(RoleSuper, handleManualReplace))
+	// الإطفاء التلقائي لجهاز البصمة (الصلاحية المطلقة)
+	mux.HandleFunc("/api/autooff", need(RoleSuper, handleAutoOff))
+	mux.HandleFunc("/api/autooff/save", need(RoleSuper, handleAutoOffSave))
+	mux.HandleFunc("/api/autooff/check", need(RoleSuper, handleAutoOffCheck))
+	mux.HandleFunc("/api/autooff/cancel", need(RoleSuper, handleAutoOffCancel))
+	startAutoOff()
 	// ملف Excel الشامل: كل التقارير والبيانات بأوراق، وهو نفسه النسخة الاحتياطية
 	mux.HandleFunc("/api/xlsx/write", need(RoleViewer, handleBookWrite))
 	mux.HandleFunc("/api/xlsx/read", need(RoleViewer, handleBookRead))
