@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -498,40 +499,66 @@ func TestBookRoundTrip(t *testing.T) {
 
 func TestAutoOffSchedule(t *testing.T) {
 	Configure(t.TempDir(), false)
-	autoOff.Lock()
-	autoOff.cfg = &autoOffCfg{Enabled: true, IP: "127.0.0.1", Port: 1, Mode: "time", Time: "16:00", Every: 60, Delay: 5}
-	autoOff.lastDay, autoOff.events, autoOff.pending = "", nil, time.Time{}
-	autoOff.Unlock()
 	day := func(hm string) time.Time { return atClock(time.Date(2026, 11, 26, 0, 0, 0, 0, time.Local), hm) }
-	events := func() int { autoOff.Lock(); defer autoOff.Unlock(); return len(autoOff.events) }
+	reset := func(rules ...autoOffRule) {
+		autoOff.Lock()
+		autoOff.cfg = &autoOffCfg{Enabled: true, IP: "127.0.0.1", Port: 1, Delay: 5, Rules: rules}
+		autoOff.lastDay, autoOff.lastRun, autoOff.events, autoOff.pending = nil, nil, nil, time.Time{}
+		autoOff.started0 = day("10:00")
+		autoOff.Unlock()
+	}
+	events := func() []string {
+		autoOff.Lock()
+		defer autoOff.Unlock()
+		var out []string
+		for _, e := range autoOff.events {
+			out = append(out, e.What)
+		}
+		return out
+	}
+	// كشف كل يوم الساعة 16:00
+	reset(autoOffRule{On: true, Action: "check", When: "time", Time: "16:00"})
 	autoOffTick(day("15:59"))
-	if events() != 0 {
+	if len(events()) != 0 {
 		t.Fatal("checked before its time")
 	}
 	autoOffTick(day("16:00"))
-	if events() != 1 {
-		t.Fatal("no check at 16:00")
-	}
 	autoOffTick(day("16:01"))
-	if events() != 1 {
-		t.Fatal("checked twice the same day")
+	if len(events()) != 1 || !strings.Contains(events()[0], "الكشف") && !strings.Contains(events()[0], "كشف") {
+		t.Fatalf("one check at 16:00: %v", events())
 	}
-	autoOff.Lock()
-	autoOff.lastDay = ""
-	autoOff.Unlock()
-	autoOffTick(day("18:00")) // البرنامج انفتح بعد الوقت بساعتين: ما يكشف متأخر
-	if events() != 1 {
+	// البرنامج انفتح بعد الوقت بساعتين: ما يكشف متأخر
+	reset(autoOffRule{On: true, Action: "check", When: "time", Time: "16:00"})
+	autoOffTick(day("18:00"))
+	if len(events()) != 0 {
 		t.Fatal("late check long after the time")
 	}
-	autoOff.Lock()
-	autoOff.cfg.Mode, autoOff.cfg.Every, autoOff.lastCheck = "interval", 60, day("10:00")
-	autoOff.Unlock()
+	// أكثر من طريقة سوه: كشف كل ساعة + إطفاء مباشر الساعة 11:00، والمطفية ما تشتغل
+	reset(autoOffRule{On: true, Action: "check", When: "interval", Every: 60},
+		autoOffRule{On: true, Action: "off", When: "time", Time: "11:00"},
+		autoOffRule{On: false, Action: "off", When: "time", Time: "10:30"})
 	autoOffTick(day("10:30"))
-	if events() != 1 {
-		t.Fatal("interval fired early")
+	if len(events()) != 0 {
+		t.Fatalf("fired early or disabled rule ran: %v", events())
 	}
-	autoOffTick(day("11:00"))
-	if events() != 2 {
-		t.Fatal("interval did not fire after an hour")
+	autoOffTick(day("11:00")) // الثنتين بنفس الوقت: الإطفاء المباشر بس
+	if ev := events(); len(ev) != 1 || !strings.Contains(ev[0], "إطفاء مباشر") {
+		t.Fatalf("direct off at 11:00 only: %v", ev)
+	}
+	autoOffTick(day("12:00"))
+	if ev := events(); len(ev) != 2 || !strings.Contains(ev[0], "كل ساعة") {
+		t.Fatalf("hourly check at 12:00: %v", ev)
+	}
+	// النسخة السابقة (طريقة وحدة) تتحول لطريقة بالقائمة
+	autoOff.Lock()
+	autoOff.cfg = nil
+	autoOff.Unlock()
+	os.MkdirAll(filepath.Dir(autoOffFile()), 0o700)
+	os.WriteFile(autoOffFile(), []byte(`{"enabled":true,"ip":"1.2.3.4","port":4370,"mode":"interval","time":"16:00","every":120,"delay":3}`), 0o600)
+	autoOff.Lock()
+	c := autoOffCfgLocked()
+	autoOff.Unlock()
+	if len(c.Rules) != 1 || c.Rules[0] != (autoOffRule{On: true, Action: "check", When: "interval", Time: "16:00", Every: 120}) {
+		t.Errorf("migrated: %+v", c.Rules)
 	}
 }
